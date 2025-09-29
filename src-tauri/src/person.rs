@@ -1,3 +1,6 @@
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+
 enum Gender {
     Unknown,    // Stands for null value.
     Male,
@@ -34,7 +37,7 @@ pub struct Player<'a> {
     position: &'a Position,
 }
 
-fn build_player(forename: String, surname: String, ability: u8, position: &Position) -> Player {
+pub fn build_player(forename: String, surname: String, ability: u8, position: &Position) -> Player<'_> {
     Player {
         person: build_person(forename, surname, Gender::Male),
         ability: ability,
@@ -42,8 +45,9 @@ fn build_player(forename: String, surname: String, ability: u8, position: &Posit
     }
 }
 
-enum PositionId {
-    Unknown,    // Basically a null value.
+#[derive(PartialEq, Eq, Hash)]
+pub enum PositionId {
+    Unknown,    // Stands for null value.
     Goalkeeper,
     Defender,
     LeftWinger,
@@ -51,12 +55,29 @@ enum PositionId {
     RightWinger,
 }
 
-struct Position {
+pub struct Position {
     id: PositionId,
 }
 
-fn build_position(id: PositionId) -> Position {
-    Position {
-        id: id,
-    }
+lazy_static! {
+    pub static ref POSITIONS: HashMap<PositionId, Position> = {
+         let p = HashMap::from([
+            (PositionId::Goalkeeper, Position {
+                id: PositionId::Goalkeeper
+            }),
+            (PositionId::Defender, Position {
+                id: PositionId::Defender,
+            }),
+            (PositionId::LeftWinger, Position {
+                id: PositionId::LeftWinger,
+            }),
+            (PositionId::Centre, Position {
+                id: PositionId::Centre,
+            }),
+            (PositionId::RightWinger, Position {
+                id: PositionId::RightWinger,
+            }),
+        ]);
+        p
+    };
 }

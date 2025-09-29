@@ -113,6 +113,14 @@ impl Game<'_> {
         self.home.reset();
         self.away.reset();
     }
+
+    // Test stuffs.
+
+    fn generate_players(&mut self) {
+        // Generate players for both teams.
+        self.home.team.generate_roster(0, 0);
+        self.away.team.generate_roster(0, 0);
+    }
 }
 
 struct TeamData<'a> {
@@ -154,6 +162,10 @@ impl TeamData<'_> {
         self.shots = Vec::new();
         self.players_on_ice = Vec::new();
         self.penalties = Vec::new();
+    }
+
+    fn build_lineup(&self) {
+        // Build a lineup for the team.
     }
 }
 
