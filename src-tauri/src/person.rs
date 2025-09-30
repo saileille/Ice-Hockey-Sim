@@ -1,8 +1,9 @@
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
+#[derive(Default)]
 enum Gender {
-    Unknown,    // Stands for null value.
+    #[default] Unknown,
     Male,
     Female,
 }
@@ -11,6 +12,16 @@ struct Person {
     forename: String,
     surname: String,
     gender: Gender,
+}
+
+impl Default for Person {
+    fn default() -> Self {
+        Person {
+            forename: String::from(""),
+            surname: String::from(""),
+            gender: Gender::default(),
+        }
+    }
 }
 
 fn build_person(forename: String, surname: String, gender: Gender) -> Person {
@@ -22,6 +33,11 @@ fn build_person(forename: String, surname: String, gender: Gender) -> Person {
 }
 
 impl Person {
+    fn new() -> Self {
+        Default::default()
+    }
+
+
     fn get_full_name(&self) -> String {
         format!("{} {}", self.forename, self.surname)
     }
@@ -33,8 +49,18 @@ impl Person {
 
 pub struct Player<'a> {
     person: Person,
-    ability: u8,
-    position: &'a Position,
+    pub ability: u8,
+    pub position: &'a Position,
+}
+
+impl Default for Player<'_> {
+    fn default() -> Self {
+        Player {
+            person: Person::default(),
+            ability: 0,
+            position: POSITIONS.get(&PositionId::Unknown).unwrap(),
+        }
+    }
 }
 
 pub fn build_player(forename: String, surname: String, ability: u8, position: &Position) -> Player<'_> {
@@ -45,9 +71,16 @@ pub fn build_player(forename: String, surname: String, ability: u8, position: &P
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+impl Player<'_> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+#[derive(PartialEq, Eq, Hash)]  // Cannot be used as a HashMap key otherwise.
+#[derive(Default)]
 pub enum PositionId {
-    Unknown,    // Stands for null value.
+    #[default] Unknown,
     Goalkeeper,
     Defender,
     LeftWinger,
@@ -55,13 +88,23 @@ pub enum PositionId {
     RightWinger,
 }
 
+#[derive(Default)]
 pub struct Position {
-    id: PositionId,
+    pub id: PositionId,
+}
+
+impl Position {
+    fn new() -> Self {
+        Default::default()
+    }
 }
 
 lazy_static! {
     pub static ref POSITIONS: HashMap<PositionId, Position> = {
          let p = HashMap::from([
+            (PositionId::Unknown, Position {
+                id: PositionId::Unknown
+            }),
             (PositionId::Goalkeeper, Position {
                 id: PositionId::Goalkeeper
             }),
