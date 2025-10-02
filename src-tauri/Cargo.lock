@@ -1557,6 +1557,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
+ "weighted_rand",
 ]
 
 [[package]]
@@ -4585,6 +4586,16 @@ dependencies = [
  "thiserror 2.0.16",
  "windows",
  "windows-core 0.61.2",
+]
+
+[[package]]
+name = "weighted_rand"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ab9b6b2a8470ef752f01ec563216a4aa4fbb2ef285f4506b241095c1ef0b16e"
+dependencies = [
+ "rand 0.8.5",
+ "serde",
 ]
 
 [[package]]
