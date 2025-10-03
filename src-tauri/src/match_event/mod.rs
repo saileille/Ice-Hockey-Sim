@@ -210,7 +210,9 @@ impl Game { // Methods for testing phase.
 #[derive(Default)]
 pub struct Rules {
     periods: u8,
-    period_length: u16
+    period_length: u16,
+    overtime_length: u16,
+    continuous_overtime: bool,
 }
 
 impl Rules {
@@ -218,11 +220,13 @@ impl Rules {
         Rules {
             periods: periods,
             period_length: period_length,
+            overtime_length: 0,
+            continuous_overtime: false,
         }
     }
 
     // Make sure the rules do not contain illegal values.
-    fn is_valid(&self) -> bool {
+    pub fn is_valid(&self) -> bool {
         self.periods != 0 && self.period_length != 0
     }
 }
