@@ -4,8 +4,8 @@ use crate::team::Team;
 
 #[tauri::command]
 pub fn test_game() -> (String, String) {
-    let mut home: Team = Team::create_and_save("Home");
-    let mut away: Team = Team::create_and_save("Away");
+    let mut home: Team = Team::build_and_save("Home");
+    let mut away: Team = Team::build_and_save("Away");
 
     home.generate_roster(0, 0);
     away.generate_roster(0, 0);
@@ -13,7 +13,7 @@ pub fn test_game() -> (String, String) {
     home.auto_build_lineup();
     away.auto_build_lineup();
     
-    let mut game: Game = Game::new(home.id, away.id);
+    let mut game: Game = Game::build(home.id, away.id, 1);
     game.play();
     
     let data: (String, String) = (game.get_name_and_score(), game.get_simple_boxscore());

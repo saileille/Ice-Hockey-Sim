@@ -1,9 +1,10 @@
+use crate::custom_types::PlayerId;
 use crate::person::player::{Player, position::PositionId};
 
 // A line-up of players used in a match.
 #[derive(Default, Clone, Debug)]
 pub struct LineUp {
-    gk_ids: [usize; 2],
+    gk_ids: [PlayerId; 2],
     pub defence_pairs: [DefencePair; 4],
     pub forward_lines: [ForwardLine; 4],
 }
@@ -120,8 +121,8 @@ impl LineUp {   // Testing functions.
 // A pair of defenders used in a line-up.
 #[derive(Default, Clone, Debug)]
 pub struct DefencePair {
-    pub ld_id: usize,
-    pub rd_id: usize,
+    pub ld_id: PlayerId,
+    pub rd_id: PlayerId,
 }
 
 impl DefencePair {  // Basics.
@@ -170,9 +171,9 @@ impl DefencePairClones {
 // A line of forwards used in a line-up.
 #[derive(Default, Clone, Debug)]
 pub struct ForwardLine {
-    pub lw_id: usize,
-    pub c_id: usize,
-    pub rw_id: usize,
+    pub lw_id: PlayerId,
+    pub c_id: PlayerId,
+    pub rw_id: PlayerId,
 }
 
 impl ForwardLine {  // Basics.

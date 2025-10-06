@@ -1,36 +1,32 @@
 // Methods for generating match schedules for Stage.
 use std::collections::{HashMap, HashSet};
-use std::cmp::Ordering;
 use std::ops::Range;
-use rand::{rng, Rng};
-use rand::rngs::ThreadRng;
+use rand::{rng, rngs::ThreadRng};
 use rand::seq::SliceRandom;
 
-use clearscreen;
-
-use crate::team::Team;
-
-use super::{Stage, TeamData};
+use crate::custom_types::TeamId;
+use crate::competition::stage::{Stage, TeamData, rules};
+use super::sorting;
 
 #[derive(Default, Clone)]
-struct TeamScheduleData {
-    team_id: usize,
-    home_matches: HashSet<usize>,   // Contains teams that the team plays against home.
-    away_matches: HashSet<usize>,   // Contains teams that the team plays against away.
+pub struct TeamScheduleData {
+    pub team_id: TeamId,
+    home_matches: HashSet<TeamId>,   // Contains teams that the team plays against home.
+    away_matches: HashSet<TeamId>,   // Contains teams that the team plays against away.
 }
 
 // Methods
 impl TeamScheduleData {
-    fn get_home_match_count(&self, prev: &Self) -> u8 {
+    pub fn get_home_match_count(&self, prev: &Self) -> u8 {
         (self.home_matches.len() + prev.home_matches.len()) as u8
     }
     
-    fn get_away_match_count(&self, prev: &Self) -> u8 {
+    pub fn get_away_match_count(&self, prev: &Self) -> u8 {
         (self.away_matches.len() + prev.away_matches.len()) as u8
     }
     
     // Add home and away matches together.
-    fn get_match_count(&self, prev: &Self) -> u8 {
+    pub fn get_match_count(&self, prev: &Self) -> u8 {
         self.get_home_match_count(prev) + self.get_away_match_count(prev)
     }
 
@@ -47,7 +43,7 @@ impl TeamScheduleData {
     }
 
     // Get a combined HashSet of home_matches and away_matches.
-    fn get_all_opponents(&self) -> HashSet<usize> {
+    fn get_all_opponents(&self) -> HashSet<TeamId> {
         // Using bitwise-or to merge the HashSets.
         &self.home_matches | &self.away_matches
     }
@@ -55,20 +51,8 @@ impl TeamScheduleData {
     // Get the difference between home and away matches.
     // Positive values indicate there are more home matches.
     // Negative values indicate there are more away matches.
-    fn get_home_away_difference(&self, prev: &Self) -> i8 {
+    pub fn get_home_away_difference(&self, prev: &Self) -> i8 {
         (self.get_home_match_count(prev) as i8) - (self.get_away_match_count(prev) as i8)
-    }
-
-    // Get the percentage of disproportion between home and away matches.
-    // Positive values indicate there are more home matches.
-    // Negative values indicate there are more away matches.
-    fn get_home_away_difference_ratio(&self, prev: &Self) -> f64 {
-        // Avoiding divide-by-zero.
-        let match_count: f64 = self.get_match_count(prev) as f64;
-        if match_count == 0.0 { return 0.0; }
-
-        let diff: f64 = self.get_home_away_difference(prev) as f64;
-        return diff / match_count;
     }
 
     // Check that the team has enough matches, and that home and away matches are balanced.
@@ -91,115 +75,6 @@ impl TeamScheduleData {
     }
 }
 
-// Compare functions and helpers.
-impl TeamScheduleData {
-    // Get the previous schedule datas for compare functions.
-    fn get_previous(a: &Self, b: &Self, prev_schedule_map: &HashMap<usize, Self>) -> (Self, Self) {
-        let prev_a: Self = match prev_schedule_map.get(&a.team_id) {
-            Some(prev) => prev.clone(),
-            None => Self::default(),
-        };
-
-        let prev_b: Self = match prev_schedule_map.get(&b.team_id) {
-            Some(prev) => prev.clone(),
-            None => Self::default(),
-        };
-
-        return (prev_a, prev_b);
-    }
-
-    // Compare the home-away difference. Team with more need for a home game comes first.
-    fn compare_home_away(a: &Self, b: &Self, prev_a: &Self, prev_b: &Self) -> Ordering {
-        let a_diff: i8 = a.get_home_away_difference(prev_a);
-        let b_diff: i8 = b.get_home_away_difference(prev_b);
-
-        return b_diff.cmp(&a_diff);
-    }
-
-    // Compare the home-away difference. Team with more need for an away game comes first.
-    fn compare_away_home(a: &Self, b: &Self, prev_a: &Self, prev_b: &Self) -> Ordering {
-        return Self::compare_home_away(a, b, prev_a, prev_b).reverse();
-    }
-
-    // Compare the absolute value of home-away difference.
-    fn compare_home_away_abs(a: &Self, b: &Self, prev_a: &Self, prev_b: &Self) -> Ordering {
-        let a_diff: i8 = a.get_home_away_difference(prev_a).abs();
-        let b_diff: i8 = b.get_home_away_difference(prev_b).abs();
-
-        return b_diff.cmp(&a_diff);
-    }
-
-    // Compare the match count.
-    fn compare_match_count(a: &Self, b: &Self, prev_a: &Self, prev_b: &Self) -> Ordering {
-        let (a_total, b_total) = (a.get_match_count(prev_a), b.get_match_count(prev_b));
-
-        return (a_total as i8).cmp(&(b_total as i8));
-    }
-
-    // Sort the schedule data with criteria randomised. Let the chaos begin!
-    fn sort_default_random(schedule_data: &mut Vec<Self>, prev_schedule_map: &HashMap<usize, Self>, rng: &mut ThreadRng) {
-        let mut sort_functions: [fn(&Self, &Self, &Self, &Self) -> Ordering; 2] = [Self::compare_home_away_abs, Self::compare_match_count];
-        sort_functions.shuffle(rng);
-
-        schedule_data.sort_by(|a: &Self, b: &Self| {
-            let (prev_a, prev_b) = Self::get_previous(a, b, prev_schedule_map);
-            return sort_functions[0](a, b, &prev_a, &prev_b)
-        });
-    }
-
-    // Sort the schedule data with criteria randomised. Let the chaos begin!
-    fn sort_home_random(schedule_data: &mut Vec<Self>, prev_schedule_map: &HashMap<usize, Self>, rng: &mut ThreadRng) {
-        let mut sort_functions: [fn(&Self, &Self, &Self, &Self) -> Ordering; 2] = [Self::compare_home_away, Self::compare_match_count];
-        sort_functions.shuffle(rng);
-
-        schedule_data.sort_by(|a: &Self, b: &Self| {
-            let (prev_a, prev_b) = Self::get_previous(a, b, prev_schedule_map);
-            return sort_functions[0](a, b, &prev_a, &prev_b)
-        });
-    }
-
-    // Sort the schedule data with criteria randomised. Let the chaos begin!
-    fn sort_away_random(schedule_data: &mut Vec<Self>, prev_schedule_map: &HashMap<usize, Self>, rng: &mut ThreadRng) {
-        let mut sort_functions: [fn(&Self, &Self, &Self, &Self) -> Ordering; 2] = [Self::compare_away_home, Self::compare_match_count];
-        sort_functions.shuffle(rng);
-
-        schedule_data.sort_by(|a: &Self, b: &Self| {
-            let (prev_a, prev_b) = Self::get_previous(a, b, prev_schedule_map);
-            return sort_functions[0](a, b, &prev_a, &prev_b)
-        });
-    }
-
-    // Sort the schedule data so that the team most needing a home/away match is at the top.
-    fn sort_default(schedule_data: &mut Vec<Self>, prev_schedule_map: &HashMap<usize, Self>) {
-        schedule_data.sort_by(|a: &Self, b: &Self| {
-            let (prev_a, prev_b) = Self::get_previous(a, b, prev_schedule_map);
-
-            return Self::compare_home_away_abs(a, b, &prev_a, &prev_b)
-                .then(Self::compare_match_count(a, b, &prev_a, &prev_b));
-        });
-    }
-
-    // Sort the schedule data so that the team most needing a home match is at the top.
-    fn sort_home(schedule_data: &mut Vec<Self>, prev_schedule_map: &HashMap<usize, Self>) {
-        schedule_data.sort_by(|a: &Self, b: &Self| {
-            let (prev_a, prev_b) = Self::get_previous(a, b, prev_schedule_map);
-
-            return Self::compare_home_away(a, b, &prev_a, &prev_b)
-                .then(Self::compare_match_count(a, b, &prev_a, &prev_b));
-        });
-    }
-
-    // Sort the schedule data so that the team most needing an away match is at the top.
-    fn sort_away(schedule_data: &mut Vec<Self>, prev_schedule_map: &HashMap<usize, Self>) {
-        schedule_data.sort_by(|a: &Self, b: &Self| {
-            let (prev_a, prev_b) = Self::get_previous(a, b, prev_schedule_map);
-
-            return Self::compare_home_away(a, b, &prev_a, &prev_b).reverse()
-                .then(Self::compare_match_count(a, b, &prev_a, &prev_b));
-        });
-    }
-}
-
 // Static
 impl TeamScheduleData {
     // Check that everyone has a valid schedule.
@@ -212,7 +87,7 @@ impl TeamScheduleData {
     }
 
     // Get a new schedule_data vector with only teams that can play away games.
-    fn filter_for_home_game(schedule_data: &Vec<Self>, prev_schedule_map: &HashMap<usize, Self>, matches: u8) -> Vec<Self> {
+    fn filter_for_home_game(schedule_data: &Vec<Self>, prev_schedule_map: &HashMap<TeamId, Self>, matches: u8) -> Vec<Self> {
         let mut filtered: Vec<Self> = Vec::new();
         for item in schedule_data {
             let prev: &TeamScheduleData = match prev_schedule_map.get(&item.team_id) {
@@ -228,7 +103,7 @@ impl TeamScheduleData {
     }
 
     // Get a new schedule_data vector with only teams that can play home games.
-    fn filter_for_away_game(schedule_data: &Vec<Self>, prev_schedule_map: &HashMap<usize, Self>, matches: u8) -> Vec<Self> {
+    fn filter_for_away_game(schedule_data: &Vec<Self>, prev_schedule_map: &HashMap<TeamId, Self>, matches: u8) -> Vec<Self> {
         let mut filtered: Vec<Self> = Vec::new();
         for item in schedule_data {
             let prev: &TeamScheduleData = match prev_schedule_map.get(&item.team_id) {
@@ -273,15 +148,15 @@ impl TeamScheduleData {
     }
 
     // Convert the vector of TeamScheduleData to hashmap. Consume the vector in the process.
-    fn vector_to_hashmap(schedule_data: Vec<Self>) -> HashMap<usize, Self> {
-        let mut map: HashMap<usize, Self> = HashMap::new();
+    fn vector_to_hashmap(schedule_data: Vec<Self>) -> HashMap<TeamId, Self> {
+        let mut map: HashMap<TeamId, Self> = HashMap::new();
         for item in schedule_data {
             map.insert(item.team_id, item);
         }
         return map;
     }
 
-    fn get_debug_info_all(schedule_data: &Vec<Self>, prev_schedule_map: &HashMap<usize, Self>) {
+    fn get_debug_info_all(schedule_data: &Vec<Self>, prev_schedule_map: &HashMap<TeamId, Self>) {
         let mut log: String = String::new();
         for team in schedule_data {
             let prev: &TeamScheduleData = match prev_schedule_map.get(&team.team_id) {
@@ -299,35 +174,9 @@ impl TeamScheduleData {
 
 // Functional
 impl Stage {
-    // Generate a match schedule for round robin stages.
-    pub fn matches_for_round_robin(&mut self) {
-        let matchups: Vec<[usize; 2]> = self.generate_round_robin_matches();
-        // let matchdays: Vec<Vec<[usize; 2]>> = Vec::new();
-        self.match_tests = matchups;
-    }
-
-    // Generate a single matchday.
-    fn generate_matchday(&self, matchups: &mut Vec<[usize; 2]>) -> Vec<[usize; 2]> {
-        let mut valid_matches: Vec<[usize; 2]> = matchups.clone();
-        let mut rng: ThreadRng = rand::rng();
-        let mut matchday: Vec<[usize; 2]> = Vec::new();
-        
-        while valid_matches.len() > 0 {
-            let index: usize = rng.random_range(Range {start: 0, end: valid_matches.len()});
-            let game: [usize; 2] = valid_matches[index].clone();
-            matchday.push(game.clone());
-            matchups.remove(index);
-
-            // Remove all matches from valid_matches where either of the teams play.
-            valid_matches.retain(|g: &[usize; 2]| !g.contains(&game[0]) && !g.contains(&game[1]));
-        }
-
-        return matchday;
-    }
-
     // Generate matches where every team plays every other home and away.
-    fn generate_full_round(&self, matchups: &mut Vec<[usize; 2]>) {
-        let team_ids: Vec<usize> = self.get_team_ids();
+    fn generate_full_round(&self, matchups: &mut Vec<[TeamId; 2]>) {
+        let team_ids: Vec<TeamId> = self.get_team_ids();
 
         for home_id in team_ids.iter() {
             for away_id in team_ids.iter() {
@@ -337,14 +186,14 @@ impl Stage {
     }
 
     // Generate matches for a round robin stage.
-    fn generate_round_robin_matches(&mut self) -> Vec<[usize; 2]> {
+    pub fn generate_round_robin_matches(&mut self) -> Vec<[TeamId; 2]> {
         // How many times should uncertain generations be attempted before giving up.
         const ATTEMPTS: u8 = u8::MAX;
 
         let matches_in_round: u8 = self.get_round_length();
         let matches_in_full_round: u8 = matches_in_round * 2;
         let mut matches: u8 = self.get_theoretical_matches_per_team();
-        let mut matchups: Vec<[usize; 2]> = Vec::new();
+        let mut matchups: Vec<[TeamId; 2]> = Vec::new();
 
         // Complete rounds.
         while matches >= matches_in_full_round {
@@ -399,20 +248,14 @@ impl Stage {
     // Generate a match schedule with arbitrary number of games.
     // Add to an existing matchups vector if successful.
     // Return the schedule data. If unsuccessful, return empty vector.
-    fn generate_irregular_matches(
-        &self, matches_per_team: u8,
-        matchups: &mut Vec<[usize; 2]>,
-        prev_schedule_map: &HashMap<usize, TeamScheduleData>,
-        attempt: u8
-    ) -> Vec<TeamScheduleData> {
-// -----------------------------------------------------------
+    fn generate_irregular_matches(&self, matches_per_team: u8, matchups: &mut Vec<[TeamId; 2]>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>) -> Vec<TeamScheduleData> {
         let mut schedule_data: Vec<TeamScheduleData> = TeamScheduleData::generate(&self.teams);
         let mut completed_schedule_data: Vec<TeamScheduleData> = Vec::new();
-        let mut created_matchups: Vec<[usize; 2]> = Vec::new();
+        let mut created_matchups: Vec<[TeamId; 2]> = Vec::new();
 
         let mut rng: ThreadRng = rng();
         while schedule_data.len() > 0 {
-            if !Self::generate_irregular_match(&mut schedule_data, prev_schedule_map, &mut rng, &mut created_matchups, &mut completed_schedule_data, matches_per_team) {
+            if !self.generate_irregular_match(&mut schedule_data, prev_schedule_map, &mut rng, &mut created_matchups, &mut completed_schedule_data, matches_per_team) {
                 return Vec::new();
             }
         }
@@ -425,24 +268,25 @@ impl Stage {
     // Generate a single irregular match.
     // Return whether successful or not.
     fn generate_irregular_match(
+        &self,
         schedule_data: &mut Vec<TeamScheduleData>,
-        prev_schedule_map: &HashMap<usize, TeamScheduleData>,
+        prev_schedule_map: &HashMap<TeamId, TeamScheduleData>,
         rng: &mut ThreadRng,
-        created_matchups: &mut Vec<[usize; 2]>,
+        created_matchups: &mut Vec<[TeamId; 2]>,
         completed_schedule_data: &mut Vec<TeamScheduleData>,
         matches_per_team: u8
     ) -> bool {
 // ---------------------------------------------------------------------
         // Randomise and sort.
         schedule_data.shuffle(rng);
-        TeamScheduleData::sort_default_random(schedule_data, prev_schedule_map, rng);
+        sorting::sort_default(&rules::RoundRobin::MATCH_GEN_TYPE, schedule_data, prev_schedule_map, rng);
         let mut temp_schedule_data: Vec<TeamScheduleData> = schedule_data.clone();
 
         let mut team1: TeamScheduleData = temp_schedule_data[0].clone();
         temp_schedule_data.remove(0);
 
         // Remove every item in temp_schedule_data that already plays against team1.
-        let blacklist: HashSet<usize> = team1.get_all_opponents();
+        let blacklist: HashSet<TeamId> = team1.get_all_opponents();
         temp_schedule_data.retain(|data: &TeamScheduleData| !blacklist.contains(&data.team_id));
 
         if temp_schedule_data.len() == 0 {
@@ -461,13 +305,13 @@ impl Stage {
             None => &TeamScheduleData::default(),
         };
 
-        let home_away_ratio: f64 = team1.get_home_away_difference_ratio(prev_team1);
+        let home_away_diff: i8 = team1.get_home_away_difference(prev_team1);
         let mut team2: TeamScheduleData;
 
         // team1 needs a home game.
-        if away_filter.len() == 0 || (home_filter.len() > 0 && home_away_ratio <= 0.0) {
+        if away_filter.len() == 0 || (home_filter.len() > 0 && home_away_diff <= 0) {
             temp_schedule_data = home_filter;
-            TeamScheduleData::sort_away_random(&mut temp_schedule_data, &prev_schedule_map, rng);
+            sorting::sort_away(&rules::RoundRobin::MATCH_GEN_TYPE, &mut temp_schedule_data, prev_schedule_map, rng);
             team2 = temp_schedule_data[0].clone();
             created_matchups.push([team1.team_id, team2.team_id]);
 
@@ -478,7 +322,7 @@ impl Stage {
         // team1 needs an away game.
         else {
             temp_schedule_data = away_filter;
-            TeamScheduleData::sort_home_random(&mut temp_schedule_data, &prev_schedule_map, rng);
+            sorting::sort_home(&rules::RoundRobin::MATCH_GEN_TYPE, &mut temp_schedule_data, prev_schedule_map, rng);
             team2 = temp_schedule_data[0].clone();
             created_matchups.push([team2.team_id, team1.team_id]);
             
@@ -503,17 +347,52 @@ impl Stage {
     // Return team schedule datas if successful. Otherwise return an empty vector.
     fn attempt_irregular_generation(
         &mut self, matches_per_team: u8,
-        matchups: &mut Vec<[usize; 2]>,
+        matchups: &mut Vec<[TeamId; 2]>,
         prev_schedule_data: Vec<TeamScheduleData>,
         attempts: u8,
     ) -> Vec<TeamScheduleData> {
-        let prev_schedule_map: HashMap<usize, TeamScheduleData> = TeamScheduleData::vector_to_hashmap(prev_schedule_data);
+        let prev_schedule_map: HashMap<TeamId, TeamScheduleData> = TeamScheduleData::vector_to_hashmap(prev_schedule_data);
+
+        let team1_sort: rules::MatchGenType = rules::RoundRobin::MATCH_GEN_TYPE.clone();
+        let team2_sort: rules::MatchGenType = rules::RoundRobin::MATCH_GEN_TYPE.clone();
+
+        let team1_sorts: Vec<rules::MatchGenType> = if team1_sort == rules::MatchGenType::Alternating {
+           Vec::from([rules::MatchGenType::Random, rules::MatchGenType::MatchCount])
+        }
+        else {
+            Vec::from([team1_sort.clone()])
+        };
+        let team2_sorts: Vec<rules::MatchGenType> = if team2_sort == rules::MatchGenType::Alternating {
+            Vec::from([rules::MatchGenType::MatchCount, rules::MatchGenType::Random])
+        }
+        else {
+            Vec::from([team2_sort.clone()])
+        };
+
+        let mut data: Vec<TeamScheduleData> = Vec::new();
         for i in (Range {start: 0, end: attempts}) {
-            let data: Vec<TeamScheduleData> = self.generate_irregular_matches(matches_per_team, matchups, &prev_schedule_map, i);
-            if data.len() > 0 { return data; }
+            // Alternate between sort_types.
+            let index: usize = i as usize;
+            let (team1_index, team2_index) = if team1_sorts.len() > 1 && team2_sorts.len() > 1 {
+                (index / team1_sorts.len() % team1_sorts.len(), index % team2_sorts.len())
+            }
+            else {
+                (index % team1_sorts.len(), index % team2_sorts.len())
+            };
+
+            // self.round_robin_rules.sort_team1 = team1_sorts[team1_index].clone();
+            // self.round_robin_rules.sort_team2 = team2_sorts[team2_index].clone();
+
+            data = self.generate_irregular_matches(matches_per_team, matchups, &prev_schedule_map);
+            if data.len() > 0 {
+                break;
+            }
             self.failures += 1;
         }
 
-        return Vec::new();
+        // Give MatchGenType::Alternating back to the round_robin_rules so it can be used next time.
+        // self.round_robin_rules.sort_team1 = team1_sort;
+        // self.round_robin_rules.sort_team2 = team2_sort;
+        return data;
     }
 }

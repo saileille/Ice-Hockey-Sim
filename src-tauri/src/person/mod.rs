@@ -1,5 +1,6 @@
 pub mod player;
 
+use crate::custom_types::CountryId;
 use crate::country::Country;
 
 #[derive(PartialEq, Default, Clone, Debug)]
@@ -14,12 +15,12 @@ pub struct Person {
     forename: String,
     surname: String,
     gender: Gender,
-    country_id: usize,
+    country_id: CountryId,
 }
 
 // Basics.
 impl Person {
-    fn new(country_id: usize, gender: Gender) -> Self {
+    fn new(country_id: CountryId, gender: Gender) -> Self {
         let mut person: Person = Person::default();
         person.country_id = country_id;
         (person.forename, person.surname) = Country::fetch_from_db(&person.country_id).generate_name();

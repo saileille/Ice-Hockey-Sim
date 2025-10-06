@@ -1,19 +1,21 @@
 pub mod position;
 
+use crate::custom_types::{CountryId, PlayerId};
+use crate::database::PLAYERS;
+
 use super::{Person, Gender};
 use self::position::{Position, PositionId};
-use crate::database::PLAYERS;
 
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct Player {
-    pub id: usize,  // id: 0 is reserved
+    pub id: PlayerId,  // id: 0 is reserved
     pub person: Person,
     pub ability: u8,
     pub position_id: PositionId,
 }
 
 impl Player {   // Basics.
-    fn new(country_id: usize, ability: u8, position_id: PositionId) -> Self {
+    fn build(country_id: CountryId, ability: u8, position_id: PositionId) -> Self {
         let mut player: Self = Self::default();
         player.person = Person::new(country_id, Gender::Male);
         player.ability = ability;
@@ -23,16 +25,16 @@ impl Player {   // Basics.
     }
 
     // Create a player and store it in the database. Return a clone of the Player.
-    pub fn create_and_save(country_id: usize, ability: u8, position_id: PositionId) -> Self {
-        let mut player: Self = Self::new(country_id, ability, position_id);
-        player.id = PLAYERS.lock().unwrap().len();
+    pub fn build_and_save(country_id: CountryId, ability: u8, position_id: PositionId) -> Self {
+        let mut player: Self = Self::build(country_id, ability, position_id);
+        player.id = PLAYERS.lock().unwrap().len() as PlayerId;
         
         player.update_to_db();
         return player;
     }
 
     // Get a player from the database.
-    pub fn fetch_from_db(id: &usize) -> Self {
+    pub fn fetch_from_db(id: &PlayerId) -> Self {
         PLAYERS.lock().unwrap().get(id).expect(&format!("no Player with id {id}")).clone()
     }
 

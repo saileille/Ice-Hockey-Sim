@@ -4,33 +4,69 @@ pub mod team;
 use self::team::TeamData;
 use self::event::Shot;
 
-use crate::event as logic_event;
+use crate::custom_types::{GameId, StageId, TeamId};
+use crate::database::GAMES;
 
-#[derive(Default)]
+use crate::event as logic_event;
+use crate::competition::stage::Stage;
+
+#[derive(Default, Clone)]
 pub struct Game {
+    pub id: GameId,
     home: TeamData,
     away: TeamData,
     gameclock: Clock,
-    rules: Rules,
+    stage_id: StageId,
     attacker: TeamData,
     defender: TeamData,
 }
 
 impl Game { // Basics.
-    pub fn new(home: usize, away: usize) -> Self {
+    pub fn build(home: TeamId, away: TeamId, stage: StageId) -> Self {
         let mut game = Game::default();
 
         game.home = TeamData::new(home);
         game.away = TeamData::new(away);
         game.gameclock = Clock::default();
-        game.rules = Rules::new(3, 1200);
+        game.stage_id = stage;
 
         return game;
+    }
+    
+    pub fn build_and_save(home: TeamId, away: TeamId, stage: StageId) -> Self {
+        let mut game: Self = Self::build(home, away, stage);
+        game.id = GAMES.lock().unwrap().len() as GameId;
+        game.update_to_db();
+        return game;
+    }
+
+    pub fn fetch_from_db(id: &GameId) -> Self {
+        GAMES.lock().unwrap().get(id)
+            .expect(&format!("no Game with id {id:#?}")).clone()
+    }
+
+    // Update the Team to database.
+    pub fn update_to_db(&self) {
+        GAMES.lock()
+            .expect(&format!("something went wrong when trying to update Game {}: {} to GAMES", self.id, self.get_name()))
+            .insert(self.id, self.clone());
+    }
+
+    // Delete the Team from the database.
+    pub fn delete_from_db(&self) {
+        GAMES.lock()
+            .expect(&format!("something went wrong when trying to delete Game {}: {} from GAMES", self.id, self.get_name()))
+            .remove(&self.id);
     }
 
     // Make sure the game does not contain illegal values.
     fn is_valid(&self) -> bool {
-        self.home.is_valid() && self.away.is_valid() && self.rules.is_valid()
+        self.home.is_valid() && self.away.is_valid() && self.get_rules().is_valid()
+    }
+
+    // Get the game rules.
+    fn get_rules(&self) -> Rules {
+        Stage::fetch_from_db(&self.stage_id).match_rules
     }
 }
 
@@ -61,7 +97,7 @@ impl Game {
 
     // Simulate a game of ice hockey.
     fn simulate(&mut self) {
-        while self.gameclock.periods_completed < self.rules.periods {
+        while self.gameclock.periods_completed < self.get_rules().periods {
             self.simulate_period();
             self.gameclock.reset_period_time();
             self.gameclock.periods_completed += 1;
@@ -74,7 +110,7 @@ impl Game {
 
     // Simulate a period of ice hockey.
     fn simulate_period(&mut self) {
-        while (self.gameclock.period_total_seconds as u16) < self.rules.period_length {
+        while (self.gameclock.period_total_seconds as u16) < self.get_rules().period_length {
             self.simulate_second();
             self.gameclock.advance();
         }
@@ -185,8 +221,8 @@ impl Game { // Methods for testing phase.
 
         events.sort_by(
             |a: &BoxscoreGoal, b: &BoxscoreGoal| 
-            a.time.get_game_total_seconds(self.rules.period_length)
-            .cmp(&b.time.get_game_total_seconds(self.rules.period_length))
+            a.time.get_game_total_seconds(self.get_rules().period_length)
+            .cmp(&b.time.get_game_total_seconds(self.get_rules().period_length))
         );
 
         let mut boxscore: String = String::new();
@@ -200,14 +236,14 @@ impl Game { // Methods for testing phase.
                 away_goal_counter += 1;
             }
 
-            boxscore += &format!("{}: {} - {} {} - {} \n", event.time.game_time_to_string(self.rules.period_length), home_goal_counter, away_goal_counter, event.team, event.score_info);
+            boxscore += &format!("{}: {} - {} {} - {} \n", event.time.game_time_to_string(self.get_rules().period_length), home_goal_counter, away_goal_counter, event.team, event.score_info);
         }
 
         return boxscore;
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Rules {
     periods: u8,
     period_length: u16,
@@ -215,13 +251,14 @@ pub struct Rules {
     continuous_overtime: bool,
 }
 
+// Basics.
 impl Rules {
-    fn new(periods: u8, period_length: u16) -> Self {
+    pub fn build(periods: u8, period_length: u16, overtime_length: u16, continous_overtime: bool) -> Self {
         Rules {
             periods: periods,
             period_length: period_length,
-            overtime_length: 0,
-            continuous_overtime: false,
+            overtime_length: overtime_length,
+            continuous_overtime: continous_overtime,
         }
     }
 
@@ -231,14 +268,23 @@ impl Rules {
     }
 }
 
+// Functional.
+impl Rules {
+    // Get the total regular time of the game in seconds.
+    fn get_regular_time(&self) -> u16 {
+        (self.periods as u16) * self.period_length
+    }
+}
+
 #[derive(Default, Clone)]
 struct Clock {
     periods_completed: u8,
     period_total_seconds: u16,
 }
 
-impl Clock {    // Basics.
-    fn new(periods_completed: u8, seconds: u16) -> Self {
+// Basics.
+impl Clock {
+    fn build(periods_completed: u8, seconds: u16) -> Self {
         Clock {
             periods_completed: periods_completed,
             period_total_seconds: seconds,
@@ -246,7 +292,32 @@ impl Clock {    // Basics.
     }
 }
 
+// Functional.
 impl Clock {
+    // Check if the game time is over.
+    fn is_game_time_over(&self, rules: &Rules) -> bool {
+        if rules.continuous_overtime ||
+        !self.is_regular_time_over(rules) { 
+            return false;
+        }
+
+
+        return true;
+    }
+
+    // Check if the regular time of the game is over.
+    fn is_regular_time_over(&self, rules: &Rules) -> bool {
+        self.periods_completed >= rules.periods
+    }
+
+    // Check if the overtime is over.
+    fn is_overtime_over(&self, rules: &Rules) -> bool {
+        if rules.continuous_overtime { return false; }
+
+        let overtime_length: i32 = (self.get_game_total_seconds(rules.period_length) as i32) - (rules.get_regular_time() as i32);
+        return overtime_length >= (rules.overtime_length as i32);
+    }
+
     fn time_to_string(seconds: u32) -> String {
         format!("{}:{:0>2}", seconds / 60, seconds % 60)
     }

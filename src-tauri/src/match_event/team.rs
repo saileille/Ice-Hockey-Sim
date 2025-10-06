@@ -1,12 +1,12 @@
 use weighted_rand::{builder::{NewBuilder, WalkerTableBuilder}, table::WalkerTable};
 
+use crate::custom_types::{TeamId, PlayerId};
 use super::event::Shot;
-
 use crate::{person::player::Player, team::{Team, lineup::{LineUp, DefencePair, ForwardLine}}};
 
 #[derive(Default, Clone)]
 pub struct TeamData {
-    pub team_id: usize,
+    pub team_id: TeamId,
     pub shots: Vec<Shot>,
     pub lineup: LineUp,
     pub players_on_ice: PlayersOnIce,
@@ -14,7 +14,7 @@ pub struct TeamData {
 }
 
 impl TeamData { // Basics.
-    pub fn new(team_id: usize) -> Self {
+    pub fn new(team_id: TeamId) -> Self {
         let mut team_data: TeamData = TeamData::default();
         team_data.team_id = team_id;
         return team_data;
@@ -84,13 +84,13 @@ impl TeamData {
 
 #[derive(Default, Clone)]
 pub struct PlayersOnIce {
-    pub gk_id: usize,
-    pub ld_id: usize,
-    pub rd_id: usize,
-    pub lw_id: usize,
-    pub c_id: usize,
-    pub rw_id: usize,
-    extra_attacker_id: usize,
+    pub gk_id: PlayerId,
+    pub ld_id: PlayerId,
+    pub rd_id: PlayerId,
+    pub lw_id: PlayerId,
+    pub c_id: PlayerId,
+    pub rw_id: PlayerId,
+    extra_attacker_id: PlayerId,
 }
 
 impl PlayersOnIce {

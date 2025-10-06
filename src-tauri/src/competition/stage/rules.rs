@@ -1,16 +1,26 @@
-#[derive(Default, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq)]
+pub enum MatchGenType {
+    #[default] Null,
+    MatchCount,
+    Random,
+    Alternating,    
+}
+
+#[derive(Default, Clone, PartialEq)]
 pub struct RoundRobin {
     pub rounds: u8, // How many times each team plays one another.
     pub extra_matches: u8,  // How many matches should be scheduled in addition to rounds.
-    points_for_win: u8,
-    points_for_draw: u8,
-    points_for_loss: u8,
-    points_for_ot_win: u8,
-    points_for_ot_loss: u8,
+    pub points_for_win: u8,
+    pub points_for_draw: u8,
+    pub points_for_loss: u8,
+    pub points_for_ot_win: u8,
+    pub points_for_ot_loss: u8,
 }
 
 // Basics
 impl RoundRobin {
+    pub const MATCH_GEN_TYPE: MatchGenType = MatchGenType::Alternating;
+
     pub fn build(rounds: u8, extra_matches: u8) -> Self {
         let mut rr: Self = Self::default();
         rr.rounds = rounds;
@@ -24,7 +34,7 @@ impl RoundRobin {
     }
 }
 
-#[derive(Default, PartialEq)]
+#[derive(Default, Clone, PartialEq)]
 pub struct Knockout {
     wins_required: u8,
 }

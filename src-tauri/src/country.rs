@@ -3,50 +3,53 @@ use std::collections::HashMap;
 use std::ops::Range;
 use rand::random_range;
 
-use crate::database;
+use crate::custom_types::CountryId;
+use crate::database::COUNTRIES;
 use crate::io::load_country_names;
 
 #[derive(Default, Clone)]
 pub struct Country {
-    pub id: usize,
+    pub id: CountryId,
     name: String,
     forenames: NamePool,
     surnames: NamePool,
 }
 
 impl Country {  // Basics.
-    fn new<S: AsRef<str>>(name: S) -> Self {
+    // Build a country element.
+    fn build<S: AsRef<str>>(name: S) -> Self {
         let mut country: Self = Self::default();
         country.name = String::from(name.as_ref());
         country.assign_names();
         return country;
     }
 
-    // Create a country and store it in the database. Return a clone of the country.
-    pub fn create_and_save<S: AsRef<str>>(name: S) -> Self {
-        let mut country: Self = Self::new(name.as_ref());
-        country.id = database::COUNTRIES.lock().unwrap().len();
+    // Build a Country element and store it in the database. Return the created element.
+    pub fn build_and_save<S: AsRef<str>>(name: S) -> Self {
+        let mut country: Self = Self::build(name.as_ref());
+        country.id = COUNTRIES.lock().unwrap().len() as CountryId;
         
         country.update_to_db();
         return country;
     }
 
     // Get a Country from the database.
-    pub fn fetch_from_db(id: &usize) -> Self {
-        database::COUNTRIES.lock().unwrap().get(id).expect(&format!("no Country with id {id}")).clone()
+    pub fn fetch_from_db(id: &CountryId) -> Self {
+        COUNTRIES.lock().unwrap().get(id).expect(&format!("no Country with id {id}")).clone()
     }
 
     // Update the Country to database.
     pub fn update_to_db(&self) {
-        database::COUNTRIES.lock()
-            .expect(&format!("something went wrong when trying to update Country {}: {} to COUNTRIES", self.id, self.name)).insert(self.id, self.clone());
+        COUNTRIES.lock()
+            .expect(&format!("something went wrong when trying to update Country {}: {} to COUNTRIES", self.id, self.name))
+            .insert(self.id, self.clone());
     }
 
     // Get a Country from the database with the given name.
     pub fn fetch_from_db_with_name<S: AsRef<str>>(name: S) -> Self {
         let name_ref: &str = name.as_ref();
 
-        for country in database::COUNTRIES.lock().unwrap().values() {
+        for country in COUNTRIES.lock().unwrap().values() {
             if country.name == name_ref {
                 return country.clone();
             }

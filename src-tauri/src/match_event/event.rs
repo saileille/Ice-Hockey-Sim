@@ -7,6 +7,7 @@ use rand::seq::IndexedRandom;
 use crate::person::player::Player;
 use crate::event;
 
+use crate::custom_types::PlayerId;
 use super::Clock;
 use super::team::PlayersOnIce;
 
@@ -31,8 +32,8 @@ impl Event {
 pub struct Shot {
     pub event: Event,
     pub is_goal: bool,
-    shooter_id: usize,
-    assister_ids: Vec<usize>,
+    shooter_id: PlayerId,
+    assister_ids: Vec<PlayerId>,
 }
 
 impl Shot { // Basics.
@@ -61,13 +62,13 @@ impl Shot {
     // Completely random way to determine who shoots and who assists.
     pub fn create_shooter_and_assisters(&mut self) {
         let players: Vec<Player> = self.event.attacking_players.get_player_clones().get_skaters_in_vector();
-        let mut shooter_and_assisters: Vec<usize> = Vec::new();
+        let mut shooter_and_assisters: Vec<PlayerId> = Vec::new();
         let mut rng: ThreadRng = rand::rng();
         for i in 0..3 {
             let chosen: &Player = players.choose(&mut rng)
                 .expect(&format!("could not choose Player. iteration: {i}, players.len(): {}", players.len()));
             
-            let id: usize = chosen.id;
+            let id: PlayerId = chosen.id;
             
             if shooter_and_assisters.contains(&id) {
                 break;

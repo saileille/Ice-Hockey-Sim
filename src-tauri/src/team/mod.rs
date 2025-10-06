@@ -1,9 +1,12 @@
 pub mod lineup;
 
+use std::collections::HashSet;
 use rand::distr::Uniform;
 use rand::Rng;
 
-use crate::database;
+use crate::custom_types::{CountryId, TeamId, PlayerId};
+use crate::database::TEAMS;
+
 use crate::country::Country;
 use crate::person::player::{Player, position::PositionId};
 
@@ -11,14 +14,14 @@ use self::lineup::LineUp;
 
 #[derive(Default, Clone, Debug)]
 pub struct Team {
-    pub id: usize,  // id: 0 is reserved
+    pub id: TeamId,  // id: 0 is reserved
     pub name: String,
-    pub roster: Vec<usize>,
+    pub roster: HashSet<PlayerId>,
     pub lineup: LineUp,
 }
 
 impl Team { // Basics.
-    fn new<S: AsRef<str>>(name: S) -> Self {
+    fn build<S: AsRef<str>>(name: S) -> Self {
         let mut team: Team = Team::default();
         team.name = String::from(name.as_ref());
 
@@ -26,28 +29,28 @@ impl Team { // Basics.
     }
 
     // Create a team and store it in the database. Return a clone of the Team.
-    pub fn create_and_save<S: AsRef<str>>(name: S) -> Self {
-        let mut team: Self = Self::new(name);
-        team.id = database::TEAMS.lock().unwrap().len();
+    pub fn build_and_save<S: AsRef<str>>(name: S) -> Self {
+        let mut team: Self = Self::build(name);
+        team.id = TEAMS.lock().unwrap().len() as TeamId;
         team.update_to_db();
         return team;
     }
 
-    pub fn fetch_from_db(id: &usize) -> Self {
-        database::TEAMS.lock().unwrap().get(id)
+    pub fn fetch_from_db(id: &TeamId) -> Self {
+        TEAMS.lock().unwrap().get(id)
             .expect(&format!("no Team with id {id:#?}")).clone()
     }
 
     // Update the Team to database.
     pub fn update_to_db(&self) {
-        database::TEAMS.lock()
+        TEAMS.lock()
             .expect(&format!("something went wrong when trying to update Team {}: {} to TEAMS", self.id, self.name))
             .insert(self.id, self.clone());
     }
 
     // Delete the Team from the database.
     pub fn delete_from_db(&self) {
-        database::TEAMS.lock()
+        TEAMS.lock()
             .expect(&format!("something went wrong when trying to delete Team {}: {} from TEAMS", self.id, self.name))
             .remove(&self.id);
     }
@@ -86,43 +89,43 @@ impl Team {
 impl Team { // Functions for the testing phase.
     // Generate a basic roster of players for the team.
     pub fn generate_roster(&mut self, min_ability: u8, max_ability: u8) {
-        self.roster = Vec::new();
+        self.roster = HashSet::new();
 
         let range: Uniform<u8> = Uniform::new_inclusive(min_ability, max_ability)
             .expect(&format!("error: low: {min_ability}, high: {max_ability}"));
         
         let mut rng: rand::prelude::ThreadRng = rand::rng();
 
-        let country_id: usize = Country::fetch_from_db_with_name("Finland").id;
+        let country_id: CountryId = Country::fetch_from_db_with_name("Finland").id;
 
         // Goalkeepers...
-        for _ in 0..1 {
-            let player: Player = Player::create_and_save(country_id, rng.sample(range), PositionId::Goalkeeper);
-            self.roster.push(player.id);
+        for _ in 0..2 {
+            let player: Player = Player::build_and_save(country_id, rng.sample(range), PositionId::Goalkeeper);
+            self.roster.insert(player.id);
         }
 
         // Defenders...
         for _ in 0..8 {
-            let player: Player = Player::create_and_save(country_id, rng.sample(range), PositionId::Defender);
-            self.roster.push(player.id);
+            let player: Player = Player::build_and_save(country_id, rng.sample(range), PositionId::Defender);
+            self.roster.insert(player.id);
         }
 
         // Left Wingers...
         for _ in 0..4 {
-            let player: Player = Player::create_and_save(country_id, rng.sample(range), PositionId::LeftWinger);
-            self.roster.push(player.id);
+            let player: Player = Player::build_and_save(country_id, rng.sample(range), PositionId::LeftWinger);
+            self.roster.insert(player.id);
         }
 
         // Centres...
         for _ in 0..4 {
-            let player: Player = Player::create_and_save(country_id, rng.sample(range), PositionId::Centre);
-            self.roster.push(player.id);
+            let player: Player = Player::build_and_save(country_id, rng.sample(range), PositionId::Centre);
+            self.roster.insert(player.id);
         }
 
         // Right Wingers...
         for _ in 0..4 {
-            let player: Player = Player::create_and_save(country_id, rng.sample(range), PositionId::RightWinger);
-            self.roster.push(player.id);
+            let player: Player = Player::build_and_save(country_id, rng.sample(range), PositionId::RightWinger);
+            self.roster.insert(player.id);
         }
 
         self.update_to_db();
