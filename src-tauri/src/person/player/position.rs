@@ -1,6 +1,6 @@
 use crate::database::POSITIONS;
 
-#[derive(PartialEq, Eq, Hash)]  // Cannot be used as a HashMap key otherwise.
+#[derive(PartialEq, Eq, Hash)]
 #[derive(Default, Clone, Debug)]
 pub enum PositionId {
     #[default] Null,

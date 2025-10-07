@@ -2,7 +2,7 @@
 use std::{collections::HashMap, sync::{LazyLock, Mutex}};
 use lazy_static::lazy_static;
 
-use crate::custom_types;
+use crate::types;
 
 use crate::team::Team;
 use crate::event;
@@ -13,15 +13,15 @@ use crate::match_event;
 use crate::match_event::{Game};
 use crate::io;
 
-pub static COUNTRIES: LazyLock<Mutex<HashMap<custom_types::CountryId, Country>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+pub static COUNTRIES: LazyLock<Mutex<HashMap<types::CountryId, Country>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub static COMPETITIONS: LazyLock<Mutex<HashMap<custom_types::CompetitionId, Competition>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-pub static STAGES: LazyLock<Mutex<HashMap<custom_types::StageId, Stage>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-pub static GAMES: LazyLock<Mutex<HashMap<custom_types::GameId, Game>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+pub static COMPETITIONS: LazyLock<Mutex<HashMap<types::CompetitionId, Competition>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+pub static STAGES: LazyLock<Mutex<HashMap<types::StageId, Stage>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+pub static GAMES: LazyLock<Mutex<HashMap<types::GameId, Game>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub static TEAMS: LazyLock<Mutex<HashMap<custom_types::TeamId, Team>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+pub static TEAMS: LazyLock<Mutex<HashMap<types::TeamId, Team>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub static PLAYERS: LazyLock<Mutex<HashMap<custom_types::PlayerId, Player>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+pub static PLAYERS: LazyLock<Mutex<HashMap<types::PlayerId, Player>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 lazy_static! {
     pub static ref POSITIONS: HashMap<PositionId, Position> = {

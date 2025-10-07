@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::ops::Range;
 use rand::random_range;
 
-use crate::custom_types::CountryId;
+use crate::types::CountryId;
 use crate::database::COUNTRIES;
 use crate::io::load_country_names;
 
@@ -16,6 +16,14 @@ pub struct Country {
 }
 
 impl Country {  // Basics.
+    // Validate an ID.
+    fn create_id(&mut self, id: usize) {
+        self.id = match id.try_into() {
+            Ok(id) => id,
+            Err(e) => panic!("{e}"),
+        };
+    }
+
     // Build a country element.
     fn build<S: AsRef<str>>(name: S) -> Self {
         let mut country: Self = Self::default();
@@ -27,7 +35,7 @@ impl Country {  // Basics.
     // Build a Country element and store it in the database. Return the created element.
     pub fn build_and_save<S: AsRef<str>>(name: S) -> Self {
         let mut country: Self = Self::build(name.as_ref());
-        country.id = (COUNTRIES.lock().unwrap().len() + 1) as CountryId;
+        country.create_id(COUNTRIES.lock().unwrap().len() + 1);
 
         country.update_to_db();
         return country;

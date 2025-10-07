@@ -7,7 +7,7 @@ use rand::seq::IndexedRandom;
 use crate::person::player::Player;
 use crate::event;
 
-use crate::custom_types::PlayerId;
+use crate::types::PlayerId;
 use super::Clock;
 use super::team::PlayersOnIce;
 

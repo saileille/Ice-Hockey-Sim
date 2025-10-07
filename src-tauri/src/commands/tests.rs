@@ -1,4 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use crate::database::TEAMS;
+
 use crate::match_event::Game;
 use crate::team::Team;
 
@@ -27,8 +29,9 @@ pub fn test_game() -> (String, String) {
 }
 
 #[tauri::command]
-pub fn test_comp() {
+pub fn test_comp() -> String {
 
+    "".to_string()
 }
 
 /* #[tauri::command]

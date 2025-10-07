@@ -1,6 +1,6 @@
 pub mod player;
 
-use crate::custom_types::CountryId;
+use crate::types::CountryId;
 use crate::country::Country;
 
 #[derive(PartialEq, Default, Clone, Debug)]

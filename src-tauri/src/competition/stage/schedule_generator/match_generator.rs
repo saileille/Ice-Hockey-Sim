@@ -4,7 +4,7 @@ use std::ops::Range;
 use rand::{rng, rngs::ThreadRng};
 use rand::seq::SliceRandom;
 
-use crate::custom_types::TeamId;
+use crate::types::TeamId;
 use crate::competition::stage::{Stage, TeamData, rules};
 use super::sorting;
 
@@ -18,11 +18,17 @@ pub struct TeamScheduleData {
 // Methods
 impl TeamScheduleData {
     pub fn get_home_match_count(&self, prev: &Self) -> u8 {
-        (self.home_matches.len() + prev.home_matches.len()) as u8
+        match (self.home_matches.len() + prev.home_matches.len()).try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        }
     }
 
     pub fn get_away_match_count(&self, prev: &Self) -> u8 {
-        (self.away_matches.len() + prev.away_matches.len()) as u8
+        match (self.away_matches.len() + prev.away_matches.len()).try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        }
     }
 
     // Add home and away matches together.
@@ -52,17 +58,32 @@ impl TeamScheduleData {
     // Positive values indicate there are more home matches.
     // Negative values indicate there are more away matches.
     pub fn get_home_away_difference(&self, prev: &Self) -> i8 {
-        (self.get_home_match_count(prev) as i8) - (self.get_away_match_count(prev) as i8)
+        let home_matches: i8 = match self.get_home_match_count(prev).try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        };
+        let away_matches: i8 = match self.get_away_match_count(prev).try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        };
+
+        return home_matches - away_matches;
     }
 
     // Check that the team has enough matches, and that home and away matches are balanced.
     fn is_valid_schedule(&self, matches: u8) -> bool {
-        let home_count: u8 = self.get_home_match_count(&Self::default());
-        let away_count: u8 = self.get_away_match_count(&Self::default());
-        let total_count: u8 = home_count + away_count;
+        let home_count: i8 = match self.get_home_match_count(&Self::default()).try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        };
+        let away_count: i8 = match self.get_away_match_count(&Self::default()).try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        };
+        let total_count: u8 = (home_count + away_count) as u8;
 
         total_count == matches &&
-        (home_count as i8 - away_count as i8).abs() <= 1
+        (home_count - away_count).abs() <= 1
     }
 
     // Check if the schedule data is full (no more matches can be inserted).
@@ -265,18 +286,10 @@ impl Stage {
         return completed_schedule_data;
     }
 
-    // Generate a single irregular match.
-    // Return whether successful or not.
-    fn generate_irregular_match(
-        &self,
-        schedule_data: &mut Vec<TeamScheduleData>,
-        prev_schedule_map: &HashMap<TeamId, TeamScheduleData>,
-        rng: &mut ThreadRng,
-        created_matchups: &mut Vec<[TeamId; 2]>,
-        completed_schedule_data: &mut Vec<TeamScheduleData>,
-        matches_per_team: u8
+    // Generate a single irregular match. Return whether successful or not.
+    fn generate_irregular_match(&self, schedule_data: &mut Vec<TeamScheduleData>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>,
+    rng: &mut ThreadRng, created_matchups: &mut Vec<[TeamId; 2]>, completed_schedule_data: &mut Vec<TeamScheduleData>, matches_per_team: u8
     ) -> bool {
-// ---------------------------------------------------------------------
         // Randomise and sort.
         schedule_data.shuffle(rng);
         sorting::sort_default(&rules::RoundRobin::MATCH_GEN_TYPE, schedule_data, prev_schedule_map, rng);

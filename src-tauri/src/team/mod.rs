@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use rand::distr::Uniform;
 use rand::Rng;
 
-use crate::custom_types::{CountryId, TeamId, PlayerId};
+use crate::types::{CountryId, TeamId, PlayerId};
 use crate::database::TEAMS;
 
 use crate::country::Country;
@@ -21,6 +21,14 @@ pub struct Team {
 }
 
 impl Team { // Basics.
+    // Create a new ID.
+    fn create_id(&mut self, id: usize) {
+        self.id = match id.try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        };
+    }
+
     fn build<S: AsRef<str>>(name: S) -> Self {
         let mut team: Team = Team::default();
         team.name = String::from(name.as_ref());
@@ -31,7 +39,7 @@ impl Team { // Basics.
     // Create a team and store it in the database. Return a clone of the Team.
     pub fn build_and_save<S: AsRef<str>>(name: S) -> Self {
         let mut team: Self = Self::build(name);
-        team.id = TEAMS.lock().unwrap().len() as TeamId;
+        team.create_id(TEAMS.lock().unwrap().len() + 1);
         team.update_to_db();
         return team;
     }
@@ -90,7 +98,6 @@ impl Team { // Functions for the testing phase.
     // Generate a basic roster of players for the team.
     pub fn generate_roster(&mut self, min_ability: u8, max_ability: u8) {
         self.roster = HashSet::new();
-
         let range: Uniform<u8> = Uniform::new_inclusive(min_ability, max_ability)
             .expect(&format!("error: low: {min_ability}, high: {max_ability}"));
 

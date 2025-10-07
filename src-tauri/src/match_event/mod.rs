@@ -6,7 +6,7 @@ use std::option;
 use self::team::TeamData;
 use self::event::Shot;
 
-use crate::custom_types::{GameId, StageId, TeamId};
+use crate::types::{GameId, StageId, TeamId};
 use crate::database::GAMES;
 
 use crate::event as logic_event;
@@ -24,6 +24,14 @@ pub struct Game {
 }
 
 impl Game { // Basics.
+    // Create an ID.
+    fn create_id(&mut self, id: usize) {
+        self.id = match id.try_into() {
+            Ok(id) => id,
+            Err(e) => panic!("{e}")
+        };
+    }
+
     pub fn build(home: TeamId, away: TeamId, stage: StageId) -> Self {
         let mut game: Game = Game::default();
 
@@ -37,7 +45,7 @@ impl Game { // Basics.
 
     pub fn build_and_save(home: TeamId, away: TeamId, stage: StageId) -> Self {
         let mut game: Self = Self::build(home, away, stage);
-        game.id = (GAMES.lock().unwrap().len() + 1) as GameId;
+        game.create_id(GAMES.lock().unwrap().len() + 1);
         game.update_to_db();
         return game;
     }
@@ -223,13 +231,16 @@ impl Game {
     }
 
     // Get the amount of minutes that have passed in the game.
-    fn get_game_minutes(&self) -> u16 {
-        (self.get_game_total_seconds() / 60) as u16
+    fn get_game_minutes(&self) -> u32 {
+        self.get_game_total_seconds() / 60
     }
 
     // Get the amount of seconds that have passed in the game, after full minutes have been taken out.
     fn get_game_seconds(&self) -> u8 {
-        (self.get_game_total_seconds() % 60) as u8
+        match (self.get_game_total_seconds() % 60).try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        }
     }
 
     // Check if the game is over.
@@ -244,7 +255,7 @@ impl Game {
 
     // Check if the currently ongoing period is over.
     fn is_period_over(&self) -> bool {
-        (self.clock.period_total_seconds as u16) >= self.get_rules().period_length
+        self.clock.period_total_seconds >= self.get_rules().period_length
     }
 
     // Check if the overtime period is over.
@@ -263,12 +274,12 @@ impl Game {
             return false;
         }
 
-        return self.get_overtime_length() >= (self.get_rules().overtime_length as i32);
+        return self.get_time_expired_in_overtime() >= (self.get_rules().overtime_length as i32);
     }
 
-    // Get the maximum overtime length for the game,
-    // unless it is continuous.
-    fn get_overtime_length(&self) -> i32 {
+    // How much overtime has been played so far.
+    // Negative values mean that the regular time is still ongoing.
+    fn get_time_expired_in_overtime(&self) -> i32 {
         (self.get_game_total_seconds() as i32) - (self.get_rules().get_regular_time() as i32)
     }
 }
@@ -392,12 +403,18 @@ impl Clock {
 
     // Get the amount of minutes that have passed in the period.
     fn get_period_minutes(&self) -> u8 {
-        (self.period_total_seconds / 60) as u8
+        match (self.period_total_seconds / 60).try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        }
     }
 
     // Get the amount of seconds that have passed in the period, after full minutes have been taken out.
     fn get_period_seconds(&self) -> u8 {
-        (self.period_total_seconds % 60) as u8
+        match (self.period_total_seconds % 60).try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        }
     }
 
     // Advance time by one second.

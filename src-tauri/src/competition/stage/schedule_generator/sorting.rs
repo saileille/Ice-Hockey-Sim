@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::cmp::Ordering;
 use rand::{rngs::ThreadRng, seq::SliceRandom};
 
-use crate::custom_types::TeamId;
+use crate::types::TeamId;
 use crate::competition::stage::rules::MatchGenType;
 
 use super::match_generator::TeamScheduleData;
@@ -35,9 +35,16 @@ fn compare_home_away_abs(a: &TeamScheduleData, b: &TeamScheduleData, prev_a: &Te
 
 // Compare the match count.
 fn compare_match_count(a: &TeamScheduleData, b: &TeamScheduleData, prev_a: &TeamScheduleData, prev_b: &TeamScheduleData) -> Ordering {
-    let (a_total, b_total) = (a.get_match_count(prev_a), b.get_match_count(prev_b));
+    let a_total: i8 = match a.get_match_count(prev_a).try_into() {
+        Ok(n) => n,
+        Err(e) => panic!("{e}")
+    };
+    let b_total: i8 = match b.get_match_count(prev_b).try_into() {
+        Ok(n) => n,
+        Err(e) => panic!("{e}")
+    };
 
-    return (a_total as i8).cmp(&(b_total as i8));
+    return a_total.cmp(&b_total);
 }
 
 // Get the previous schedule datas for compare functions.

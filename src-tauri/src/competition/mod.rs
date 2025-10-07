@@ -1,7 +1,7 @@
 // Competition data.
 pub mod stage;
 
-use crate::custom_types::{CompetitionId, StageId, TeamId};
+use crate::types::{CompetitionId, StageId, TeamId};
 use crate::database::COMPETITIONS;
 
 use crate::team::Team;
@@ -17,6 +17,14 @@ pub struct Competition {
 
 // Basics.
 impl Competition {
+    // Create a new ID.
+    fn create_id(&mut self, id: usize) {
+        self.id = match id.try_into() {
+            Ok(id) => id,
+            Err(e) => panic!("{e}")
+        };
+    }
+
     // Build a Competition element.
     pub fn build<S: AsRef<str>>(name: S, teams: Vec<Team>, stages: Vec<Vec<Stage>>) -> Self {
         let mut comp: Self = Self::default();
@@ -42,7 +50,7 @@ impl Competition {
     // Build a Competition element and store it in the database. Return the created element.
     pub fn build_and_save<S: AsRef<str>>(name: S, teams: Vec<Team>, stages: Vec<Vec<Stage>>) -> Self {
         let mut comp: Self = Self::build(name, teams, stages);
-        comp.id = (COMPETITIONS.lock().unwrap().len() + 1) as CompetitionId;
+        comp.create_id(COMPETITIONS.lock().unwrap().len() + 1);
         comp.update_to_db();
         return comp;
     }

@@ -4,7 +4,7 @@ use rand::Rng;
 
 use crate::database;
 
-#[derive(PartialEq, Eq, Hash)]  // Cannot be used as a HashMap key otherwise.
+#[derive(PartialEq, Eq, Hash)]
 #[derive(Debug)]
 pub enum Id {
     PuckPossessionChange,

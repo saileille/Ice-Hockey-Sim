@@ -2,17 +2,29 @@
 use std::time::Instant;
 use std::ops::Range;
 
-use crate::custom_types::TeamId;
+use crate::types::TeamId;
+use crate::database::{TEAMS, PLAYERS};
 use crate::competition::stage::{Stage, rules, rules::MatchGenType};
+
+pub fn test_comp_generation() {
+    // Let's make players for all teams.
+    let mut teams_clone = TEAMS.lock().unwrap().clone();
+    for team in teams_clone.values_mut() {
+        println!("{}", team.name);
+        team.generate_roster(0, 0);
+    }
+
+    println!("{} players", PLAYERS.lock().unwrap().len());
+}
 
 // Testing with various team counts and match amounts.
 /* pub fn test_match_generator() {
     let sort_types: [MatchGenType; 3] = [MatchGenType::MatchCount, MatchGenType::Random, MatchGenType::Alternating];
-    
+
     let mut counter: usize = 0;
     let benchmark: Instant = Instant::now();
     for sort_team1 in sort_types.iter() {
-        
+
         for sort_team2 in sort_types.iter() {
             let mut fail_counter: usize = 0;
             let mut skip_counter: usize = 0;
@@ -33,7 +45,7 @@ use crate::competition::stage::{Stage, rules, rules::MatchGenType};
 
                     // Let's skip what is doomed to fail.
                     if !stage.has_valid_match_amount() { continue; }
-                    
+
                     stage.generate_schedule_for_round_robin();
 
                     skip_counter += (match_count - stage.get_matches_per_team()) as usize;

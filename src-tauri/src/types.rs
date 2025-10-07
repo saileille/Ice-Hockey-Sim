@@ -7,4 +7,4 @@ pub type StageId = u8;
 pub type GameId = u8;
 
 pub type TeamId = u8;
-pub type PlayerId = u8;
+pub type PlayerId = u16;

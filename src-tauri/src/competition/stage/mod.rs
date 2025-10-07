@@ -1,7 +1,7 @@
 pub mod rules;
 pub mod schedule_generator;
 
-use crate::custom_types::{StageId, GameId, TeamId};
+use crate::types::{StageId, GameId, TeamId};
 use crate::database::STAGES;
 use crate::match_event;
 use crate::team::Team;
@@ -31,6 +31,14 @@ pub struct Stage {
 
 // Basics
 impl Stage {
+    // Create an ID.
+    fn create_id(&mut self, id: usize) {
+        self.id = match id.try_into() {
+            Ok(id) => id,
+            Err(e) => panic!("{e}")
+        };
+    }
+
     // Build a Stage element.
     pub fn build<S: AsRef<str>>(name: S, round_robin_rules: Option<rules::RoundRobin>,
     knockout_rules: Option<rules::Knockout>, match_rules: match_event::Rules) -> Self {
@@ -53,7 +61,7 @@ impl Stage {
     pub fn build_and_save<S: AsRef<str>>(name: S, round_robin_rules: Option<rules::RoundRobin>,
     knockout_rules: Option<rules::Knockout>, match_rules: match_event::Rules) -> Self {
         let mut stage: Self = Self::build(name, round_robin_rules, knockout_rules, match_rules);
-        stage.id = (STAGES.lock().unwrap().len() + 1) as StageId;
+        stage.create_id(STAGES.lock().unwrap().len() + 1);
         stage.update_to_db();
         return stage;
     }
@@ -100,10 +108,26 @@ impl Stage {
 impl Stage {
     // Get the amount of actual games each team plays.
     pub fn get_matches_per_team(&self) -> u8 {
-        let matches: f64 = self.schedule.len() as f64;
-        let teams: f64 = self.teams.len() as f64;
+        let matches_u: usize = self.schedule.len();
+        let matches: f64 = if matches_u <= (f64::MAX as usize) {
+            matches_u as f64
+        } else {
+            panic!("{matches_u} is bigger than {}", f64::MAX)
+        };
 
-        return (matches / teams * 2.0) as u8;
+        let teams_u: usize = self.teams.len();
+        let teams: f64 = if teams_u <= (f64::MAX as usize) {
+            teams_u as f64
+        } else {
+            panic!("{teams_u} is bigger than {}", f64::MAX)
+        };
+
+        let result: f64 = matches / teams * 2.0;
+        if result <= (u8::MAX as f64) {
+            return result as u8;
+        }
+
+        panic!("{result} matches when maximum allowed is {}", u8::MAX);
     }
 
     // Get how many matches each team should play.
@@ -116,7 +140,10 @@ impl Stage {
 
     // Get how many matches each team has to play to face each team once.
     fn get_round_length(&self) -> u8 {
-        (self.teams.len() as u8) - 1
+        match (self.teams.len() - 1).try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        }
     }
 
     // Check if the stage has a valid amount of matches.
@@ -145,7 +172,12 @@ impl Stage {
     // Get how many matches there should be in the stage in total.
     // For round robins only.
     pub fn get_theoretical_total_matches(&self) -> u16 {
-        (self.get_theoretical_matches_per_team() as u16) * (self.teams.len() as u16) / 2
+        let teams: u16 = match self.teams.len().try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        };
+
+        return (self.get_theoretical_matches_per_team() as u16) * teams / 2;
     }
 
     // Check if the stage has a valid amount of matches.
@@ -156,7 +188,12 @@ impl Stage {
 
     // Check if the match schedule went according to plan.
     pub fn had_successful_match_generation(&self) -> bool {
-        self.get_theoretical_total_matches() == (self.schedule.len() as u16)
+        let matches: u16 = match self.schedule.len().try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        };
+
+        return self.get_theoretical_total_matches() == matches;
     }
 }
 
@@ -210,6 +247,9 @@ impl TeamData {
     }
 
     fn get_goal_difference(&self) -> i8 {
-        (self.goals_scored as i8) - (self.goals_conceded as i8)
+        match ((self.goals_scored as i16) - (self.goals_conceded as i16)).try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        }
     }
 }

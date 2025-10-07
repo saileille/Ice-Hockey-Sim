@@ -6,7 +6,7 @@ use rand::rng;
 use rand::seq::SliceRandom;
 use rand::{rngs::ThreadRng, Rng};
 
-use crate::custom_types::{GameId, TeamId};
+use crate::types::{GameId, TeamId};
 use crate::match_event::Game;
 use super::Stage;
 
@@ -32,7 +32,7 @@ impl Stage {
         let mut valid_matches: Vec<[TeamId; 2]> = matchups.clone();
         let mut rng: ThreadRng = rand::rng();
         let mut matchday: Vec<[TeamId; 2]> = Vec::new();
-        
+
         while valid_matches.len() > 0 {
             let index: usize = rng.random_range(Range {start: 0, end: valid_matches.len()});
             let game: [TeamId; 2] = valid_matches[index].clone();
@@ -50,7 +50,7 @@ impl Stage {
     fn convert_to_games(&self, matchups: &Vec<[TeamId; 2]>) -> Vec<GameId> {
         let mut games: Vec<GameId> = Vec::new();
         for matchup in matchups {
-            let game: Game = Game::build_and_save(matchup[0], matchup[1], self.id); 
+            let game: Game = Game::build_and_save(matchup[0], matchup[1], self.id);
             games.push(game.id);
         }
 

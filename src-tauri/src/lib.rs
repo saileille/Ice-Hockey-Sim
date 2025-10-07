@@ -1,7 +1,7 @@
 mod commands;
 mod competition;
 mod country;
-mod custom_types;
+mod types;
 mod database;
 mod event;
 mod match_event;
@@ -18,7 +18,7 @@ pub fn run() {
 
     // terminal testing...
     #[cfg(dev)] {
-        // terminal_tests::test_match_generator();
+        terminal_tests::test_comp_generation();
     }
 
     tauri::Builder::default()
@@ -31,6 +31,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![commands::tests::test_game])
+        .invoke_handler(tauri::generate_handler![commands::tests::test_comp])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

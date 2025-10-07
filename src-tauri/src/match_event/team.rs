@@ -1,6 +1,6 @@
 use weighted_rand::{builder::{NewBuilder, WalkerTableBuilder}, table::WalkerTable};
 
-use crate::custom_types::{PlayerId, TeamId};
+use crate::types::{PlayerId, TeamId};
 use super::event::Shot;
 use crate::{person::player::Player, team::{Team, lineup::{LineUp, DefencePair, ForwardLine}}};
 
@@ -33,7 +33,10 @@ impl TeamData { // Basics.
 
 impl TeamData {
     fn get_shot_amount(&self) -> u16 {
-        self.shots.len() as u16
+        match self.shots.len().try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        }
     }
 
     pub fn get_goal_amount(&self) -> u16 {

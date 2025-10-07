@@ -1,6 +1,6 @@
 pub mod position;
 
-use crate::custom_types::{CountryId, PlayerId};
+use crate::types::{CountryId, PlayerId};
 use crate::database::PLAYERS;
 
 use super::{Person, Gender};
@@ -15,6 +15,14 @@ pub struct Player {
 }
 
 impl Player {   // Basics.
+    // Create a new ID.
+    fn create_id(&mut self, id: usize) {
+        self.id = match id.try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        };
+    }
+
     fn build(country_id: CountryId, ability: u8, position_id: PositionId) -> Self {
         let mut player: Self = Self::default();
         player.person = Person::build(country_id, Gender::Male);
@@ -27,8 +35,7 @@ impl Player {   // Basics.
     // Create a player and store it in the database. Return a clone of the Player.
     pub fn build_and_save(country_id: CountryId, ability: u8, position_id: PositionId) -> Self {
         let mut player: Self = Self::build(country_id, ability, position_id);
-        player.id = (PLAYERS.lock().unwrap().len() + 1) as PlayerId;
-
+        player.create_id(PLAYERS.lock().unwrap().len() + 1);
         player.update_to_db();
         return player;
     }
