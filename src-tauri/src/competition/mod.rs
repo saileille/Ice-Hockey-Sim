@@ -1,10 +1,15 @@
 // Competition data.
 pub mod stage;
 
-use crate::types::{CompetitionId, StageId, TeamId};
-use crate::database::COMPETITIONS;
-
-use crate::team::Team;
+use crate::{
+    types::{
+        CompetitionId,
+        StageId,
+        TeamId
+    },
+    database::COMPETITIONS,
+    team::Team
+};
 use self::stage::Stage;
 
 #[derive(Default, Clone)]
@@ -65,5 +70,16 @@ impl Competition {
         COMPETITIONS.lock()
             .expect(&format!("something went wrong when trying to update Competition {}: {} to COMPETITIONS", self.id, self.name))
             .insert(self.id, self.clone());
+    }
+}
+
+// Testing.
+impl Competition {
+    // Generate rosters for all teams in the competition.
+    pub fn generate_rosters(&self) {
+        for id in self.team_ids.iter() {
+            println!("{id}");
+            Team::fetch_from_db(id).generate_roster(0, 0);
+        }
     }
 }

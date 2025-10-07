@@ -1,16 +1,20 @@
 pub mod event;
 pub mod team;
 
-use std::option;
-
-use self::team::TeamData;
-use self::event::Shot;
-
-use crate::types::{GameId, StageId, TeamId};
-use crate::database::GAMES;
-
-use crate::event as logic_event;
-use crate::competition::stage::Stage;
+use crate::{
+    types::{
+        GameId,
+        StageId,
+        TeamId
+    },
+    database::GAMES,
+    event as logic_event,
+    competition::stage::Stage
+};
+use self::{
+    team::TeamData,
+    event::Shot
+};
 
 #[derive(Default, Clone)]
 pub struct Game {

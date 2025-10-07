@@ -1,10 +1,16 @@
 pub mod rules;
 pub mod schedule_generator;
 
-use crate::types::{StageId, GameId, TeamId};
-use crate::database::STAGES;
-use crate::match_event;
-use crate::team::Team;
+use crate::{
+    types::{
+        StageId,
+        GameId,
+        TeamId,
+    },
+    database::STAGES,
+    match_event,
+    team::Team
+};
 
 #[derive(Default, Clone, PartialEq)]
 enum Type {

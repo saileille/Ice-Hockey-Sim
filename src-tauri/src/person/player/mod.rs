@@ -1,10 +1,20 @@
 pub mod position;
 
-use crate::types::{CountryId, PlayerId};
-use crate::database::PLAYERS;
-
-use super::{Person, Gender};
-use self::position::{Position, PositionId};
+use crate::{
+    types::{
+        CountryId,
+        PlayerId
+    },
+    database::PLAYERS
+};
+use super::{
+    Person,
+    Gender
+};
+use self::position::{
+    Position,
+    PositionId
+};
 
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct Player {

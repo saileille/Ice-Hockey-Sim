@@ -1,8 +1,27 @@
-use weighted_rand::{builder::{NewBuilder, WalkerTableBuilder}, table::WalkerTable};
+use weighted_rand::{
+    builder::{
+        NewBuilder,
+        WalkerTableBuilder
+    },
+    table::WalkerTable
+};
 
-use crate::types::{PlayerId, TeamId};
+use crate::{
+    types::{
+        PlayerId,
+        TeamId
+    },
+    person::player::Player,
+    team::{
+        Team,
+        lineup::{
+            LineUp,
+            DefencePair,
+            ForwardLine
+        }
+    }
+};
 use super::event::Shot;
-use crate::{person::player::Player, team::{Team, lineup::{LineUp, DefencePair, ForwardLine}}};
 
 #[derive(Default, Clone)]
 pub struct TeamData {

@@ -1,11 +1,15 @@
 // Countries and such.
-use std::collections::HashMap;
-use std::ops::Range;
+use std::{
+    collections::HashMap,
+    ops::Range
+};
 use rand::random_range;
 
-use crate::types::CountryId;
-use crate::database::COUNTRIES;
-use crate::io::load_country_names;
+use crate::{
+    types::CountryId,
+    database::COUNTRIES,
+    io::load_country_names
+};
 
 #[derive(Default, Clone)]
 pub struct Country {

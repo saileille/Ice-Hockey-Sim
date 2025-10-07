@@ -1,11 +1,17 @@
 // Functions and methods for sorting and comparing teams when generating matches.
+use std::{
+    collections::HashMap,
+    cmp::Ordering
+};
+use rand::{
+    rngs::ThreadRng,
+    seq::SliceRandom
+};
 
-use std::collections::HashMap;
-use std::cmp::Ordering;
-use rand::{rngs::ThreadRng, seq::SliceRandom};
-
-use crate::types::TeamId;
-use crate::competition::stage::rules::MatchGenType;
+use crate::{
+    types::TeamId,
+    competition::stage::rules::MatchGenType
+};
 
 use super::match_generator::TeamScheduleData;
 

@@ -1,19 +1,21 @@
 // Input/output logic.
-use std::collections::HashMap;
-use std::fs::{File, ReadDir, read_dir};
-use std::io;
-use std::io::Read;
+use std::{
+    collections::HashMap,
+    fs,
+    io,
+    io::Read
+};
 
 // Get a file, or error if it does not exist.
-fn get_file<S: AsRef<str>>(path: S) -> io::Result<File> {
-    return File::open(path.as_ref());
+fn get_file<S: AsRef<str>>(path: S) -> io::Result<fs::File> {
+    return fs::File::open(path.as_ref());
 }
 
 fn read_json_file<S: AsRef<str>>(path: S) -> io::Result<String> {
     // Read a JSON file and return it as a string.
     let mut json: String = String::new();
     // let file_result: Result<File, io::Error> = File::open(path.as_ref());
-    let mut file: File = match File::open(path.as_ref()) {
+    let mut file: fs::File = match fs::File::open(path.as_ref()) {
         Ok(f) => f,
         Err(e) => return Err(e),
     };
@@ -38,9 +40,9 @@ pub fn load_country_names<S: AsRef<str>>(country: S) -> HashMap<String, HashMap<
 // Function for listing all JSON files in the names folder.
 // Used for generating countries in the database.
 pub fn get_countries_from_name_files() -> Vec<String> {
-    let paths: ReadDir = match read_dir("./json/names/") {
+    let paths: fs::ReadDir = match fs::read_dir("./json/names/") {
         Ok(r) => r,
-        Err(_) => read_dir("E:/Tiedostot/koodaus/Tauri/icehockeysim/Ice Hockey Sim/src-tauri/json/names/").unwrap(),
+        Err(_) => fs::read_dir("E:/Tiedostot/koodaus/Tauri/icehockeysim/Ice Hockey Sim/src-tauri/json/names/").unwrap(),
     };
 
     let mut countries: Vec<String> = Vec::new();

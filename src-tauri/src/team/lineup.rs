@@ -1,5 +1,10 @@
-use crate::types::PlayerId;
-use crate::person::player::{Player, position::PositionId};
+use crate::{
+    types::PlayerId,
+    person::player::{
+        Player,
+        position::PositionId
+    }
+};
 
 // A line-up of players used in a match.
 #[derive(Default, Clone, Debug)]

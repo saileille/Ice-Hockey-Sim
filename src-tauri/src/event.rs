@@ -1,6 +1,8 @@
 // Events used for game logic, with likelihoods of something happening or not.
-use rand::rngs::ThreadRng;
-use rand::Rng;
+use rand::{
+    rngs::ThreadRng,
+    Rng
+};
 
 use crate::database;
 

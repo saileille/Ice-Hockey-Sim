@@ -1,15 +1,23 @@
 pub mod lineup;
 
 use std::collections::HashSet;
-use rand::distr::Uniform;
-use rand::Rng;
-
-use crate::types::{CountryId, TeamId, PlayerId};
-use crate::database::TEAMS;
-
-use crate::country::Country;
-use crate::person::player::{Player, position::PositionId};
-
+use rand::{
+    distr::Uniform,
+    Rng
+};
+use crate::{
+    types::{
+        CountryId,
+        TeamId,
+        PlayerId
+    },
+    database::TEAMS,
+    country::Country,
+    person::player::{
+        Player,
+        position::PositionId
+    }
+};
 use self::lineup::LineUp;
 
 #[derive(Default, Clone, Debug)]

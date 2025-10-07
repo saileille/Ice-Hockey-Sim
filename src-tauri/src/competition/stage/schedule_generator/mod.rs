@@ -2,12 +2,21 @@ mod match_generator;
 mod sorting;
 
 use std::ops::Range;
-use rand::rng;
-use rand::seq::SliceRandom;
-use rand::{rngs::ThreadRng, Rng};
 
-use crate::types::{GameId, TeamId};
-use crate::match_event::Game;
+use rand::{
+    rng,
+    Rng,
+    seq::SliceRandom,
+    rngs::ThreadRng
+};
+
+use crate::{
+    types::{
+        GameId, TeamId
+    },
+    match_event::Game
+};
+
 use super::Stage;
 
 impl Stage {

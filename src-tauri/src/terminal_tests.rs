@@ -1,14 +1,17 @@
 // Functions for testing things on the terminal.
-use std::time::Instant;
-use std::ops::Range;
+use std::collections::HashMap;
 
-use crate::types::TeamId;
-use crate::database::{TEAMS, PLAYERS};
-use crate::competition::stage::{Stage, rules, rules::MatchGenType};
+use crate::{
+    database::{
+        TEAMS,
+        PLAYERS
+    },
+    team::Team,
+};
 
 pub fn test_comp_generation() {
     // Let's make players for all teams.
-    let mut teams_clone = TEAMS.lock().unwrap().clone();
+    let mut teams_clone: HashMap<u8, Team> = TEAMS.lock().unwrap().clone();
     for team in teams_clone.values_mut() {
         println!("{}", team.name);
         team.generate_roster(0, 0);

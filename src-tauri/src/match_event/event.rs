@@ -1,15 +1,18 @@
 // An event is anything worth of writing down that happens during a match.
 // Shot, goal, penalty, etc.
-
-use rand::rngs::ThreadRng;
-use rand::seq::IndexedRandom;
-
-use crate::person::player::Player;
-use crate::event;
-
-use crate::types::PlayerId;
-use super::Clock;
-use super::team::PlayersOnIce;
+use rand::{
+    rngs::ThreadRng,
+    seq::IndexedRandom
+};
+use crate::{
+    person::player::Player,
+    event,
+    types::PlayerId
+};
+use super::{
+    Clock,
+    team::PlayersOnIce
+};
 
 #[derive(Default, Clone)]
 pub struct Event {

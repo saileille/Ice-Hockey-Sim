@@ -1,8 +1,14 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use crate::database::TEAMS;
+use crate::database::{
+    COMPETITIONS,
+    TEAMS
+};
 
-use crate::match_event::Game;
-use crate::team::Team;
+use crate::{
+    competition::Competition,
+    match_event::Game,
+    team::Team
+};
 
 #[tauri::command]
 pub fn test_game() -> (String, String) {
@@ -30,6 +36,8 @@ pub fn test_game() -> (String, String) {
 
 #[tauri::command]
 pub fn test_comp() -> String {
+    let comp: crate::competition::Competition = COMPETITIONS.lock().unwrap().get(&1).unwrap().clone();
+    comp.generate_rosters();
 
     "".to_string()
 }

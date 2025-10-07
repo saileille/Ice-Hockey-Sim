@@ -1,7 +1,9 @@
 pub mod player;
 
-use crate::types::CountryId;
-use crate::country::Country;
+use crate::{
+    types::CountryId,
+    country::Country
+};
 
 #[derive(PartialEq, Default, Clone, Debug)]
 enum Gender {

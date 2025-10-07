@@ -1,11 +1,25 @@
 // Methods for generating match schedules for Stage.
-use std::collections::{HashMap, HashSet};
-use std::ops::Range;
-use rand::{rng, rngs::ThreadRng};
-use rand::seq::SliceRandom;
+use std::{
+    collections::{
+        HashMap,
+        HashSet
+    },
+    ops::Range
+};
+use rand::{
+    rng,
+    rngs::ThreadRng,
+    seq::SliceRandom
+};
 
-use crate::types::TeamId;
-use crate::competition::stage::{Stage, TeamData, rules};
+use crate::{
+    types::TeamId,
+    competition::stage::{
+        rules,
+        Stage,
+        TeamData
+    }
+};
 use super::sorting;
 
 #[derive(Default, Clone)]
