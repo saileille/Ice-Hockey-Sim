@@ -42,7 +42,7 @@ impl Competition {
     // Build a Competition element and store it in the database. Return the created element.
     pub fn build_and_save<S: AsRef<str>>(name: S, teams: Vec<Team>, stages: Vec<Vec<Stage>>) -> Self {
         let mut comp: Self = Self::build(name, teams, stages);
-        comp.id = COMPETITIONS.lock().unwrap().len() as CompetitionId;
+        comp.id = (COMPETITIONS.lock().unwrap().len() + 1) as CompetitionId;
         comp.update_to_db();
         return comp;
     }

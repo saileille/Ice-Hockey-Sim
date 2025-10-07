@@ -1,6 +1,6 @@
 use weighted_rand::{builder::{NewBuilder, WalkerTableBuilder}, table::WalkerTable};
 
-use crate::custom_types::{TeamId, PlayerId};
+use crate::custom_types::{PlayerId, TeamId};
 use super::event::Shot;
 use crate::{person::player::Player, team::{Team, lineup::{LineUp, DefencePair, ForwardLine}}};
 
@@ -9,12 +9,12 @@ pub struct TeamData {
     pub team_id: TeamId,
     pub shots: Vec<Shot>,
     pub lineup: LineUp,
-    pub players_on_ice: PlayersOnIce,
+    pub players_on_ice: Option<PlayersOnIce>,
     penalties: Vec<String>, // Placeholder.
 }
 
 impl TeamData { // Basics.
-    pub fn new(team_id: TeamId) -> Self {
+    pub fn build(team_id: TeamId) -> Self {
         let mut team_data: TeamData = TeamData::default();
         team_data.team_id = team_id;
         return team_data;
@@ -24,7 +24,7 @@ impl TeamData { // Basics.
     pub fn is_valid(&self) -> bool {
         self.team_id != 0
     }
-    
+
     // Get a clone of the team.
     pub fn get_team_clone(&self) -> Team {
         Team::fetch_from_db(&self.team_id)
@@ -50,17 +50,19 @@ impl TeamData {
     // Reset the TeamData.
     pub fn reset(&mut self) {
         self.shots = Vec::new();
-        self.players_on_ice = PlayersOnIce::new();
+        self.players_on_ice = None;
         self.penalties = Vec::new();
     }
 
     // Determine who should go on ice next.
     pub fn change_players_on_ice(&mut self) {
+        let mut players_on_ice: PlayersOnIce = PlayersOnIce::default();
+
         // The better goalkeeper is always on ice (for now).
-        let mut goalkeepers: [Player; 2] = self.lineup.get_goalkeeper_clones();
+        let mut goalkeepers: Vec<Player> = self.lineup.get_goalkeeper_clones();
         goalkeepers.sort_by(|a, b| b.ability.cmp(&a.ability));
 
-        self.players_on_ice.gk_id = goalkeepers[0].id;
+        players_on_ice.gk_id = goalkeepers[0].id;
 
         // Simple randomness to determine which line is playing.
         // This should be player-editable in the future.
@@ -70,15 +72,17 @@ impl TeamData {
         let wa_table: WalkerTable = builder.build();
 
         let index: usize = wa_table.next();
-        
+
         let d_pair: DefencePair = self.lineup.defence_pairs[index].clone();
-        self.players_on_ice.ld_id = d_pair.ld_id;
-        self.players_on_ice.rd_id = d_pair.rd_id;
-        
+        players_on_ice.ld_id = d_pair.ld_id;
+        players_on_ice.rd_id = d_pair.rd_id;
+
         let f_line: ForwardLine = self.lineup.forward_lines[index].clone();
-        self.players_on_ice.lw_id = f_line.lw_id;
-        self.players_on_ice.c_id = f_line.c_id;
-        self.players_on_ice.rw_id = f_line.rw_id;
+        players_on_ice.lw_id = f_line.lw_id;
+        players_on_ice.c_id = f_line.c_id;
+        players_on_ice.rw_id = f_line.rw_id;
+
+        self.players_on_ice = Some(players_on_ice);
     }
 }
 
@@ -94,37 +98,37 @@ pub struct PlayersOnIce {
 }
 
 impl PlayersOnIce {
-    pub fn new() -> Self {
-        PlayersOnIce::default()
-    }
-
     // Get PlayersOnIceClones struct.
-    pub fn get_player_clones(&self) -> PlayersOnIceClones {
-        PlayersOnIceClones::new(self)
+    pub fn get_clones(&self) -> PlayersOnIceClones {
+        PlayersOnIceClones::build(self)
     }
 
-    pub fn get_goalkeeper_clone(&self) -> Player {
+    pub fn get_goalkeeper_clone(&self) -> Option<Player> {
         Player::fetch_from_db(&self.gk_id)
     }
 
-    fn get_left_defender_clone(&self) -> Player {
+    fn get_left_defender_clone(&self) -> Option<Player> {
         Player::fetch_from_db(&self.ld_id)
     }
 
-    fn get_right_defender_clone(&self) -> Player {
+    fn get_right_defender_clone(&self) -> Option<Player> {
         Player::fetch_from_db(&self.rd_id)
     }
 
-    fn get_left_winger_clone(&self) -> Player {
+    fn get_left_winger_clone(&self) -> Option<Player> {
         Player::fetch_from_db(&self.lw_id)
     }
 
-    fn get_centre_clone(&self) -> Player {
+    fn get_centre_clone(&self) -> Option<Player> {
         Player::fetch_from_db(&self.c_id)
     }
 
-    fn get_right_winger_clone(&self) -> Player {
+    fn get_right_winger_clone(&self) -> Option<Player> {
         Player::fetch_from_db(&self.rw_id)
+    }
+
+    fn get_extra_attacker_clone(&self) -> Option<Player> {
+        Player::fetch_from_db(&self.extra_attacker_id)
     }
 }
 
@@ -153,17 +157,17 @@ impl PlayersOnIce {
 
 #[derive(Default)]
 pub struct PlayersOnIceClones {
-    gk: Player,
-    ld: Player,
-    rd: Player,
-    lw: Player,
-    c: Player,
-    rw: Player,
-    extra_attacker: Player,
+    gk: Option<Player>,
+    ld: Option<Player>,
+    rd: Option<Player>,
+    lw: Option<Player>,
+    c: Option<Player>,
+    rw: Option<Player>,
+    extra_attacker: Option<Player>,
 }
 
 impl PlayersOnIceClones {   // Basics.
-    fn new(players_on_ice: &PlayersOnIce) -> Self {
+    fn build(players_on_ice: &PlayersOnIce) -> Self {
         PlayersOnIceClones {
             gk: Player::fetch_from_db(&players_on_ice.gk_id),
             ld: Player::fetch_from_db(&players_on_ice.ld_id),
@@ -180,26 +184,18 @@ impl PlayersOnIceClones {
     // Get the total ability of skaters (not goalkeeper).
     fn get_skaters_ability(&self) -> u16 {
         let mut total_ability: u16 = 0;
+        let skaters: Vec<Player> = self.get_skaters_in_vector();
 
-        if self.ld.is_valid() {
-            total_ability += self.ld.ability as u16;
-        } if self.rd.is_valid() {
-            total_ability += self.rd.ability as u16;
-        } if self.lw.is_valid() {
-            total_ability += self.rd.ability as u16;
-        } if self.c.is_valid() {
-            total_ability += self.c.ability as u16;
-        } if self.rw.is_valid() {
-            total_ability += self.rw.ability as u16;
-        } if self.extra_attacker.is_valid() {
-            total_ability += self.extra_attacker.ability as u16;
+        for skater in skaters.iter() {
+            total_ability += skater.ability as u16;
         }
 
         return total_ability;
     }
 
     // Compare the ability of skaters on ice to the opponent.
-    pub fn get_skaters_ability_ratio(&self, opponent: PlayersOnIceClones) -> f64 {
+    pub fn get_skaters_ability_ratio(&self, opponent_ids: &PlayersOnIce) -> f64 {
+        let opponent: PlayersOnIceClones = opponent_ids.get_clones();
         let ability: f64 = self.get_skaters_ability() as f64;
         let both_sides_ability: f64 = ability + (opponent.get_skaters_ability() as f64);
 
@@ -214,11 +210,12 @@ impl PlayersOnIceClones {
     pub fn get_skaters_in_vector(&self) -> Vec<Player> {
         let mut players: Vec<Player> = Vec::new();
 
-        if self.ld.is_valid() {players.push(self.ld.clone())}
-        if self.rd.is_valid() {players.push(self.rd.clone())}
-        if self.lw.is_valid() {players.push(self.lw.clone())}
-        if self.c.is_valid() {players.push(self.c.clone())}
-        if self.rw.is_valid() {players.push(self.rw.clone())}
+        if self.ld.is_some() {players.push(self.ld.as_ref().unwrap().clone())}
+        if self.rd.is_some() {players.push(self.rd.as_ref().unwrap().clone())}
+        if self.lw.is_some() {players.push(self.lw.as_ref().unwrap().clone())}
+        if self.c.is_some() {players.push(self.c.as_ref().unwrap().clone())}
+        if self.rw.is_some() {players.push(self.rw.as_ref().unwrap().clone())}
+        if self.extra_attacker.is_some() {players.push(self.extra_attacker.as_ref().unwrap().clone())}
 
         return players;
     }

@@ -17,7 +17,7 @@ pub struct Player {
 impl Player {   // Basics.
     fn build(country_id: CountryId, ability: u8, position_id: PositionId) -> Self {
         let mut player: Self = Self::default();
-        player.person = Person::new(country_id, Gender::Male);
+        player.person = Person::build(country_id, Gender::Male);
         player.ability = ability;
         player.position_id = position_id;
 
@@ -27,21 +27,28 @@ impl Player {   // Basics.
     // Create a player and store it in the database. Return a clone of the Player.
     pub fn build_and_save(country_id: CountryId, ability: u8, position_id: PositionId) -> Self {
         let mut player: Self = Self::build(country_id, ability, position_id);
-        player.id = PLAYERS.lock().unwrap().len() as PlayerId;
-        
+        player.id = (PLAYERS.lock().unwrap().len() + 1) as PlayerId;
+
         player.update_to_db();
         return player;
     }
 
     // Get a player from the database.
-    pub fn fetch_from_db(id: &PlayerId) -> Self {
-        PLAYERS.lock().unwrap().get(id).expect(&format!("no Player with id {id}")).clone()
+    pub fn fetch_from_db(id: &PlayerId) -> Option<Self> {
+        PLAYERS.lock().unwrap().get(id).cloned()
     }
 
     // Update the Team to database.
     pub fn update_to_db(&self) {
         PLAYERS.lock()
             .expect(&format!("something went wrong when trying to update Player {}: {} to PLAYERS", self.id, self.person.get_full_name())).insert(self.id, self.clone());
+    }
+
+    // Delete the Player from the database.
+    pub fn delete_from_db(&self) {
+        PLAYERS.lock()
+            .expect(&format!("something went wrong when trying to delete Player {}: {} from PLAYERS", self.id, self.person.get_full_name()))
+            .remove(&self.id);
     }
 
     // Check if the player in question is not the default placeholder.

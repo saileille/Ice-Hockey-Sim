@@ -6,7 +6,7 @@ use crate::database::STAGES;
 use crate::match_event;
 use crate::team::Team;
 
-#[derive(Default, PartialEq)]
+#[derive(Default, Clone, PartialEq)]
 enum Type {
     #[default] Null,
     RoundRobin,
@@ -19,8 +19,9 @@ pub struct Stage {
     name: String,
     pub teams: Vec<TeamData>,
     pub match_rules: match_event::Rules,
-    round_robin_rules: rules::RoundRobin,
-    knockout_rules: rules::Knockout,
+    round_robin_rules: Option<rules::RoundRobin>,
+    knockout_rules: Option<rules::Knockout>,
+    stage_type: Type,   // Easy way to check whether the stage is a knockout or round robin type.
     schedule: Vec<GameId>,
 
     // Tests.
@@ -31,19 +32,28 @@ pub struct Stage {
 // Basics
 impl Stage {
     // Build a Stage element.
-    pub fn build<S: AsRef<str>>(name: S, round_robin_rules: rules::RoundRobin, match_rules: match_event::Rules) -> Self {
+    pub fn build<S: AsRef<str>>(name: S, round_robin_rules: Option<rules::RoundRobin>,
+    knockout_rules: Option<rules::Knockout>, match_rules: match_event::Rules) -> Self {
         let mut stage: Self = Self::default();
         stage.name = String::from(name.as_ref());
         stage.round_robin_rules = round_robin_rules;
+        stage.knockout_rules = knockout_rules;
         stage.match_rules = match_rules;
+
+        // Set the stage type. Only one of round_robin_rules and knockout_rules can be defined.
+        if stage.round_robin_rules.is_some() {
+            if stage.knockout_rules.is_none() { stage.stage_type = Type::RoundRobin }
+        }
+        else if stage.knockout_rules.is_some() { stage.stage_type = Type::Knockout }
 
         return stage;
     }
 
     // Build a Stage element and store it in the database. Return the created element.
-    pub fn build_and_save<S: AsRef<str>>(name: S, round_robin_rules: rules::RoundRobin, match_rules: match_event::Rules) -> Self {
-        let mut stage: Self = Self::build(name, round_robin_rules, match_rules);
-        stage.id = STAGES.lock().unwrap().len() as StageId;
+    pub fn build_and_save<S: AsRef<str>>(name: S, round_robin_rules: Option<rules::RoundRobin>,
+    knockout_rules: Option<rules::Knockout>, match_rules: match_event::Rules) -> Self {
+        let mut stage: Self = Self::build(name, round_robin_rules, knockout_rules, match_rules);
+        stage.id = (STAGES.lock().unwrap().len() + 1) as StageId;
         stage.update_to_db();
         return stage;
     }
@@ -66,34 +76,7 @@ impl Stage {
         self.name != String::default() &&
         self.teams.len() > 1 &&
         self.match_rules.is_valid() &&
-        self.get_type() != Type::Null
-    }
-
-    // Get the stage type.
-    fn get_type(&self) -> Type {
-        if self.round_robin_rules.is_valid() {
-            if self.knockout_rules == rules::Knockout::default() {
-                // Round robin rules are valid, knockout rules are entirely undefined.
-                return Type::RoundRobin;
-            }
-            else {
-                // Round robin rules are valid, knockout rules have some assigned values.
-                return Type::Null;
-            }
-        }
-        else if self.knockout_rules.is_valid() {
-            if self.round_robin_rules == rules::RoundRobin::default() {
-                // Knockout rules are valid, round robin rules are entirely undefined.
-                return Type::Knockout;
-            }
-            else {
-                // Knockout rules are valid, round robin rules have some assigned values.
-                return Type::Null;
-            }
-        }
-
-        // Neither ruleset is valid.
-        return Type::Null;
+        self.stage_type != Type::Null
     }
 
     // Add teams to this stage.
@@ -119,15 +102,16 @@ impl Stage {
     pub fn get_matches_per_team(&self) -> u8 {
         let matches: f64 = self.schedule.len() as f64;
         let teams: f64 = self.teams.len() as f64;
-        
+
         return (matches / teams * 2.0) as u8;
     }
 
     // Get how many matches each team should play.
     // For round robins only.
     fn get_theoretical_matches_per_team(&self) -> u8 {
-        self.get_round_length() * self.round_robin_rules.rounds
-        + self.round_robin_rules.extra_matches
+        let rr: &rules::RoundRobin = self.round_robin_rules.as_ref().unwrap();
+        self.get_round_length() * rr.rounds
+        + rr.extra_matches
     }
 
     // Get how many matches each team has to play to face each team once.
@@ -139,17 +123,20 @@ impl Stage {
     // Increase the matches by one if that is not the case.
     // For round robins only.
     fn validate_match_amount(&mut self) {
+        let mut rr: rules::RoundRobin = self.round_robin_rules.as_ref().unwrap().clone();
         let matches_per_team: u8 = self.get_theoretical_matches_per_team();
-        
-        // Make sure there will be some matches on the stage.
+
+        // Make sure there is at least one match on the stage per team.
         if matches_per_team == 0 {
-            self.round_robin_rules.extra_matches += 1
+            rr.extra_matches += 1
         }
 
         // Either the amount of teams or the matches per team must be even.
         if (self.teams.len() % 2 != 0) && (matches_per_team % 2 != 0) {
-            self.round_robin_rules.extra_matches += 1;
+            rr.extra_matches += 1;
         }
+
+        self.round_robin_rules = Some(rr);
     }
 }
 
@@ -189,9 +176,7 @@ pub struct TeamData {
 impl TeamData {
     fn build(team_id: TeamId) -> Self {
         let mut teamdata: Self = Self::default();
-        
         teamdata.team_id = team_id;
-        
         return teamdata;
     }
 

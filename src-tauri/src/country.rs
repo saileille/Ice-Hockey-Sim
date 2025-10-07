@@ -27,8 +27,8 @@ impl Country {  // Basics.
     // Build a Country element and store it in the database. Return the created element.
     pub fn build_and_save<S: AsRef<str>>(name: S) -> Self {
         let mut country: Self = Self::build(name.as_ref());
-        country.id = COUNTRIES.lock().unwrap().len() as CountryId;
-        
+        country.id = (COUNTRIES.lock().unwrap().len() + 1) as CountryId;
+
         country.update_to_db();
         return country;
     }

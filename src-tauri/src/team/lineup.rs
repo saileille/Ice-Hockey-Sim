@@ -10,27 +10,29 @@ pub struct LineUp {
 }
 
 impl LineUp {   // Basics.
-    pub fn new() -> Self {
-        LineUp::default()
-    }
-
     // Get a clone of either of the goalkeeper players.
-    fn get_goalkeeper_clone(&self, index: usize) -> Player {
+    fn get_goalkeeper_clone(&self, index: usize) -> Option<Player> {
         Player::fetch_from_db(&self.gk_ids[index])
     }
 
     // Get clones of both goalkeepers.
-    pub fn get_goalkeeper_clones(&self) -> [Player; 2] {
-        [
-            Player::fetch_from_db(&self.gk_ids[0]),
-            Player::fetch_from_db(&self.gk_ids[1]),
-        ]
+    pub fn get_goalkeeper_clones(&self) -> Vec<Player> {
+        let mut gks: Vec<Player> = Vec::new();
+
+        for id in self.gk_ids.iter() {
+            let gk: Option<Player> = Player::fetch_from_db(id);
+            if gk.is_some() {
+                gks.push(gk.unwrap());
+            }
+        }
+
+        return gks;
     }
 }
 
 impl LineUp {
+    // Clear the lineup.
     fn clear(&mut self) {
-        // Clear the lineup.
         for id in self.gk_ids.iter_mut() {
             *id = 0;
         }
@@ -126,22 +128,18 @@ pub struct DefencePair {
 }
 
 impl DefencePair {  // Basics.
-    fn new() -> Self {
-        DefencePair::default()
-    }
-
     // Get a clone of the left defender.
-    fn get_left_defender_clone(&self) -> Player {
+    fn get_left_defender_clone(&self) -> Option<Player> {
         Player::fetch_from_db(&self.ld_id)
     }
 
     // Get a clone of the right defender.
-    fn get_right_defender_clone(&self) -> Player {
+    fn get_right_defender_clone(&self) -> Option<Player> {
         Player::fetch_from_db(&self.rd_id)
     }
 
     fn get_clones(&self) -> DefencePairClones {
-        DefencePairClones::new(self)
+        DefencePairClones::build(self)
     }
 }
 
@@ -155,12 +153,12 @@ impl DefencePair {
 
 #[derive(Default)]
 struct DefencePairClones {
-    ld: Player,
-    rd: Player,
+    ld: Option<Player>,
+    rd: Option<Player>,
 }
 
 impl DefencePairClones {
-    fn new(defence_pair: &DefencePair) -> Self {
+    fn build(defence_pair: &DefencePair) -> Self {
         DefencePairClones {
             ld: defence_pair.get_left_defender_clone(),
             rd: defence_pair.get_right_defender_clone(),
@@ -177,27 +175,23 @@ pub struct ForwardLine {
 }
 
 impl ForwardLine {  // Basics.
-    fn new() -> Self {
-        ForwardLine::default()
-    }
-
     // Get a clone of the left winger.
-    fn get_left_winger_clone(&self) -> Player {
+    fn get_left_winger_clone(&self) -> Option<Player> {
         Player::fetch_from_db(&self.lw_id)
     }
 
     // Get a clone of the centre forward.
-    fn get_centre_clone(&self) -> Player {
+    fn get_centre_clone(&self) -> Option<Player> {
         Player::fetch_from_db(&self.c_id)
     }
 
     // Get a clone of the right winger.
-    fn get_right_winger_clone(&self) -> Player {
+    fn get_right_winger_clone(&self) -> Option<Player> {
         Player::fetch_from_db(&self.rw_id)
     }
 
     fn get_clones(&self) -> ForwardLineClones {
-        ForwardLineClones::new(self)
+        ForwardLineClones::build(self)
     }
 }
 
@@ -212,13 +206,13 @@ impl ForwardLine {
 
 #[derive(Default)]
 struct ForwardLineClones {
-    lw: Player,
-    c: Player,
-    rw: Player,
+    lw: Option<Player>,
+    c: Option<Player>,
+    rw: Option<Player>,
 }
 
 impl ForwardLineClones {
-    fn new(forward_line: &ForwardLine) -> Self {
+    fn build(forward_line: &ForwardLine) -> Self {
         ForwardLineClones {
             lw: forward_line.get_left_winger_clone(),
             c: forward_line.get_centre_clone(),

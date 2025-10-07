@@ -18,7 +18,7 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn new(id: PositionId, offensive_value: u8) -> Self {
+    pub fn build(id: PositionId, offensive_value: u8) -> Self {
         let mut position: Position = Position::default();
         position.id = id;
         position.offensive_value = offensive_value;

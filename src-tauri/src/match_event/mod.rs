@@ -1,6 +1,8 @@
 pub mod event;
 pub mod team;
 
+use std::option;
+
 use self::team::TeamData;
 use self::event::Shot;
 
@@ -15,27 +17,27 @@ pub struct Game {
     pub id: GameId,
     home: TeamData,
     away: TeamData,
-    gameclock: Clock,
+    clock: Clock,
     stage_id: StageId,
-    attacker: TeamData,
-    defender: TeamData,
+    attacker: Option<TeamData>,
+    defender: Option<TeamData>,
 }
 
 impl Game { // Basics.
     pub fn build(home: TeamId, away: TeamId, stage: StageId) -> Self {
-        let mut game = Game::default();
+        let mut game: Game = Game::default();
 
-        game.home = TeamData::new(home);
-        game.away = TeamData::new(away);
-        game.gameclock = Clock::default();
+        game.home = TeamData::build(home);
+        game.away = TeamData::build(away);
+        game.clock = Clock::default();
         game.stage_id = stage;
 
         return game;
     }
-    
+
     pub fn build_and_save(home: TeamId, away: TeamId, stage: StageId) -> Self {
         let mut game: Self = Self::build(home, away, stage);
-        game.id = GAMES.lock().unwrap().len() as GameId;
+        game.id = (GAMES.lock().unwrap().len() + 1) as GameId;
         game.update_to_db();
         return game;
     }
@@ -70,6 +72,7 @@ impl Game { // Basics.
     }
 }
 
+// Functional.
 impl Game {
     // Call when both teams must submit their lineups.
     fn get_team_lineups(&mut self) {
@@ -84,8 +87,8 @@ impl Game {
 
     // Do everything that needs to be done after the game is concluded.
     fn do_post_game_tasks(&mut self) {
-        self.attacker = TeamData::default();
-        self.defender = TeamData::default();
+        self.attacker = None;
+        self.defender = None;
     }
 
     // Play the game.
@@ -97,23 +100,33 @@ impl Game {
 
     // Simulate a game of ice hockey.
     fn simulate(&mut self) {
-        while self.gameclock.periods_completed < self.get_rules().periods {
-            self.simulate_period();
-            self.gameclock.reset_period_time();
-            self.gameclock.periods_completed += 1;
+        // Regular time.
+        while !self.is_regular_time_over() {
+            self.simulate_regular_period();
         }
 
-        // To save space, let's clear all duplicate data.
-        self.attacker = TeamData::default();
-        self.defender = TeamData::default();
+        // Overtime.
+        while !self.is_overtime_over() {
+            println!("This game went into overtime!");
+            self.simulate_overtime_period();
+        }
     }
 
     // Simulate a period of ice hockey.
-    fn simulate_period(&mut self) {
-        while (self.gameclock.period_total_seconds as u16) < self.get_rules().period_length {
+    fn simulate_regular_period(&mut self) {
+        while !self.is_period_over() {
             self.simulate_second();
-            self.gameclock.advance();
         }
+
+        self.clock.next_period();
+    }
+
+    fn simulate_overtime_period(&mut self) {
+        while !self.is_overtime_period_over() {
+            self.simulate_second();
+        }
+
+        self.clock.next_period();
     }
 
     // Simulate a second of ice hockey.
@@ -121,7 +134,9 @@ impl Game {
         self.change_players_on_ice();
         self.change_puck_possession();
         self.attempt_shot();
-        self.update_team_data();
+
+        self.update_teamdata();
+        self.clock.advance();
     }
 
     // Change the players on ice for home and away teams.
@@ -132,39 +147,48 @@ impl Game {
 
     // Change which team has the puck.
     fn change_puck_possession(&mut self) {
-        let modifier: f64 = self.home.players_on_ice.get_player_clones().get_skaters_ability_ratio(self.away.players_on_ice.get_player_clones());
+        let modifier: f64 = self.home.players_on_ice.as_ref().unwrap().get_clones().get_skaters_ability_ratio(
+            self.away.players_on_ice.as_ref().unwrap());
+
         if logic_event::Type::fetch_from_db(&logic_event::Id::PuckPossessionChange).get_outcome(modifier) {
-            self.attacker = self.home.clone();
-            self.defender = self.away.clone();
+            self.attacker = Some(self.home.clone());
+            self.defender = Some(self.away.clone());
         }
         else {
-            self.attacker = self.away.clone();
-            self.defender = self.home.clone();
+            self.attacker = Some(self.away.clone());
+            self.defender = Some(self.home.clone());
         }
     }
 
     // The attacking team attempts to shoot the puck.
     fn attempt_shot(&mut self) {
-        let modifier: f64 = self.attacker.players_on_ice.get_player_clones().get_skaters_ability_ratio(self.defender.players_on_ice.get_player_clones());
+        let attacker: &mut TeamData = self.attacker.as_mut().unwrap();
+        let attacker_players: &team::PlayersOnIce = attacker.players_on_ice.as_ref().unwrap();
+        let defender_players = self.defender.as_ref().unwrap().players_on_ice.as_ref().unwrap();
+
+        let modifier: f64 = attacker_players.get_clones().get_skaters_ability_ratio(defender_players);
         let success: bool = logic_event::Type::fetch_from_db(&logic_event::Id::ShotAtGoal).get_outcome(modifier);
 
         if success {
-            let mut shot: Shot = Shot::new(self.gameclock.clone(), self.attacker.players_on_ice.clone(), self.defender.players_on_ice.clone());
+            let mut shot: Shot = Shot::build(self.clock.clone(), attacker_players, defender_players);
             shot.create_shooter_and_assisters();
             shot.calculate_goal();
-            self.attacker.shots.push(shot);
+            attacker.shots.push(shot);
         }
     }
 
-    // Update the home and away team data with what attacker and defender have done.
-    fn update_team_data(&mut self) {
-        if self.home.team_id == self.attacker.team_id {
-            self.home = self.attacker.clone();
-            self.away = self.defender.clone();
+    // Update the attacker and defender teamdata.
+    fn update_teamdata(&mut self) {
+        let attacker: &TeamData = self.attacker.as_ref().unwrap();
+        let defender: &TeamData = self.defender.as_ref().unwrap();
+
+        if attacker.team_id == self.home.team_id {
+            self.home = attacker.clone();
+            self.away = defender.clone();
         }
         else {
-            self.home = self.defender.clone();
-            self.away = self.attacker.clone();
+            self.away = attacker.clone();
+            self.home = defender.clone();
         }
     }
 
@@ -180,19 +204,84 @@ impl Game {
 
     // Reset the match by setting the time and team data back to default values.
     fn reset(&mut self) {
-        self.gameclock.reset();
+        self.clock.reset();
         self.home.reset();
         self.away.reset();
+    }
+}
+
+// Clock-related functions.
+impl Game {
+    // Get a minutes-seconds representation of the time that has passed in the game.
+    fn game_time_to_string(&self) -> String {
+        Clock::time_to_string(self.get_game_total_seconds())
+    }
+
+    // Get the total seconds that have passed in the game.
+    fn get_game_total_seconds(&self) -> u32 {
+        (self.clock.periods_completed as u32) * (self.get_rules().period_length as u32) + (self.clock.period_total_seconds as u32)
+    }
+
+    // Get the amount of minutes that have passed in the game.
+    fn get_game_minutes(&self) -> u16 {
+        (self.get_game_total_seconds() / 60) as u16
+    }
+
+    // Get the amount of seconds that have passed in the game, after full minutes have been taken out.
+    fn get_game_seconds(&self) -> u8 {
+        (self.get_game_total_seconds() % 60) as u8
+    }
+
+    // Check if the game is over.
+    fn is_game_over(&self) -> bool {
+        return self.is_regular_time_over() && self.is_overtime_over()
+    }
+
+    // Check if the regular time of the game is over.
+    fn is_regular_time_over(&self) -> bool {
+        self.clock.periods_completed >= self.get_rules().periods
+    }
+
+    // Check if the currently ongoing period is over.
+    fn is_period_over(&self) -> bool {
+        (self.clock.period_total_seconds as u16) >= self.get_rules().period_length
+    }
+
+    // Check if the overtime period is over.
+    fn is_overtime_period_over(&self) -> bool {
+        return self.is_overtime_over() || self.is_period_over()
+    }
+
+    // Check if the overtime is over.
+    fn is_overtime_over(&self) -> bool {
+        // Always ends if teams are not tied.
+        if self.home.get_goal_amount() != self.away.get_goal_amount() {
+            return true;
+        }
+
+        if self.get_rules().continuous_overtime {
+            return false;
+        }
+
+        return self.get_overtime_length() >= (self.get_rules().overtime_length as i32);
+    }
+
+    // Get the maximum overtime length for the game,
+    // unless it is continuous.
+    fn get_overtime_length(&self) -> i32 {
+        (self.get_game_total_seconds() as i32) - (self.get_rules().get_regular_time() as i32)
     }
 }
 
 impl Game { // Methods for testing phase.
     // Generate an ascetic infodump about which team scored and when.
     pub fn get_simple_boxscore(&self) -> String {
+        let rules: Rules = self.get_rules();
+
         struct BoxscoreGoal {
-            time: Clock,
             team: String,
             score_info: String,
+            total_seconds: u32,
         }
 
         let home_name: String = self.home.get_team_clone().name;
@@ -202,9 +291,10 @@ impl Game { // Methods for testing phase.
         for goal in self.home.shots.iter() {
             if goal.is_goal {
                 events.push(BoxscoreGoal {
-                    time: goal.event.time.clone(),
                     team: home_name.clone(),
                     score_info: goal.scorer_and_assists_to_string(),
+                    total_seconds: (goal.event.time.periods_completed as u32) *
+                        (rules.period_length as u32) + (goal.event.time.period_total_seconds as u32),
                 });
             }
         }
@@ -212,18 +302,15 @@ impl Game { // Methods for testing phase.
         for goal in self.away.shots.iter() {
             if goal.is_goal {
                 events.push(BoxscoreGoal {
-                    time: goal.event.time.clone(),
                     team: away_name.clone(),
                     score_info: goal.scorer_and_assists_to_string(),
+                    total_seconds: (goal.event.time.periods_completed as u32) *
+                        (rules.period_length as u32) + (goal.event.time.period_total_seconds as u32),
                 });
             }
         }
 
-        events.sort_by(
-            |a: &BoxscoreGoal, b: &BoxscoreGoal| 
-            a.time.get_game_total_seconds(self.get_rules().period_length)
-            .cmp(&b.time.get_game_total_seconds(self.get_rules().period_length))
-        );
+        events.sort_by(|a: &BoxscoreGoal, b: &BoxscoreGoal| a.total_seconds.cmp(&b.total_seconds));
 
         let mut boxscore: String = String::new();
         let mut home_goal_counter: u16 = 0;
@@ -236,7 +323,7 @@ impl Game { // Methods for testing phase.
                 away_goal_counter += 1;
             }
 
-            boxscore += &format!("{}: {} - {} {} - {} \n", event.time.game_time_to_string(self.get_rules().period_length), home_goal_counter, away_goal_counter, event.team, event.score_info);
+            boxscore += &format!("{}: {} - {} {} - {}\n", Clock::time_to_string(event.total_seconds), home_goal_counter, away_goal_counter, event.team, event.score_info);
         }
 
         return boxscore;
@@ -294,37 +381,8 @@ impl Clock {
 
 // Functional.
 impl Clock {
-    // Check if the game time is over.
-    fn is_game_time_over(&self, rules: &Rules) -> bool {
-        if rules.continuous_overtime ||
-        !self.is_regular_time_over(rules) { 
-            return false;
-        }
-
-
-        return true;
-    }
-
-    // Check if the regular time of the game is over.
-    fn is_regular_time_over(&self, rules: &Rules) -> bool {
-        self.periods_completed >= rules.periods
-    }
-
-    // Check if the overtime is over.
-    fn is_overtime_over(&self, rules: &Rules) -> bool {
-        if rules.continuous_overtime { return false; }
-
-        let overtime_length: i32 = (self.get_game_total_seconds(rules.period_length) as i32) - (rules.get_regular_time() as i32);
-        return overtime_length >= (rules.overtime_length as i32);
-    }
-
     fn time_to_string(seconds: u32) -> String {
         format!("{}:{:0>2}", seconds / 60, seconds % 60)
-    }
-
-    // Get a minutes-seconds representation of the time that has passed in the game.
-    fn game_time_to_string(&self, period_length: u16) -> String {
-        Clock::time_to_string(self.get_game_total_seconds(period_length))
     }
 
     // Get a minutes-seconds representation of the time that has passed in the period.
@@ -332,11 +390,6 @@ impl Clock {
         Clock::time_to_string(self.period_total_seconds as u32)
     }
 
-    // Get the total seconds that have passed in the game.
-    fn get_game_total_seconds(&self, period_length: u16) -> u32 {
-        (self.periods_completed as u32) * (period_length as u32) + (self.period_total_seconds as u32)
-    }
-    
     // Get the amount of minutes that have passed in the period.
     fn get_period_minutes(&self) -> u8 {
         (self.period_total_seconds / 60) as u8
@@ -347,19 +400,15 @@ impl Clock {
         (self.period_total_seconds % 60) as u8
     }
 
-    // Get the amount of minutes that have passed in the game.
-    fn get_game_minutes(&self, period_length: u16) -> u16 {
-        (self.get_game_total_seconds(period_length) / 60) as u16
-    }
-
-    // Get the amount of seconds that have passed in the game, after full minutes have been taken out.
-    fn get_game_seconds(&self, period_length: u16) -> u8 {
-        (self.get_game_total_seconds(period_length) % 60) as u8
-    }
-
     // Advance time by one second.
     fn advance(&mut self) {
         self.period_total_seconds += 1;
+    }
+
+    // Move on to the next period.
+    fn next_period(&mut self) {
+        self.reset_period_time();
+        self.periods_completed += 1;
     }
 
     // Reset the period clock.

@@ -67,7 +67,7 @@ impl Team { // Basics.
         let mut players: Vec<Player> = Vec::new();
 
         for id in self.roster.iter() {
-            players.push(Player::fetch_from_db(id));
+            players.push(Player::fetch_from_db(id).unwrap());
         }
 
         return players;
@@ -79,7 +79,7 @@ impl Team {
     pub fn auto_build_lineup(&mut self) {
         let mut players: Vec<Player> = self.get_all_player_clones();
         players.sort_by(|a, b| b.ability.cmp(&a.ability));
-        
+
         self.lineup.auto_add(players);
 
         self.update_to_db();
@@ -93,7 +93,7 @@ impl Team { // Functions for the testing phase.
 
         let range: Uniform<u8> = Uniform::new_inclusive(min_ability, max_ability)
             .expect(&format!("error: low: {min_ability}, high: {max_ability}"));
-        
+
         let mut rng: rand::prelude::ThreadRng = rand::rng();
 
         let country_id: CountryId = Country::fetch_from_db_with_name("Finland").id;
@@ -129,5 +129,14 @@ impl Team { // Functions for the testing phase.
         }
 
         self.update_to_db();
+    }
+
+    // Delete the team's players.
+    pub fn delete_players(&mut self) {
+        for id in self.roster.iter() {
+            Player::fetch_from_db(id).unwrap().delete_from_db();
+        }
+
+        self.roster.clear();
     }
 }

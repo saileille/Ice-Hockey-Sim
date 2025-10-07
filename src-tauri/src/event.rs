@@ -20,8 +20,8 @@ pub struct Type {
 }
 
 impl Type {    // Basics.
-    pub fn new(min_boundary: f64, equilibrium: f64, max_boundary: f64) -> Self {
-        let mut event = Type::default();
+    pub fn build(min_boundary: f64, equilibrium: f64, max_boundary: f64) -> Self {
+        let mut event: Type = Type::default();
         event.min_boundary = min_boundary;
         event.equilibrium = equilibrium;
         event.max_boundary = max_boundary;
