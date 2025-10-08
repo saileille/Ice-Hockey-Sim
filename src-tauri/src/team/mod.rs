@@ -48,7 +48,7 @@ impl Team { // Basics.
     pub fn build_and_save<S: AsRef<str>>(name: S) -> Self {
         let mut team: Self = Self::build(name);
         team.create_id(TEAMS.lock().unwrap().len() + 1);
-        team.update_to_db();
+        team.save();
         return team;
     }
 
@@ -58,7 +58,7 @@ impl Team { // Basics.
     }
 
     // Update the Team to database.
-    pub fn update_to_db(&self) {
+    pub fn save(&self) {
         TEAMS.lock()
             .expect(&format!("something went wrong when trying to update Team {}: {} to TEAMS", self.id, self.name))
             .insert(self.id, self.clone());
@@ -79,7 +79,7 @@ impl Team { // Basics.
     }
 
     // Get every player in the roster as a clone.
-    fn get_all_player_clones(&self) -> Vec<Player> {
+    fn get_players(&self) -> Vec<Player> {
         let mut players: Vec<Player> = Vec::new();
 
         for id in self.roster.iter() {
@@ -93,18 +93,20 @@ impl Team { // Basics.
 impl Team {
     // Build a lineup for the team from its roster.
     pub fn auto_build_lineup(&mut self) {
-        let mut players: Vec<Player> = self.get_all_player_clones();
+        self.lineup.clear();
+
+        let mut players: Vec<Player> = self.get_players();
         players.sort_by(|a, b| b.ability.cmp(&a.ability));
 
         self.lineup.auto_add(players);
-
-        self.update_to_db();
+        self.save();
     }
 }
 
-impl Team { // Functions for the testing phase.
+// Tests.
+impl Team {
     // Generate a basic roster of players for the team.
-    pub fn generate_roster(&mut self, min_ability: u8, max_ability: u8) {
+    fn generate_roster(&mut self, min_ability: u8, max_ability: u8) {
         self.roster = HashSet::new();
         let range: Uniform<u8> = Uniform::new_inclusive(min_ability, max_ability)
             .expect(&format!("error: low: {min_ability}, high: {max_ability}"));
@@ -143,7 +145,7 @@ impl Team { // Functions for the testing phase.
             self.roster.insert(player.id);
         }
 
-        self.update_to_db();
+        self.save();
     }
 
     // Delete the team's players.
@@ -153,5 +155,10 @@ impl Team { // Functions for the testing phase.
         }
 
         self.roster.clear();
+    }
+
+    // Setup a team before a season.
+    pub fn setup(&mut self, min_ability: u8, max_ability: u8) {
+        self.generate_roster(min_ability, max_ability);
     }
 }

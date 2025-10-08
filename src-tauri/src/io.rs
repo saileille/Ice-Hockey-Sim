@@ -20,7 +20,7 @@ fn read_json_file<S: AsRef<str>>(path: S) -> io::Result<String> {
         Err(e) => return Err(e),
     };
 
-    file.read_to_string(&mut json);
+    file.read_to_string(&mut json).unwrap();
     return Ok(json);
 }
 

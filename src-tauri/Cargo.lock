@@ -1577,6 +1577,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
+ "time",
  "weighted_rand",
 ]
 

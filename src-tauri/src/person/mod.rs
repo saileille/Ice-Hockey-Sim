@@ -41,7 +41,7 @@ impl Person {
     }
 
     // Get the person's country as an object.
-    fn get_country_clone(&self) -> Country {
+    fn get_country(&self) -> Country {
         Country::fetch_from_db(&self.country_id)
     }
 }

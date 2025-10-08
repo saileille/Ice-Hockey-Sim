@@ -1,10 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use crate::database::{
-    COMPETITIONS,
-    TEAMS
-};
-
 use crate::{
+    database::COMPETITIONS,
     competition::Competition,
     match_event::Game,
     team::Team
@@ -15,11 +11,8 @@ pub fn test_game() -> (String, String) {
     let mut home: Team = Team::build_and_save("Home");
     let mut away: Team = Team::build_and_save("Away");
 
-    home.generate_roster(0, 0);
-    away.generate_roster(0, 0);
-
-    home.auto_build_lineup();
-    away.auto_build_lineup();
+    home.setup(0, 0);
+    away.setup(0, 0);
 
     let mut game: Game = Game::build(home.id, away.id, 1);
     game.play();
@@ -34,10 +27,11 @@ pub fn test_game() -> (String, String) {
     return data;
 }
 
+// Test a competition.
 #[tauri::command]
 pub fn test_comp() -> String {
-    let comp: crate::competition::Competition = COMPETITIONS.lock().unwrap().get(&1).unwrap().clone();
-    comp.generate_rosters();
+    let comp: Competition = COMPETITIONS.lock().unwrap().get(&1).unwrap().clone();
+    comp.setup();
 
     "".to_string()
 }

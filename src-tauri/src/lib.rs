@@ -8,6 +8,7 @@ mod match_event;
 mod io;
 mod person;
 mod team;
+mod time;
 mod terminal_tests;
 
 use tauri::Manager;
@@ -32,6 +33,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![commands::tests::test_game])
         .invoke_handler(tauri::generate_handler![commands::tests::test_comp])
+        .invoke_handler(tauri::generate_handler![commands::go_to_next_day])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

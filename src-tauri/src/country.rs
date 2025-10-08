@@ -23,7 +23,7 @@ impl Country {  // Basics.
     // Validate an ID.
     fn create_id(&mut self, id: usize) {
         self.id = match id.try_into() {
-            Ok(id) => id,
+            Ok(n) => n,
             Err(e) => panic!("{e}"),
         };
     }
@@ -41,7 +41,7 @@ impl Country {  // Basics.
         let mut country: Self = Self::build(name.as_ref());
         country.create_id(COUNTRIES.lock().unwrap().len() + 1);
 
-        country.update_to_db();
+        country.save();
         return country;
     }
 
@@ -51,7 +51,7 @@ impl Country {  // Basics.
     }
 
     // Update the Country to database.
-    pub fn update_to_db(&self) {
+    pub fn save(&self) {
         COUNTRIES.lock()
             .expect(&format!("something went wrong when trying to update Country {}: {} to COUNTRIES", self.id, self.name))
             .insert(self.id, self.clone());

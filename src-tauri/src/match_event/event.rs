@@ -47,12 +47,12 @@ impl Shot { // Basics.
     }
 
     // Get shooter object.
-    fn get_shooter_clone(&self) -> Player {
+    fn get_shooter(&self) -> Player {
         Player::fetch_from_db(&self.shooter_id).unwrap()
     }
 
     // Get assister objects.
-    fn get_assister_clones(&self) -> Vec<Player> {
+    fn get_assisters(&self) -> Vec<Player> {
         let mut clones: Vec<Player> = Vec::new();
 
         for id in self.assister_ids.iter() {
@@ -68,7 +68,7 @@ impl Shot { // Basics.
 impl Shot {
     // Completely random way to determine who shoots and who assists.
     pub fn create_shooter_and_assisters(&mut self) {
-        let players: Vec<Player> = self.event.attacking_players.get_clones().get_skaters_in_vector();
+        let players: Vec<Player> = self.event.attacking_players.get().get_skaters_in_vector();
         let mut shooter_and_assisters: Vec<PlayerId> = Vec::new();
         let mut rng: ThreadRng = rand::rng();
         for i in 0..3 {
@@ -98,8 +98,8 @@ impl Shot {
     // Check if the shot ends up in goal.
     // Only taking shooter into account for now.
     pub fn calculate_goal(&mut self) {
-        let gk_ability: f64 = self.event.defending_players.get_goalkeeper_clone().unwrap().ability as f64;
-        let shooter_ability: f64 = self.get_shooter_clone().ability as f64;
+        let gk_ability: f64 = self.event.defending_players.get_goalkeeper().unwrap().ability as f64;
+        let shooter_ability: f64 = self.get_shooter().ability as f64;
         let total_ability: f64 = gk_ability + shooter_ability;
         let modifier: f64;
 
@@ -114,10 +114,10 @@ impl Shot {
 
 impl Shot { // Testing stuff.
     pub fn scorer_and_assists_to_string(&self) -> String {
-        let string: String = self.get_shooter_clone().person.get_full_name();
+        let string: String = self.get_shooter().person.get_full_name();
 
         let mut assisters_string: String = String::new();
-        let assisters: Vec<Player> = self.get_assister_clones();
+        let assisters: Vec<Player> = self.get_assisters();
 
         for (i, assister) in assisters.iter().enumerate() {
             if i > 0 { assisters_string += ", "; }

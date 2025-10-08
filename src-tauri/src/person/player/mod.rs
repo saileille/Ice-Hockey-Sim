@@ -1,20 +1,11 @@
 pub mod position;
 
 use crate::{
-    types::{
-        CountryId,
-        PlayerId
-    },
+    types::{CountryId, PlayerId},
     database::PLAYERS
 };
-use super::{
-    Person,
-    Gender
-};
-use self::position::{
-    Position,
-    PositionId
-};
+use super::{Person, Gender};
+use self::position::{Position, PositionId};
 
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct Player {
@@ -46,7 +37,7 @@ impl Player {   // Basics.
     pub fn build_and_save(country_id: CountryId, ability: u8, position_id: PositionId) -> Self {
         let mut player: Self = Self::build(country_id, ability, position_id);
         player.create_id(PLAYERS.lock().unwrap().len() + 1);
-        player.update_to_db();
+        player.save();
         return player;
     }
 
@@ -56,7 +47,7 @@ impl Player {   // Basics.
     }
 
     // Update the Team to database.
-    pub fn update_to_db(&self) {
+    pub fn save(&self) {
         PLAYERS.lock()
             .expect(&format!("something went wrong when trying to update Player {}: {} to PLAYERS", self.id, self.person.get_full_name())).insert(self.id, self.clone());
     }
@@ -76,7 +67,7 @@ impl Player {   // Basics.
     }
 
     // Get a clone of the player's position.
-    fn get_position_clone(&self) -> Position {
+    fn get_position(&self) -> Position {
         Position::fetch_from_db(&self.position_id)
     }
 }

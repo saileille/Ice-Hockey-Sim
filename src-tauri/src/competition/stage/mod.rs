@@ -1,15 +1,17 @@
 pub mod rules;
-pub mod schedule_generator;
+mod schedule_generator;
+mod knockout;
+mod round_robin;
+
+use std::collections::HashMap;
+use ::time::Date;
 
 use crate::{
-    types::{
-        StageId,
-        GameId,
-        TeamId,
-    },
     database::STAGES,
-    match_event,
-    team::Team
+    match_event::{self, Game},
+    team::Team,
+    time::{date_to_db_string, get_next_annual_date, get_previous_annual_date},
+    types::{convert, StageId, TeamId}
 };
 
 #[derive(Default, Clone, PartialEq)]
@@ -23,16 +25,17 @@ enum Type {
 pub struct Stage {
     pub id: StageId,
     name: String,
-    pub teams: Vec<TeamData>,
+    num_of_teams: u8,   // How many teams this stage takes. Can be left at 0 for initial stage.
+    earliest_date: [u8; 2], // Month and day for the earliest possible match in the Stage.
+    latest_date: [u8; 2],   // Month and day for the latest possible match in the Stage.
+    pub teams: HashMap<TeamId, TeamData>,
     pub match_rules: match_event::Rules,
-    round_robin_rules: Option<rules::RoundRobin>,
-    knockout_rules: Option<rules::Knockout>,
+    round_robin: Option<rules::RoundRobin>,
+    knockout: Option<rules::Knockout>,
     stage_type: Type,   // Easy way to check whether the stage is a knockout or round robin type.
-    schedule: Vec<GameId>,
 
     // Tests.
-    matchday_tests: Vec<Vec<GameId>>,
-    pub failures: usize,
+    // pub failures: usize,
 }
 
 // Basics
@@ -40,35 +43,39 @@ impl Stage {
     // Create an ID.
     fn create_id(&mut self, id: usize) {
         self.id = match id.try_into() {
-            Ok(id) => id,
+            Ok(n) => n,
             Err(e) => panic!("{e}")
         };
     }
 
     // Build a Stage element.
-    pub fn build<S: AsRef<str>>(name: S, round_robin_rules: Option<rules::RoundRobin>,
-    knockout_rules: Option<rules::Knockout>, match_rules: match_event::Rules) -> Self {
+    pub fn build(name: &str, round_robin: Option<rules::RoundRobin>,
+    knockout: Option<rules::Knockout>, match_rules: match_event::Rules,
+    earliest_date: [u8; 2], latest_date: [u8; 2]) -> Self {
         let mut stage: Self = Self::default();
-        stage.name = String::from(name.as_ref());
-        stage.round_robin_rules = round_robin_rules;
-        stage.knockout_rules = knockout_rules;
+        stage.name = name.to_string();
+        stage.round_robin = round_robin;
+        stage.knockout = knockout;
         stage.match_rules = match_rules;
+        stage.earliest_date = earliest_date;
+        stage.latest_date = latest_date;
 
-        // Set the stage type. Only one of round_robin_rules and knockout_rules can be defined.
-        if stage.round_robin_rules.is_some() {
-            if stage.knockout_rules.is_none() { stage.stage_type = Type::RoundRobin }
+        // Set the stage type. Only one of round_robin and knockout can be defined.
+        if stage.round_robin.is_some() {
+            if stage.knockout.is_none() { stage.stage_type = Type::RoundRobin }
         }
-        else if stage.knockout_rules.is_some() { stage.stage_type = Type::Knockout }
+        else if stage.knockout.is_some() { stage.stage_type = Type::Knockout }
 
         return stage;
     }
 
     // Build a Stage element and store it in the database. Return the created element.
-    pub fn build_and_save<S: AsRef<str>>(name: S, round_robin_rules: Option<rules::RoundRobin>,
-    knockout_rules: Option<rules::Knockout>, match_rules: match_event::Rules) -> Self {
-        let mut stage: Self = Self::build(name, round_robin_rules, knockout_rules, match_rules);
+    pub fn build_and_save(name: &str, round_robin: Option<rules::RoundRobin>,
+    knockout: Option<rules::Knockout>, match_rules: match_event::Rules,
+    earliest_date: [u8; 2], latest_date: [u8; 2]) -> Self {
+        let mut stage: Self = Self::build(name, round_robin, knockout, match_rules, earliest_date, latest_date);
         stage.create_id(STAGES.lock().unwrap().len() + 1);
-        stage.update_to_db();
+        stage.save();
         return stage;
     }
 
@@ -78,7 +85,7 @@ impl Stage {
     }
 
     // Update the Stage to database.
-    pub fn update_to_db(&self) {
+    pub fn save(&self) {
         STAGES.lock()
             .expect(&format!("something went wrong when trying to update Stage {}: {} to STAGES", self.id, self.name))
             .insert(self.id, self.clone());
@@ -93,126 +100,86 @@ impl Stage {
         self.stage_type != Type::Null
     }
 
-    // Add teams to this stage.
-    fn add_teams(&mut self, team_ids: Vec<TeamId>) {
-        for id in team_ids {
-            self.teams.push(TeamData::build(id));
-        }
-    }
-
     // Get the IDs of teams participating in the stage.
     fn get_team_ids(&self) -> Vec<TeamId> {
         let mut ids: Vec<TeamId> = Vec::new();
-        for team_data in self.teams.iter() {
+        for team_data in self.teams.values() {
             ids.push(team_data.team_id);
         }
         return ids;
     }
+
+    // Get the previous earliest match date as a date object.
+    pub fn get_previous_start_date(&self) -> Date {
+        get_previous_annual_date(self.earliest_date[0], self.earliest_date[1])
+    }
+
+    // Get the previous latest match date as a date object.
+    fn get_previous_end_date(&self) -> Date {
+        get_previous_annual_date(self.latest_date[0], self.latest_date[1])
+    }
+
+    // Get the next earliest match date as a date object.
+    fn get_next_start_date(&self) -> Date {
+        get_next_annual_date(self.earliest_date[0], self.earliest_date[1])
+    }
+
+    // Get the next latest match date as a date object.
+    pub fn get_next_end_date(&self) -> Date {
+        get_next_annual_date(self.latest_date[0], self.latest_date[1])
+    }
+
 }
 
 // Functional.
 impl Stage {
-    // Get the amount of actual games each team plays.
-    pub fn get_matches_per_team(&self) -> u8 {
-        let matches_u: usize = self.schedule.len();
-        let matches: f64 = if matches_u <= (f64::MAX as usize) {
-            matches_u as f64
-        } else {
-            panic!("{matches_u} is bigger than {}", f64::MAX)
-        };
-
-        let teams_u: usize = self.teams.len();
-        let teams: f64 = if teams_u <= (f64::MAX as usize) {
-            teams_u as f64
-        } else {
-            panic!("{teams_u} is bigger than {}", f64::MAX)
-        };
-
-        let result: f64 = matches / teams * 2.0;
-        if result <= (u8::MAX as f64) {
-            return result as u8;
-        }
-
-        panic!("{result} matches when maximum allowed is {}", u8::MAX);
-    }
-
-    // Get how many matches each team should play.
-    // For round robins only.
-    fn get_theoretical_matches_per_team(&self) -> u8 {
-        let rr: &rules::RoundRobin = self.round_robin_rules.as_ref().unwrap();
-        self.get_round_length() * rr.rounds
-        + rr.extra_matches
-    }
-
-    // Get how many matches each team has to play to face each team once.
-    fn get_round_length(&self) -> u8 {
-        match (self.teams.len() - 1).try_into() {
-            Ok(n) => n,
-            Err(e) => panic!("{e}")
+    // Add teams to this stage.
+    pub fn add_teams(&mut self, team_ids: &Vec<TeamId>) {
+        for id in team_ids.iter() {
+            self.teams.insert(*id, TeamData::build(*id));
         }
     }
 
-    // Check if the stage has a valid amount of matches.
-    // Increase the matches by one if that is not the case.
-    // For round robins only.
-    fn validate_match_amount(&mut self) {
-        let mut rr: rules::RoundRobin = self.round_robin_rules.as_ref().unwrap().clone();
-        let matches_per_team: u8 = self.get_theoretical_matches_per_team();
-
-        // Make sure there is at least one match on the stage per team.
-        if matches_per_team == 0 {
-            rr.extra_matches += 1
-        }
-
-        // Either the amount of teams or the matches per team must be even.
-        if (self.teams.len() % 2 != 0) && (matches_per_team % 2 != 0) {
-            rr.extra_matches += 1;
-        }
-
-        self.round_robin_rules = Some(rr);
+    // Set up the stage so the competition can use it, and save to database.
+    pub fn setup(&mut self, team_ids: &Vec<TeamId>) {
+        self.add_teams(team_ids);
+        self.generate_schedule_for_round_robin();   // todo: make sure knockouts do not do this.
+        self.save();
     }
 }
 
 // Testing
 impl Stage {
-    // Get how many matches there should be in the stage in total.
-    // For round robins only.
-    pub fn get_theoretical_total_matches(&self) -> u16 {
-        let teams: u16 = match self.teams.len().try_into() {
-            Ok(n) => n,
-            Err(e) => panic!("{e}")
-        };
+    // Get a nice printed display of match schedule.
+    pub fn display_match_schedule(&self) -> String {
+        let mut s: String = String::new();
+        let games: Vec<(Date, Vec<Game>)> = Game::fetch_stage_matches_by_date(self.id);
 
-        return (self.get_theoretical_matches_per_team() as u16) * teams / 2;
-    }
+        for date in games.iter() {
+            if s.len() > 0 {
+                s += "\n\n";
+            }
+            s += &date_to_db_string(&date.0);
 
-    // Check if the stage has a valid amount of matches.
-    // For testing purposes only. For in-game use, see validate_match_amount.
-    pub fn has_valid_match_amount(&self) -> bool {
-        (self.teams.len() % 2 == 0) || (self.get_theoretical_matches_per_team() % 2 == 0)
-    }
+            for game in date.1.iter() {
+                s += &format!("\n{}", game.get_name_and_score_if_started());
+            }
+        }
 
-    // Check if the match schedule went according to plan.
-    pub fn had_successful_match_generation(&self) -> bool {
-        let matches: u16 = match self.schedule.len().try_into() {
-            Ok(n) => n,
-            Err(e) => panic!("{e}")
-        };
-
-        return self.get_theoretical_total_matches() == matches;
+        return s;
     }
 }
 
 #[derive(Default, Clone)]
 pub struct TeamData {
     pub team_id: TeamId,
-    regular_wins: u8,
-    ot_wins: u8,
-    draws: u8,
-    ot_losses: u8,
-    regular_losses: u8,
-    goals_scored: u8,
-    goals_conceded: u8,
+    pub regular_wins: u8,
+    pub ot_wins: u8,
+    pub draws: u8,
+    pub ot_losses: u8,
+    pub regular_losses: u8,
+    pub goals_scored: u16,
+    pub goals_conceded: u16,
 }
 
 // Basics.
@@ -253,9 +220,8 @@ impl TeamData {
     }
 
     fn get_goal_difference(&self) -> i8 {
-        match ((self.goals_scored as i16) - (self.goals_conceded as i16)).try_into() {
-            Ok(n) => n,
-            Err(e) => panic!("{e}")
-        }
+        let gf: i16 = convert::u16_to_i16(self.goals_scored);
+        let ga: i16 = convert::u16_to_i16(self.goals_conceded);
+        return convert::i16_to_i8(gf - ga);
     }
 }

@@ -26,6 +26,7 @@ rand = "0.9.2"
 lazy_static = "1.5.0"
 weighted_rand = "0.4.2"
 clearscreen = "4.0.2"
+time = {version = "0.3.44", features = ["formatting", "parsing"] }
 
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.

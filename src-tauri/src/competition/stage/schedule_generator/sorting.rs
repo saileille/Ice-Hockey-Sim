@@ -9,8 +9,7 @@ use rand::{
 };
 
 use crate::{
-    types::TeamId,
-    competition::stage::rules::MatchGenType
+    competition::stage::rules::MatchGenType, types::{convert, TeamId}
 };
 
 use super::match_generator::TeamScheduleData;
@@ -41,14 +40,8 @@ fn compare_home_away_abs(a: &TeamScheduleData, b: &TeamScheduleData, prev_a: &Te
 
 // Compare the match count.
 fn compare_match_count(a: &TeamScheduleData, b: &TeamScheduleData, prev_a: &TeamScheduleData, prev_b: &TeamScheduleData) -> Ordering {
-    let a_total: i8 = match a.get_match_count(prev_a).try_into() {
-        Ok(n) => n,
-        Err(e) => panic!("{e}")
-    };
-    let b_total: i8 = match b.get_match_count(prev_b).try_into() {
-        Ok(n) => n,
-        Err(e) => panic!("{e}")
-    };
+    let a_total: i8 = convert::u8_to_i8(a.get_match_count(prev_a));
+    let b_total: i8 = convert::u8_to_i8(b.get_match_count(prev_b));
 
     return a_total.cmp(&b_total);
 }

@@ -1,11 +1,9 @@
 // The game database.
 use std::{
     collections::HashMap,
-    sync::{
-        LazyLock,
-        Mutex
-    }
+    sync::{LazyLock, Mutex}
 };
+use time::{macros::date, Date};
 use lazy_static::lazy_static;
 
 use crate::{
@@ -14,31 +12,29 @@ use crate::{
     team::Team,
     person::player::{
         Player,
-        position::{
-            Position,
-            PositionId
-        }
+        position::{Position, PositionId}
     },
     country::Country,
     competition::{
         Competition,
-        stage::{
-            Stage,
-            rules
-        }
+        stage::{Stage, rules}
     },
     match_event,
     io
 };
 
-pub static COUNTRIES: LazyLock<Mutex<HashMap<types::CountryId, Country>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+// The current date in the game.
+pub static TODAY: LazyLock<Mutex<Date>> = LazyLock::new(|| Mutex::new(date!(2025-08-01)));
 
+pub static COUNTRIES: LazyLock<Mutex<HashMap<types::CountryId, Country>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 pub static COMPETITIONS: LazyLock<Mutex<HashMap<types::CompetitionId, Competition>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 pub static STAGES: LazyLock<Mutex<HashMap<types::StageId, Stage>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-pub static GAMES: LazyLock<Mutex<HashMap<types::GameId, match_event::Game>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+// NOTE: GAMES is exceptional in that the games are stored first based on date and then GameId.
+pub static GAMES: LazyLock<Mutex<
+    HashMap<String, HashMap<types::GameId, match_event::Game>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 pub static TEAMS: LazyLock<Mutex<HashMap<types::TeamId, Team>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-
 pub static PLAYERS: LazyLock<Mutex<HashMap<types::PlayerId, Player>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 lazy_static! {
@@ -79,7 +75,6 @@ lazy_static! {
         ]);
         return e;
     };
-
 }
 
 // Initialise the database.
@@ -107,21 +102,21 @@ fn add_competition_data() {
             Team::build_and_save("KalPa"),
             Team::build_and_save("Kärpät"),
             Team::build_and_save("Lukko"),
-            Team::build_and_save("Pelicans"),
+            Team::build_and_save("Pelican"),
             Team::build_and_save("SaiPa"),
             Team::build_and_save("Tappara"),
             Team::build_and_save("TPS"),
             Team::build_and_save("Ässät"),
         ],
         vec![
-            vec![
-                Stage::build_and_save(
-                    "Regular Season",
-                    Some(rules::RoundRobin::build(4, 0)),
-                    None,
-                    match_event::Rules::build(3, 1200, 300, false),
-                )
-            ]
+            Stage::build_and_save(
+                "Regular Season",
+                Some(rules::RoundRobin::build(4, 0, 3, 2, 1, 1, 0)),
+                None,
+                match_event::Rules::build(3, 1200, 300, false),
+                [9, 1],
+                [4, 1]
+            )
         ]
     );
 }

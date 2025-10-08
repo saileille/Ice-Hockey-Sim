@@ -1,26 +1,36 @@
 // Functions for testing things on the terminal.
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
+use time::Date;
 
 use crate::{
-    database::{
-        TEAMS,
-        PLAYERS
-    },
-    team::Team,
+    database::{COMPETITIONS, TODAY},
+    commands::go_to_next_day,
+    competition::{Competition, stage::Stage,}
 };
 
 pub fn test_comp_generation() {
-    // Let's make players for all teams.
-    let mut teams_clone: HashMap<u8, Team> = TEAMS.lock().unwrap().clone();
-    for team in teams_clone.values_mut() {
-        println!("{}", team.name);
-        team.generate_roster(0, 0);
+    let start_time: Instant = Instant::now();
+
+    let mut comps: HashMap<u8, Competition> = COMPETITIONS.lock().unwrap().clone();
+    for comp in comps.values_mut() {
+        comp.setup();
     }
 
-    println!("{} players", PLAYERS.lock().unwrap().len());
+    let comp: &Competition = comps.get(&1).unwrap();
+    let end_date: Date = Stage::fetch_from_db(&comp.stage_ids[0]).get_next_end_date();
+
+    loop {
+        go_to_next_day();
+        if *TODAY.lock().unwrap() > end_date { break; }
+    }
+
+    let stage: Stage = Stage::fetch_from_db(&comp.stage_ids[0]);
+    println!("{}", stage.display_standings());
+    println!("{}", stage.display_match_schedule());
+
+    println!("Completed in {} seconds", start_time.elapsed().as_secs());
 }
 
-// Testing with various team counts and match amounts.
 /* pub fn test_match_generator() {
     let sort_types: [MatchGenType; 3] = [MatchGenType::MatchCount, MatchGenType::Random, MatchGenType::Alternating];
 
