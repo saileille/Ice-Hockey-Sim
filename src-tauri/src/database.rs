@@ -17,7 +17,7 @@ use crate::{
     country::Country,
     competition::{
         Competition,
-        stage::{Stage, rules}
+        stage::{Stage, round_robin::RoundRobin}
     },
     match_event,
     io
@@ -111,7 +111,7 @@ fn add_competition_data() {
         vec![
             Stage::build_and_save(
                 "Regular Season",
-                Some(rules::RoundRobin::build(4, 0, 3, 2, 1, 1, 0)),
+                Some(RoundRobin::build(4, 0, 3, 2, 1, 1, 0)),
                 None,
                 match_event::Rules::build(3, 1200, 300, false),
                 [9, 1],

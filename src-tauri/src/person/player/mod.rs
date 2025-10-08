@@ -7,7 +7,7 @@ use crate::{
 use super::{Person, Gender};
 use self::position::{Position, PositionId};
 
-#[derive(PartialEq, Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub struct Player {
     pub id: PlayerId,  // id: 0 is reserved
     pub person: Person,

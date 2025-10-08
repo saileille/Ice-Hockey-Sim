@@ -6,7 +6,7 @@ use rand::{
 
 use crate::database;
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Eq, Hash, PartialEq)]
 #[derive(Debug)]
 pub enum Id {
     PuckPossessionChange,
@@ -33,7 +33,7 @@ impl Type {    // Basics.
 
     // Fetch the EventType from the database.
     pub fn fetch_from_db(id: &Id) -> Self {
-        database::EVENT_TYPES.get(id).expect(&format!("no EventType with id {id:#?}")).clone()
+        database::EVENT_TYPES.get(id).expect(&format!("no EventType with id {id:?}")).clone()
     }
 }
 

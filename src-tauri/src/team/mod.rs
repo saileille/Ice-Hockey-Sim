@@ -20,7 +20,7 @@ use crate::{
 };
 use self::lineup::LineUp;
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub struct Team {
     pub id: TeamId,  // id: 0 is reserved
     pub name: String,

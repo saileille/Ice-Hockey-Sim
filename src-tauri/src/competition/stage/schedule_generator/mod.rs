@@ -6,18 +6,18 @@ use rand::{rng, rngs::ThreadRng, Rng};
 use ::time::Date;
 
 use crate::{
-    types::{GameId, TeamId},
+    types::TeamId,
     time::{get_dates, date_to_db_string},
     match_event::Game
 };
 
-use super::Stage;
+use super::{Stage, round_robin::RoundRobin};
 
 
-impl Stage {
-    fn calc_matches_in_match_pool(&self, match_pool: &Vec<[TeamId; 2]>) {
+impl RoundRobin {
+    fn calc_matches_in_match_pool(&self, match_pool: &Vec<[TeamId; 2]>, stage: &Stage) {
         let mut teams: HashMap<TeamId, u8> = HashMap::new();
-        for id in self.teams.keys() {
+        for id in stage.teams.keys() {
             teams.insert(*id, 0);
         }
         for game in match_pool.iter() {
@@ -30,9 +30,9 @@ impl Stage {
         panic!();
 
     }
-    fn calc_matches_in_matchdays(&self, matchdays: &Vec<Vec<[TeamId; 2]>>) {
+    fn calc_matches_in_matchdays(&self, matchdays: &Vec<Vec<[TeamId; 2]>>, stage: &Stage) {
         let mut teams: HashMap<TeamId, u8> = HashMap::new();
-        for id in self.teams.keys() {
+        for id in stage.teams.keys() {
             teams.insert(*id, 0);
         }
         for matchday in matchdays.iter() {
@@ -47,12 +47,15 @@ impl Stage {
     }
 
     // Generate a match schedule for round robin stages.
-    pub fn generate_schedule_for_round_robin(&self) {
-        let mut match_pool: Vec<[TeamId; 2]> = self.generate_round_robin_matches();
-        let matchdays: Vec<Vec<[TeamId; 2]>> = self.generate_matchdays(&mut match_pool);
-        self.assign_dates_for_matchdays(&matchdays);
+    pub fn generate_schedule(&self, stage: &Stage) {
+        let mut match_pool: Vec<[TeamId; 2]> = self.generate_round_robin_matches(stage);
+        let matchdays: Vec<Vec<[TeamId; 2]>> = Stage::generate_matchdays(&mut match_pool);
+        stage.assign_dates_for_matchdays(&matchdays);
     }
+}
 
+// Scheduling-related methods that are valid for both Knockout and RoundRobin.
+impl Stage {
     // Give each matchday a date and add to the stage's schedule.
     fn assign_dates_for_matchdays(&self, matchdays: &Vec<Vec<[TeamId; 2]>>) {
         let mut dates: Vec<Date> = get_dates(&self.get_next_start_date(), &self.get_next_end_date());
@@ -66,19 +69,16 @@ impl Stage {
         }
     }
 
-    // Generate individual matchdays from the given list of games.
-    fn generate_matchdays(&self, match_pool: &mut Vec<[TeamId; 2]>) -> Vec<Vec<[TeamId; 2]>> {
-        let mut matchdays: Vec<Vec<[TeamId; 2]>> = Vec::new();
-        let mut rng: ThreadRng = rand::rng();
-        while match_pool.len() > 0 {
-            matchdays.push(self.generate_matchday(match_pool, &mut rng));
+    // Convert the simple representations of two teams into Game elements, and save them to the database.
+    fn build_and_save_games(&self, match_pool: &Vec<[TeamId; 2]>, date: &str) {
+        for matchup in match_pool {
+            Game::build_and_save(matchup[0], matchup[1], self.id, date);
         }
-        return matchdays;
     }
 
     // Generate a single matchday.
     // Attempts to make as many teams as possible to play at the same time.
-    fn generate_matchday(&self, match_pool: &mut Vec<[TeamId; 2]>, rng: &mut ThreadRng) -> Vec<[TeamId; 2]> {
+    fn generate_matchday(match_pool: &mut Vec<[TeamId; 2]>, rng: &mut ThreadRng) -> Vec<[TeamId; 2]> {
         let mut valid_matches: Vec<[TeamId; 2]> = match_pool.clone();
         let mut matchday: Vec<[TeamId; 2]> = Vec::new();
 
@@ -104,10 +104,13 @@ impl Stage {
         return matchday;
     }
 
-    // Convert the simple representations of two teams into Game elements, and save them to the database.
-    fn build_and_save_games(&self, match_pool: &Vec<[TeamId; 2]>, date: &str) {
-        for matchup in match_pool {
-            Game::build_and_save(matchup[0], matchup[1], self.id, date);
+    // Generate individual matchdays from the given list of games.
+    fn generate_matchdays(match_pool: &mut Vec<[TeamId; 2]>) -> Vec<Vec<[TeamId; 2]>> {
+        let mut matchdays: Vec<Vec<[TeamId; 2]>> = Vec::new();
+        let mut rng: ThreadRng = rand::rng();
+        while match_pool.len() > 0 {
+            matchdays.push(Stage::generate_matchday(match_pool, &mut rng));
         }
+        return matchdays;
     }
 }

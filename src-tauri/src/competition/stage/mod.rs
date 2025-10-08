@@ -1,7 +1,6 @@
-pub mod rules;
 mod schedule_generator;
 mod knockout;
-mod round_robin;
+pub mod round_robin;
 
 use std::collections::HashMap;
 use ::time::Date;
@@ -13,10 +12,12 @@ use crate::{
     time::{date_to_db_string, get_next_annual_date, get_previous_annual_date},
     types::{convert, StageId, TeamId}
 };
+use self::{round_robin::RoundRobin, knockout::Knockout};
 
 #[derive(Default, Clone, PartialEq)]
 enum Type {
-    #[default] Null,
+    #[default]
+    Null,
     RoundRobin,
     Knockout,
 }
@@ -30,8 +31,8 @@ pub struct Stage {
     latest_date: [u8; 2],   // Month and day for the latest possible match in the Stage.
     pub teams: HashMap<TeamId, TeamData>,
     pub match_rules: match_event::Rules,
-    round_robin: Option<rules::RoundRobin>,
-    knockout: Option<rules::Knockout>,
+    pub round_robin: Option<RoundRobin>,
+    knockout: Option<Knockout>,
     stage_type: Type,   // Easy way to check whether the stage is a knockout or round robin type.
 
     // Tests.
@@ -49,8 +50,8 @@ impl Stage {
     }
 
     // Build a Stage element.
-    pub fn build(name: &str, round_robin: Option<rules::RoundRobin>,
-    knockout: Option<rules::Knockout>, match_rules: match_event::Rules,
+    pub fn build(name: &str, round_robin: Option<RoundRobin>,
+    knockout: Option<Knockout>, match_rules: match_event::Rules,
     earliest_date: [u8; 2], latest_date: [u8; 2]) -> Self {
         let mut stage: Self = Self::default();
         stage.name = name.to_string();
@@ -70,8 +71,8 @@ impl Stage {
     }
 
     // Build a Stage element and store it in the database. Return the created element.
-    pub fn build_and_save(name: &str, round_robin: Option<rules::RoundRobin>,
-    knockout: Option<rules::Knockout>, match_rules: match_event::Rules,
+    pub fn build_and_save(name: &str, round_robin: Option<RoundRobin>,
+    knockout: Option<Knockout>, match_rules: match_event::Rules,
     earliest_date: [u8; 2], latest_date: [u8; 2]) -> Self {
         let mut stage: Self = Self::build(name, round_robin, knockout, match_rules, earliest_date, latest_date);
         stage.create_id(STAGES.lock().unwrap().len() + 1);
@@ -143,7 +144,7 @@ impl Stage {
     // Set up the stage so the competition can use it, and save to database.
     pub fn setup(&mut self, team_ids: &Vec<TeamId>) {
         self.add_teams(team_ids);
-        self.generate_schedule_for_round_robin();   // todo: make sure knockouts do not do this.
+        self.round_robin.as_ref().unwrap().generate_schedule(self);   // todo: make sure knockouts do not do this.
         self.save();
     }
 }
@@ -211,12 +212,12 @@ impl TeamData {
     }
 
     // Get points accumulated in a round robin stage.
-    fn get_points(&self, rules: &rules::RoundRobin) -> u8 {
-        self.regular_wins * rules.points_for_win +
-        self.ot_wins * rules.points_for_ot_win +
-        self.draws * rules.points_for_draw +
-        self.ot_losses * rules.points_for_ot_loss +
-        self.regular_losses * rules.points_for_loss
+    fn get_points(&self, rr: &RoundRobin) -> u8 {
+        self.regular_wins * rr.points_for_win +
+        self.ot_wins * rr.points_for_ot_win +
+        self.draws * rr.points_for_draw +
+        self.ot_losses * rr.points_for_ot_loss +
+        self.regular_losses * rr.points_for_loss
     }
 
     fn get_goal_difference(&self) -> i8 {

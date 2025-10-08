@@ -1,9 +1,10 @@
 use crate::database::POSITIONS;
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Eq, Hash, PartialEq)]
 #[derive(Default, Clone, Debug)]
 pub enum PositionId {
-    #[default] Null,
+    #[default]
+    Null,
     Goalkeeper,
     Defender,
     LeftWinger,

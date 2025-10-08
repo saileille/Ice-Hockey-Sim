@@ -7,7 +7,7 @@ use crate::{
 };
 
 // A line-up of players used in a match.
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub struct LineUp {
     gk_ids: [PlayerId; 2],
     pub defence_pairs: [DefencePair; 4],
@@ -38,15 +38,7 @@ impl LineUp {   // Basics.
 impl LineUp {
     // Clear the lineup.
     pub fn clear(&mut self) {
-        for id in self.gk_ids.iter_mut() {
-            *id = 0;
-        }
-        for pair in self.defence_pairs.iter_mut() {
-            pair.clear();
-        }
-        for line in self.forward_lines.iter_mut() {
-            line.clear();
-        }
+        *self = Self::default();
     }
 }
 
@@ -126,7 +118,7 @@ impl LineUp {   // Testing functions.
 }
 
 // A pair of defenders used in a line-up.
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub struct DefencePair {
     pub ld_id: PlayerId,
     pub rd_id: PlayerId,
@@ -156,7 +148,7 @@ impl DefencePair {
     }
 }
 
-#[derive(Default)]
+#[derive()]
 struct DefencePairClones {
     ld: Option<Player>,
     rd: Option<Player>,
@@ -172,7 +164,7 @@ impl DefencePairClones {
 }
 
 // A line of forwards used in a line-up.
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub struct ForwardLine {
     pub lw_id: PlayerId,
     pub c_id: PlayerId,
@@ -209,7 +201,7 @@ impl ForwardLine {
     }
 }
 
-#[derive(Default)]
+#[derive()]
 struct ForwardLineClones {
     lw: Option<Player>,
     c: Option<Player>,

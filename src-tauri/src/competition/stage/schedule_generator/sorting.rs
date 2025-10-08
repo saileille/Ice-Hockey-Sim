@@ -9,9 +9,9 @@ use rand::{
 };
 
 use crate::{
-    competition::stage::rules::MatchGenType, types::{convert, TeamId}
+    types::{convert, TeamId},
+    competition::stage::round_robin::MatchGenType,
 };
-
 use super::match_generator::TeamScheduleData;
 
 // The type that pieces of sort functions use.

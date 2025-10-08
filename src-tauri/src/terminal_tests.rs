@@ -25,7 +25,7 @@ pub fn test_comp_generation() {
     }
 
     let stage: Stage = Stage::fetch_from_db(&comp.stage_ids[0]);
-    println!("{}", stage.display_standings());
+    println!("{}", stage.round_robin.as_ref().unwrap().display_standings(&stage));
     println!("{}", stage.display_match_schedule());
 
     println!("Completed in {} seconds", start_time.elapsed().as_secs());

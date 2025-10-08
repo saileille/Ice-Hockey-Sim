@@ -5,14 +5,14 @@ use crate::{
     country::Country
 };
 
-#[derive(PartialEq, Default, Clone, Debug)]
+#[derive(Default, Clone, PartialEq)]
 enum Gender {
     #[default] Null,
     Male,
     Female,
 }
 
-#[derive(PartialEq, Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub struct Person {
     forename: String,
     surname: String,

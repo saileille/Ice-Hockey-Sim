@@ -175,7 +175,7 @@ impl PlayersOnIce {
     }
 }
 
-#[derive(Default)]
+#[derive()]
 pub struct PlayersOnIceClones {
     gk: Option<Player>,
     ld: Option<Player>,

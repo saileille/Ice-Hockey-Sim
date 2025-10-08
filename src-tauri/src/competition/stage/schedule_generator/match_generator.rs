@@ -6,7 +6,11 @@ use std::{
 use rand::{rng, rngs::ThreadRng, seq::SliceRandom};
 
 use crate::{
-    competition::stage::{rules, Stage, TeamData},
+    competition::stage::{
+        Stage,
+        TeamData,
+        round_robin::{RoundRobin, MatchGenType}
+    },
     types::{convert, TeamId}
 };
 use super::sorting;
@@ -164,10 +168,10 @@ impl TeamScheduleData {
 }
 
 // Functional
-impl Stage {
+impl RoundRobin {
     // Generate matches where every team plays every other home and away.
-    fn generate_full_round(&self, match_pool: &mut Vec<[TeamId; 2]>) {
-        let team_ids: Vec<TeamId> = self.get_team_ids();
+    fn generate_full_round(&self, match_pool: &mut Vec<[TeamId; 2]>, stage: &Stage) {
+        let team_ids: Vec<TeamId> = stage.get_team_ids();
 
         for home_id in team_ids.iter() {
             for away_id in team_ids.iter() {
@@ -177,32 +181,32 @@ impl Stage {
     }
 
     // Generate matches for a round robin stage.
-    pub fn generate_round_robin_matches(&self) -> Vec<[TeamId; 2]> {
+    pub fn generate_round_robin_matches(&self, stage: &Stage) -> Vec<[TeamId; 2]> {
         // How many times should uncertain generations be attempted before giving up.
         const ATTEMPTS: u8 = u8::MAX;
 
-        let matches_in_round: u8 = self.get_round_length();
+        let matches_in_round: u8 = self.get_round_length(stage);
         let matches_in_full_round: u8 = matches_in_round * 2;
-        let mut matches: u8 = self.get_theoretical_matches_per_team();
+        let mut matches: u8 = self.get_theoretical_matches_per_team(stage);
         let mut match_pool: Vec<[TeamId; 2]> = Vec::new();
 
         // Complete rounds.
         while matches >= matches_in_full_round {
-            self.generate_full_round(&mut match_pool);
+            self.generate_full_round(&mut match_pool, stage);
             matches -= matches_in_full_round;
         }
 
         // Half rounds.
         let mut prev_schedule_data: Vec<TeamScheduleData> = Vec::new();
         if matches >= matches_in_round {
-            prev_schedule_data = self.attempt_irregular_generation(matches_in_round, &mut match_pool, prev_schedule_data, ATTEMPTS);
+            prev_schedule_data = self.attempt_irregular_generation(matches_in_round, &mut match_pool, prev_schedule_data, ATTEMPTS, stage);
 
             // If unsuccessful, move on to the next part with one match less.
             if prev_schedule_data.len() == 0 {
                 matches = matches_in_round - 1;
 
                 // Making sure we are not trying the impossible.
-                if self.teams.len() % 2 != 0 && matches % 2 != 0 {
+                if stage.teams.len() % 2 != 0 && matches % 2 != 0 {
                     matches -= 1;
                 }
             }
@@ -215,7 +219,7 @@ impl Stage {
 
         // Handle the leftover matches.
         while matches > 0 {
-            prev_schedule_data = self.attempt_irregular_generation(matches, &mut match_pool, prev_schedule_data, ATTEMPTS);
+            prev_schedule_data = self.attempt_irregular_generation(matches, &mut match_pool, prev_schedule_data, ATTEMPTS, stage);
 
             // If unsuccessful, try again with one match less.
             if prev_schedule_data.len() == 0 {
@@ -228,7 +232,7 @@ impl Stage {
             }
 
             // Making sure we are not trying the impossible.
-            if self.teams.len() % 2 != 0 && matches % 2 != 0 {
+            if stage.teams.len() % 2 != 0 && matches % 2 != 0 {
                 matches -= 1;
             }
         }
@@ -239,8 +243,8 @@ impl Stage {
     // Generate a match schedule with arbitrary number of games.
     // Add to an existing match pool vector if successful.
     // Return the schedule data. If unsuccessful, return empty vector.
-    fn generate_irregular_matches(&self, matches_per_team: u8, match_pool: &mut Vec<[TeamId; 2]>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>) -> Vec<TeamScheduleData> {
-        let mut schedule_data: Vec<TeamScheduleData> = TeamScheduleData::generate(&self.teams);
+    fn generate_irregular_matches(&self, matches_per_team: u8, match_pool: &mut Vec<[TeamId; 2]>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>, stage: &Stage) -> Vec<TeamScheduleData> {
+        let mut schedule_data: Vec<TeamScheduleData> = TeamScheduleData::generate(&stage.teams);
         let mut completed_schedule_data: Vec<TeamScheduleData> = Vec::new();
         let mut created_matches: Vec<[TeamId; 2]> = Vec::new();
 
@@ -262,7 +266,7 @@ impl Stage {
     ) -> bool {
         // Randomise and sort.
         schedule_data.shuffle(rng);
-        sorting::sort_default(&rules::RoundRobin::MATCH_GEN_TYPE, schedule_data, prev_schedule_map, rng);
+        sorting::sort_default(&RoundRobin::MATCH_GEN_TYPE, schedule_data, prev_schedule_map, rng);
         let mut temp_schedule_data: Vec<TeamScheduleData> = schedule_data.clone();
 
         let mut team1: TeamScheduleData = temp_schedule_data[0].clone();
@@ -294,7 +298,7 @@ impl Stage {
         // team1 needs a home game.
         if away_filter.len() == 0 || (home_filter.len() > 0 && home_away_diff <= 0) {
             temp_schedule_data = home_filter;
-            sorting::sort_away(&rules::RoundRobin::MATCH_GEN_TYPE, &mut temp_schedule_data, prev_schedule_map, rng);
+            sorting::sort_away(&RoundRobin::MATCH_GEN_TYPE, &mut temp_schedule_data, prev_schedule_map, rng);
             team2 = temp_schedule_data[0].clone();
             created_matches.push([team1.team_id, team2.team_id]);
 
@@ -305,7 +309,7 @@ impl Stage {
         // team1 needs an away game.
         else {
             temp_schedule_data = away_filter;
-            sorting::sort_home(&rules::RoundRobin::MATCH_GEN_TYPE, &mut temp_schedule_data, prev_schedule_map, rng);
+            sorting::sort_home(&RoundRobin::MATCH_GEN_TYPE, &mut temp_schedule_data, prev_schedule_map, rng);
             team2 = temp_schedule_data[0].clone();
             created_matches.push([team2.team_id, team1.team_id]);
 
@@ -332,21 +336,21 @@ impl Stage {
         &self, matches_per_team: u8,
         match_pool: &mut Vec<[TeamId; 2]>,
         prev_schedule_data: Vec<TeamScheduleData>,
-        attempts: u8,
+        attempts: u8, stage: &Stage,
     ) -> Vec<TeamScheduleData> {
         let prev_schedule_map: HashMap<TeamId, TeamScheduleData> = TeamScheduleData::vector_to_hashmap(prev_schedule_data);
 
-        let team1_sort: rules::MatchGenType = rules::RoundRobin::MATCH_GEN_TYPE.clone();
-        let team2_sort: rules::MatchGenType = rules::RoundRobin::MATCH_GEN_TYPE.clone();
+        let team1_sort: MatchGenType = RoundRobin::MATCH_GEN_TYPE.clone();
+        let team2_sort: MatchGenType = RoundRobin::MATCH_GEN_TYPE.clone();
 
-        let team1_sorts: Vec<rules::MatchGenType> = if team1_sort == rules::MatchGenType::Alternating {
-           Vec::from([rules::MatchGenType::Random, rules::MatchGenType::MatchCount])
+        let team1_sorts: Vec<MatchGenType> = if team1_sort == MatchGenType::Alternating {
+           Vec::from([MatchGenType::Random, MatchGenType::MatchCount])
         }
         else {
             Vec::from([team1_sort.clone()])
         };
-        let team2_sorts: Vec<rules::MatchGenType> = if team2_sort == rules::MatchGenType::Alternating {
-            Vec::from([rules::MatchGenType::MatchCount, rules::MatchGenType::Random])
+        let team2_sorts: Vec<MatchGenType> = if team2_sort == MatchGenType::Alternating {
+            Vec::from([MatchGenType::MatchCount, MatchGenType::Random])
         }
         else {
             Vec::from([team2_sort.clone()])
@@ -366,7 +370,7 @@ impl Stage {
             // self.round_robin_rules.sort_team1 = team1_sorts[team1_index].clone();
             // self.round_robin_rules.sort_team2 = team2_sorts[team2_index].clone();
 
-            data = self.generate_irregular_matches(matches_per_team, match_pool, &prev_schedule_map);
+            data = self.generate_irregular_matches(matches_per_team, match_pool, &prev_schedule_map, stage);
             if data.len() > 0 {
                 break;
             }

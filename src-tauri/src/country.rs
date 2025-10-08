@@ -94,7 +94,7 @@ impl Country {
 }
 
 // Namepool with names and weights.
-#[derive(Default, Clone, PartialEq)]
+#[derive(Default, Clone)]
 struct NamePool {
     names: Vec<String>,
     weights: Vec<u16>,
