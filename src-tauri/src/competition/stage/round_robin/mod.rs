@@ -1,6 +1,9 @@
 // The round robin struct and methods for round-robin stages.
+mod match_generator;
+mod sorting;
+
 use crate::{types::convert, team::Team, match_event::Game};
-use super::{Stage, TeamData};
+use super::{Stage, TeamStageData};
 
 #[derive(Default, Clone, PartialEq, Debug)]
 pub enum MatchGenType {
@@ -41,6 +44,11 @@ impl RoundRobin {
     pub fn is_valid(&self) -> bool {
         self.rounds != 0 || self.extra_matches != 0
     }
+
+    // Set up the round-robin stage.
+    pub fn setup(&self, stage: &Stage) {
+        self.generate_schedule(stage);
+    }
 }
 
 impl RoundRobin {
@@ -77,8 +85,8 @@ impl RoundRobin {
     }
 
     // Get the teams in the order of the standings.
-    fn get_sorted_teams(&self, stage: &Stage) -> Vec<TeamData> {
-        let mut teams: Vec<TeamData> = stage.teams.values().cloned().collect();
+    fn get_sorted_teams(&self, stage: &Stage) -> Vec<TeamStageData> {
+        let mut teams: Vec<TeamStageData> = stage.teams.values().cloned().collect();
 
         teams.sort_by(|a, b| {
             b.get_points(self).cmp(&a.get_points(self))
@@ -118,7 +126,7 @@ impl RoundRobin {
 
     // Get the standings.
     pub fn display_standings(&self, stage: &Stage) -> String {
-        let teams: Vec<TeamData> = self.get_sorted_teams(stage);
+        let teams: Vec<TeamStageData> = self.get_sorted_teams(stage);
 
         let mut s: String = "Rank\tName\tG\tW\tOTW\tD\tOTL\tL\tGF\tGA\tDiff\tPts".to_string();
         for (i, team) in teams.iter().enumerate() {

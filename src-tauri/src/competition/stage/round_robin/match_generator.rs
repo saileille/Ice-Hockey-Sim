@@ -1,4 +1,4 @@
-// Methods for generating match schedules for Stage.
+// Methods for generating match schedules for round robins.
 use std::{
     collections::{HashMap, HashSet},
     ops::Range
@@ -6,14 +6,15 @@ use std::{
 use rand::{rng, rngs::ThreadRng, seq::SliceRandom};
 
 use crate::{
+    types::{convert, TeamId},
     competition::stage::{
         Stage,
-        TeamData,
-        round_robin::{RoundRobin, MatchGenType}
+        TeamStageData,
+        round_robin::{RoundRobin, MatchGenType},
+        match_generator::{generate_matchdays, assign_dates_for_matchdays}
     },
-    types::{convert, TeamId}
+    competition::stage::round_robin::sorting
 };
-use super::sorting;
 
 #[derive(Default, Clone)]
 pub struct TeamScheduleData {
@@ -79,10 +80,6 @@ impl TeamScheduleData {
     fn is_full(&self, matches: u8) -> bool {
         self.get_match_count(&Self::default()) >= matches
     }
-
-    fn get_debug_info(&self, prev: &Self) -> String {
-        format!("{}\nHome: {}\nAway: {}", self.team_id, self.get_home_match_count(prev), self.get_away_match_count(prev))
-    }
 }
 
 // Static
@@ -144,7 +141,7 @@ impl TeamScheduleData {
     }
 
     // Generate schedule data objects.
-    fn generate(stage_teams: &HashMap<TeamId, TeamData>) -> Vec<Self> {
+    fn generate(stage_teams: &HashMap<TeamId, TeamStageData>) -> Vec<Self> {
         let mut schedule_data: Vec<Self> = Vec::new();
         for team_data in stage_teams.values() {
             schedule_data.push(Self {
@@ -169,6 +166,44 @@ impl TeamScheduleData {
 
 // Functional
 impl RoundRobin {
+    fn calc_matches_in_match_pool(&self, match_pool: &Vec<[TeamId; 2]>, stage: &Stage) {
+        let mut teams: HashMap<TeamId, u8> = HashMap::new();
+        for id in stage.teams.keys() {
+            teams.insert(*id, 0);
+        }
+        for game in match_pool.iter() {
+            for team in game.iter() {
+                *teams.get_mut(team).unwrap() += 1;
+            }
+        }
+
+        println!("{teams:#?}");
+        panic!();
+
+    }
+    fn calc_matches_in_matchdays(&self, matchdays: &Vec<Vec<[TeamId; 2]>>, stage: &Stage) {
+        let mut teams: HashMap<TeamId, u8> = HashMap::new();
+        for id in stage.teams.keys() {
+            teams.insert(*id, 0);
+        }
+        for matchday in matchdays.iter() {
+            for game in matchday.iter() {
+                for team in game.iter() {
+                    *teams.get_mut(team).unwrap() += 1;
+                }
+            }
+        }
+
+        println!("{teams:#?}");
+    }
+
+    // Generate a match schedule for round robin stages.
+    pub fn generate_schedule(&self, stage: &Stage) {
+        let mut match_pool: Vec<[TeamId; 2]> = self.generate_match_pool(stage);
+        let matchdays: Vec<Vec<[TeamId; 2]>> = generate_matchdays(&mut match_pool);
+        assign_dates_for_matchdays(&matchdays, &stage.get_next_start_date(), &stage.get_next_end_date(), stage.id);
+    }
+
     // Generate matches where every team plays every other home and away.
     fn generate_full_round(&self, match_pool: &mut Vec<[TeamId; 2]>, stage: &Stage) {
         let team_ids: Vec<TeamId> = stage.get_team_ids();
@@ -181,7 +216,7 @@ impl RoundRobin {
     }
 
     // Generate matches for a round robin stage.
-    pub fn generate_round_robin_matches(&self, stage: &Stage) -> Vec<[TeamId; 2]> {
+    pub fn generate_match_pool(&self, stage: &Stage) -> Vec<[TeamId; 2]> {
         // How many times should uncertain generations be attempted before giving up.
         const ATTEMPTS: u8 = u8::MAX;
 
@@ -269,24 +304,24 @@ impl RoundRobin {
         sorting::sort_default(&RoundRobin::MATCH_GEN_TYPE, schedule_data, prev_schedule_map, rng);
         let mut temp_schedule_data: Vec<TeamScheduleData> = schedule_data.clone();
 
-        let mut team1: TeamScheduleData = temp_schedule_data[0].clone();
-        temp_schedule_data.remove(0);
+        let mut team1: TeamScheduleData = temp_schedule_data.swap_remove(0);
 
         // Remove every item in temp_schedule_data that already plays against team1.
-        let blacklist: HashSet<TeamId> = team1.get_all_opponents();
-        temp_schedule_data.retain(|data: &TeamScheduleData| !blacklist.contains(&data.team_id));
+        let opponents: HashSet<TeamId> = team1.get_all_opponents();
+        temp_schedule_data.retain(|team: &TeamScheduleData| !opponents.contains(&team.team_id));
 
-        if temp_schedule_data.len() == 0 {
+        if temp_schedule_data.is_empty() {
             return false;
         }
 
         let home_filter: Vec<TeamScheduleData> = TeamScheduleData::filter_for_home_game(&temp_schedule_data, &prev_schedule_map, matches_per_team);
         let away_filter: Vec<TeamScheduleData> = TeamScheduleData::filter_for_away_game(&temp_schedule_data, &prev_schedule_map, matches_per_team);
 
-        if home_filter.len() == 0 && away_filter.len() == 0 {
+        if home_filter.is_empty() && away_filter.is_empty() {
             return false;
         }
 
+        // Get the match data from a match generation that occurred previously.
         let prev_team1: &TeamScheduleData = match prev_schedule_map.get(&team1.team_id) {
             Some(p) => p,
             None => &TeamScheduleData::default(),
@@ -299,7 +334,7 @@ impl RoundRobin {
         if away_filter.len() == 0 || (home_filter.len() > 0 && home_away_diff <= 0) {
             temp_schedule_data = home_filter;
             sorting::sort_away(&RoundRobin::MATCH_GEN_TYPE, &mut temp_schedule_data, prev_schedule_map, rng);
-            team2 = temp_schedule_data[0].clone();
+            team2 = temp_schedule_data.swap_remove(0);
             created_matches.push([team1.team_id, team2.team_id]);
 
             team1.home_matches.insert(team2.team_id);
@@ -310,7 +345,7 @@ impl RoundRobin {
         else {
             temp_schedule_data = away_filter;
             sorting::sort_home(&RoundRobin::MATCH_GEN_TYPE, &mut temp_schedule_data, prev_schedule_map, rng);
-            team2 = temp_schedule_data[0].clone();
+            team2 = temp_schedule_data.swap_remove(0);
             created_matches.push([team2.team_id, team1.team_id]);
 
             team1.away_matches.insert(team2.team_id);

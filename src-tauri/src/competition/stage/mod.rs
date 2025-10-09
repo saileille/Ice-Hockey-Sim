@@ -1,8 +1,8 @@
-mod schedule_generator;
-mod knockout;
+mod match_generator;
+pub mod knockout;
 pub mod round_robin;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
 use ::time::Date;
 
 use crate::{
@@ -26,10 +26,11 @@ enum Type {
 pub struct Stage {
     pub id: StageId,
     name: String,
-    num_of_teams: u8,   // How many teams this stage takes. Can be left at 0 for initial stage.
+    // num_of_teams: u8,   // How many teams this stage takes. Can be left at 0 for initial stage.
     earliest_date: [u8; 2], // Month and day for the earliest possible match in the Stage.
     latest_date: [u8; 2],   // Month and day for the latest possible match in the Stage.
-    pub teams: HashMap<TeamId, TeamData>,
+    connections: Vec<StageConnection>,
+    pub teams: HashMap<TeamId, TeamStageData>,
     pub match_rules: match_event::Rules,
     pub round_robin: Option<RoundRobin>,
     knockout: Option<Knockout>,
@@ -50,9 +51,9 @@ impl Stage {
     }
 
     // Build a Stage element.
-    pub fn build(name: &str, round_robin: Option<RoundRobin>,
-    knockout: Option<Knockout>, match_rules: match_event::Rules,
-    earliest_date: [u8; 2], latest_date: [u8; 2]) -> Self {
+    pub fn build(name: &str, round_robin: Option<RoundRobin>, knockout: Option<Knockout>,
+    match_rules: match_event::Rules, earliest_date: [u8; 2], latest_date: [u8; 2],
+    connections: Vec<StageConnection>) -> Self {
         let mut stage: Self = Self::default();
         stage.name = name.to_string();
         stage.round_robin = round_robin;
@@ -60,6 +61,7 @@ impl Stage {
         stage.match_rules = match_rules;
         stage.earliest_date = earliest_date;
         stage.latest_date = latest_date;
+        stage.connections = connections;
 
         // Set the stage type. Only one of round_robin and knockout can be defined.
         if stage.round_robin.is_some() {
@@ -71,10 +73,10 @@ impl Stage {
     }
 
     // Build a Stage element and store it in the database. Return the created element.
-    pub fn build_and_save(name: &str, round_robin: Option<RoundRobin>,
-    knockout: Option<Knockout>, match_rules: match_event::Rules,
-    earliest_date: [u8; 2], latest_date: [u8; 2]) -> Self {
-        let mut stage: Self = Self::build(name, round_robin, knockout, match_rules, earliest_date, latest_date);
+    pub fn build_and_save(name: &str, round_robin: Option<RoundRobin>, knockout: Option<Knockout>,
+    match_rules: match_event::Rules, earliest_date: [u8; 2], latest_date: [u8; 2],
+    connections: Vec<StageConnection>) -> Self {
+        let mut stage: Self = Self::build(name, round_robin, knockout, match_rules, earliest_date, latest_date, connections);
         stage.create_id(STAGES.lock().unwrap().len() + 1);
         stage.save();
         return stage;
@@ -110,6 +112,17 @@ impl Stage {
         return ids;
     }
 
+    // Get the start and end dates for this season if ongoing, or the next if over.
+    fn get_next_or_ongoing_season_boundaries(&self) -> (Date, Date) {
+        let end: Date = self.get_next_end_date();
+        let mut start: Date = self.get_next_start_date();
+        if start > end {
+            start = self.get_previous_start_date();
+        }
+
+        return (start, end);
+    }
+
     // Get the previous earliest match date as a date object.
     pub fn get_previous_start_date(&self) -> Date {
         get_previous_annual_date(self.earliest_date[0], self.earliest_date[1])
@@ -135,16 +148,23 @@ impl Stage {
 // Functional.
 impl Stage {
     // Add teams to this stage.
-    pub fn add_teams(&mut self, team_ids: &Vec<TeamId>) {
+    pub fn add_teams_from_ids(&mut self, team_ids: &Vec<TeamId>) {
         for id in team_ids.iter() {
-            self.teams.insert(*id, TeamData::build(*id));
+            self.teams.insert(*id, TeamStageData::build(*id, 0));
         }
     }
 
     // Set up the stage so the competition can use it, and save to database.
     pub fn setup(&mut self, team_ids: &Vec<TeamId>) {
-        self.add_teams(team_ids);
-        self.round_robin.as_ref().unwrap().generate_schedule(self);   // todo: make sure knockouts do not do this.
+        self.add_teams_from_ids(team_ids);
+        if self.round_robin.is_some() {
+            self.round_robin.as_ref().unwrap().setup(self);
+        }
+        else {
+            let mut knockout: Knockout = self.knockout.clone().unwrap();
+            knockout.setup(self);
+            self.knockout = Some(knockout);
+        }
         self.save();
     }
 }
@@ -171,9 +191,31 @@ impl Stage {
     }
 }
 
+// Stores data for which teams go to which stage.
+#[derive(Clone)]
+pub struct StageConnection {
+    teams_from_positions: Range<u8>,
+    stage_to_connect: StageId,
+}
+
+impl StageConnection {
+    // Build the element.
+    pub fn build(teams_from_positions: Range<u8>, stage_to_connect: StageId) -> Self {
+        Self {
+            teams_from_positions: teams_from_positions,
+            stage_to_connect: stage_to_connect,
+        }
+    }
+}
+
 #[derive(Default, Clone)]
-pub struct TeamData {
+pub struct TeamStageData {
     pub team_id: TeamId,
+
+    // Seed is mostly used in knockouts, but can be used for tie-breakers in round-robin as well.
+    // The lower the value, the better the seed is.
+    // 0 can theoretically be used, but for clarity, maybe use it only when every team's seed is 0?
+    seed: u8,
     pub regular_wins: u8,
     pub ot_wins: u8,
     pub draws: u8,
@@ -184,10 +226,11 @@ pub struct TeamData {
 }
 
 // Basics.
-impl TeamData {
-    fn build(team_id: TeamId) -> Self {
+impl TeamStageData {
+    fn build(team_id: TeamId, seed: u8) -> Self {
         let mut teamdata: Self = Self::default();
         teamdata.team_id = team_id;
+        teamdata.seed = seed;
         return teamdata;
     }
 
@@ -198,7 +241,7 @@ impl TeamData {
 }
 
 // Functional
-impl TeamData {
+impl TeamStageData {
     fn get_game_count(&self) -> u8 {
         self.get_wins() + self.get_losses() + self.draws
     }

@@ -1,4 +1,5 @@
 // Time-related operations.
+use std::time::Duration;
 use time::{
     format_description::{BorrowedFormatItem, parse},
     macros::format_description,
@@ -8,6 +9,7 @@ use crate::database::TODAY;
 
 // Use this format for formatting and parsing dates.
 static DB_DATE_FORMAT: &[BorrowedFormatItem<'_>] = format_description!("[year]-[month]-[day]");
+static SECONDS_IN_DAY: u64 = 86400;
 
 // Get a Date object for the next time specific day and month will occur.
 pub fn get_next_annual_date(month: u8, day: u8) -> Date {
@@ -49,6 +51,11 @@ pub fn get_dates(start: &Date, end: &Date) -> Vec<Date> {
     }
 
     return dates;
+}
+
+// Get std::time::Duration from desired days.
+pub fn get_duration_from_days(days: u64) -> Duration {
+    Duration::new(days * SECONDS_IN_DAY, 0)
 }
 
 // Convert a Date object to database string.

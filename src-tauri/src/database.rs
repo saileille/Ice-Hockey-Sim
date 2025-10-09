@@ -7,20 +7,11 @@ use time::{macros::date, Date};
 use lazy_static::lazy_static;
 
 use crate::{
-    types,
-    event,
-    team::Team,
-    person::player::{
-        Player,
-        position::{Position, PositionId}
-    },
-    country::Country,
     competition::{
-        Competition,
-        stage::{Stage, round_robin::RoundRobin}
-    },
-    match_event,
-    io
+        stage::{knockout::Knockout, round_robin::RoundRobin, Stage, StageConnection}, Competition
+    }, country::Country, event, io, match_event, person::player::{
+        position::{Position, PositionId}, Player
+    }, team::Team, types
 };
 
 // The current date in the game.
@@ -109,13 +100,23 @@ fn add_competition_data() {
             Team::build_and_save("Ässät"),
         ],
         vec![
-            Stage::build_and_save(
+            /* Stage::build_and_save(
                 "Regular Season",
                 Some(RoundRobin::build(4, 0, 3, 2, 1, 1, 0)),
                 None,
                 match_event::Rules::build(3, 1200, 300, false),
                 [9, 1],
-                [4, 1]
+                [4, 1],
+                vec![StageConnection::build(0..7, 0)]
+            ) */
+            Stage::build_and_save(
+                "Playoffs",
+                None,
+                Some(Knockout::build(vec![4], 1)),
+                match_event::Rules::build(3, 1200, 0, true),
+                [4, 2],
+                [6, 1],
+                Vec::new()
             )
         ]
     );

@@ -9,12 +9,12 @@ use crate::{
         lineup::{DefencePair, ForwardLine, LineUp},
         Team
     },
-    competition::stage::TeamData as StageTeamData
+    competition::stage::TeamStageData as StageTeamData
 };
 use super::event::Shot;
 
 #[derive(Default, Clone)]
-pub struct TeamData {
+pub struct TeamGameData {
     pub team_id: TeamId,
     pub shots: Vec<Shot>,
     pub lineup: LineUp,
@@ -22,9 +22,9 @@ pub struct TeamData {
     penalties: Vec<String>, // Placeholder.
 }
 
-impl TeamData { // Basics.
+impl TeamGameData { // Basics.
     pub fn build(team_id: TeamId) -> Self {
-        let mut team_data: TeamData = TeamData::default();
+        let mut team_data: TeamGameData = TeamGameData::default();
         team_data.team_id = team_id;
         return team_data;
     }
@@ -41,7 +41,7 @@ impl TeamData { // Basics.
 }
 
 // Functional.
-impl TeamData {
+impl TeamGameData {
     fn get_shot_amount(&self) -> u16 {
         convert::usize_to_u16(self.shots.len())
     }
@@ -86,7 +86,7 @@ impl TeamData {
     }
 
     // Update the team data for the stage the match is part of.
-    pub fn update_stagedata(&self, opponent: &TeamData, had_overtime: bool, stagedata: &mut StageTeamData) {
+    pub fn update_stagedata(&self, opponent: &TeamGameData, had_overtime: bool, stagedata: &mut StageTeamData) {
         let self_goals: u16 = self.get_goal_amount();
         let opp_goals: u16 = opponent.get_goal_amount();
 

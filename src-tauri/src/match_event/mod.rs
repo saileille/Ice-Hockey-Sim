@@ -7,17 +7,17 @@ use time::Date;
 use crate::{
     competition::stage::{
         Stage,
-        TeamData as StageTeamData,
+        TeamStageData as StageTeamData,
     },
     team::Team,
-    database::{GAMES},
+    database::{GAMES, TODAY},
     event as logic_event,
     time::db_string_to_date, types::{
         convert, GameId, StageId, TeamId
     }
 };
 use self::{
-    team::TeamData,
+    team::TeamGameData,
     event::Shot
 };
 
@@ -25,12 +25,12 @@ use self::{
 pub struct Game {
     pub date: String,
     pub id: GameId,
-    home: TeamData,
-    away: TeamData,
+    home: TeamGameData,
+    away: TeamGameData,
     clock: Clock,
     stage_id: StageId,
-    attacker: Option<TeamData>,
-    defender: Option<TeamData>,
+    attacker: Option<TeamGameData>,
+    defender: Option<TeamGameData>,
 }
 
 impl Game { // Basics.
@@ -45,8 +45,8 @@ impl Game { // Basics.
     pub fn build(home: TeamId, away: TeamId, stage: StageId) -> Self {
         let mut game: Game = Game::default();
 
-        game.home = TeamData::build(home);
-        game.away = TeamData::build(away);
+        game.home = TeamGameData::build(home);
+        game.away = TeamGameData::build(away);
         game.clock = Clock::default();
         game.stage_id = stage;
 
@@ -59,6 +59,41 @@ impl Game { // Basics.
         game.save();
 
         return game;
+    }
+
+    pub fn fetch_from_db<S: AsRef<str>>(date: S, id: &GameId) -> Self {
+        let games = GAMES.lock().unwrap();
+        let date: &HashMap<u8, Game> = games.get(date.as_ref())
+            .expect(&format!("no Game with date {:?}", date.as_ref()));
+
+        date.get(id).expect(&format!("no Game with id {id}")).clone()
+    }
+
+    // Update the Game to database. Create ID if one does not already exist.
+    pub fn save(&mut self) {
+        let mut games: HashMap<String, HashMap<u8, Self>> = GAMES.lock().unwrap().clone();
+
+        let date: &mut HashMap<u8, Self> = match games.get_mut(&self.date) {
+            Some(d) => d,
+            None => {
+                games.insert(self.date.clone(), HashMap::new());
+                games.get_mut(&self.date).unwrap()
+            }
+        };
+
+        if self.id == 0 { self.create_id(date.len() + 1); }
+
+        date.insert(self.id, self.clone());
+        *GAMES.lock().unwrap() = games;
+    }
+
+    // Delete the Game from the database.
+    pub fn delete_from_db(&self) {
+        let mut games = GAMES.lock().unwrap();
+        let date: &mut HashMap<u8, Game> = games.get_mut(&self.date).expect(&format!("Could not find date {:?} in GAMES", &self.date));
+
+        date.remove(&self.id);
+        *GAMES.lock().unwrap() = games.clone();
     }
 
     // Get all matches that are part of the specific stage.
@@ -109,39 +144,20 @@ impl Game { // Basics.
         return dates_and_games;
     }
 
-    pub fn fetch_from_db<S: AsRef<str>>(date: S, id: &GameId) -> Self {
-        let games = GAMES.lock().unwrap();
-        let date: &HashMap<u8, Game> = games.get(date.as_ref())
-            .expect(&format!("no Game with date {:?}", date.as_ref()));
+    // Remove future matches of a stage played by specific teams.
+    pub fn remove_future_matches(stage_id: StageId, team_ids: Vec<TeamId>) {
+        let mut all_games = GAMES.lock().unwrap();
+        let today: Date = TODAY.lock().unwrap().clone();
 
-        date.get(id).expect(&format!("no Game with id {id}")).clone()
-    }
+        for (date_s, games) in all_games.iter_mut() {
+            if today >= db_string_to_date(date_s) { continue; }
+            games.retain(|_, game|
+                (stage_id != game.stage_id) ||
+                (!team_ids.contains(&game.home.team_id) && !team_ids.contains(&game.away.team_id))
+            );
+        }
 
-    // Update the Game to database. Create ID if one does not already exist.
-    pub fn save(&mut self) {
-        let mut games: HashMap<String, HashMap<u8, Self>> = GAMES.lock().unwrap().clone();
-
-        let date: &mut HashMap<u8, Self> = match games.get_mut(&self.date) {
-            Some(d) => d,
-            None => {
-                games.insert(self.date.clone(), HashMap::new());
-                games.get_mut(&self.date).unwrap()
-            }
-        };
-
-        if self.id == 0 { self.create_id(date.len() + 1); }
-
-        date.insert(self.id, self.clone());
-        *GAMES.lock().unwrap() = games;
-    }
-
-    // Delete the Game from the database.
-    pub fn delete_from_db(&self) {
-        let mut games = GAMES.lock().unwrap();
-        let date: &mut HashMap<u8, Game> = games.get_mut(&self.date).expect(&format!("Could not find date {:?} in GAMES", &self.date));
-
-        date.remove(&self.id);
-        *GAMES.lock().unwrap() = games.clone();
+        *GAMES.lock().unwrap() = all_games.clone();
     }
 
     // Make sure the game does not contain illegal values.
@@ -271,7 +287,7 @@ impl Game {
 
     // The attacking team attempts to shoot the puck.
     fn attempt_shot(&mut self) {
-        let attacker: &mut TeamData = self.attacker.as_mut().unwrap();
+        let attacker: &mut TeamGameData = self.attacker.as_mut().unwrap();
         let attacker_players: &team::PlayersOnIce = attacker.players_on_ice.as_ref().unwrap();
         let defender_players = self.defender.as_ref().unwrap().players_on_ice.as_ref().unwrap();
 
@@ -288,8 +304,8 @@ impl Game {
 
     // Update the attacker and defender teamdata.
     fn update_teamdata(&mut self) {
-        let attacker: &TeamData = self.attacker.as_ref().unwrap();
-        let defender: &TeamData = self.defender.as_ref().unwrap();
+        let attacker: &TeamGameData = self.attacker.as_ref().unwrap();
+        let defender: &TeamGameData = self.defender.as_ref().unwrap();
 
         if attacker.team_id == self.home.team_id {
             self.home = attacker.clone();
