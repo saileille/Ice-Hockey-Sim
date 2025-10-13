@@ -35,22 +35,35 @@ impl KnockoutRound {
         let mut rng = rng();
         for pair in self.pairs.iter_mut() {
             let last_index = pots.len() - 1;
-            let mut best_pot = pots[0].clone();
-            let mut worst_pot = pots[last_index].clone();
+
+            let mut draw_pots = if pots.len() > 1 {
+                vec![pots[0].clone(), pots[last_index].clone()]
+            }
+            else {
+                vec![pots[0].clone()]
+            };
 
             // Draw the teams for the pair.
-            let home_id = Self::draw_team(&mut best_pot.1, &mut rng);
-            let away_id = Self::draw_team(&mut worst_pot.1, &mut rng);
+            let home_id = Self::draw_team(&mut draw_pots.first_mut().unwrap().1, &mut rng);
+            let away_id = Self::draw_team(&mut draw_pots.last_mut().unwrap().1, &mut rng);
 
-            pair.home = TeamCompData::build(home_id, best_pot.0);
-            pair.away = TeamCompData::build(away_id, worst_pot.0);
+            pair.home = TeamCompData::build(home_id, draw_pots.first().unwrap().0);
+            pair.away = TeamCompData::build(away_id, draw_pots.last().unwrap().0);
 
             // Remove pots if empty.
-            if worst_pot.1.is_empty() { pots.remove(last_index); }
-            else { pots[last_index] = worst_pot; }
+            for (i, pot) in draw_pots.into_iter().rev().enumerate() {
+                let index = match i {
+                    0 => last_index,
+                    _ => 0,
+                };
 
-            if best_pot.1.is_empty() { pots.remove(0); }
-            else { pots[0] = best_pot; }
+                if pot.1.is_empty() {
+                    pots.remove(index);
+                }
+                else {
+                    pots[index] = pot
+                }
+            }
         }
     }
 
