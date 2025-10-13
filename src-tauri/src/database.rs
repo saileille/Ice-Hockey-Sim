@@ -77,7 +77,7 @@ pub fn initialise() {
 
         // Set up seasons, starting from the top level.
         if comp.parent_comp_id == 0 {
-            comp.setup_season(None);
+            comp.setup_season(&mut Vec::new());
         }
     }
 
@@ -125,18 +125,18 @@ fn add_competition_data() {
             None,
             match_event::Rules::build(3, 1200, 300, false)
         ),
-        vec![CompConnection::build([1, 8], 3, Seed::GetFromPosition)],
+        vec![CompConnection::build([1, 10], 3, Seed::GetFromPosition)],
         Vec::new(),
         14
     );
     // 3: Liiga Playoffs.
     knockout_generator::build(
         "Playoffs",
-        Vec::new(),
+        vec!["Säälit"],
         AnnualWindow::build(4, 2, 6, 1),
         vec![match_event::Rules::build(3, 1200, 0, true)],
-        vec![4],
-        vec![8],
+        vec![2, 4],
+        vec![10],
         1,
         Vec::new()
     );

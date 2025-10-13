@@ -50,7 +50,10 @@ impl TeamCompData {
     }
 
     // Get points accumulated in a round robin stage.
-    pub fn get_points(&self, rr: &format::round_robin::RoundRobin) -> u8 {
+    pub fn get_points(&self, rr_option: &Option<&format::round_robin::RoundRobin>) -> u8 {
+        if rr_option.is_none() { return 0; }
+        let rr = rr_option.unwrap();
+
         self.regular_wins * rr.points_for_win +
         self.ot_wins * rr.points_for_ot_win +
         self.draws * rr.points_for_draw +

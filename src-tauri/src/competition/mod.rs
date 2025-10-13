@@ -103,11 +103,11 @@ impl Competition {
 // Functional.
 impl Competition {
     // Set up a season that has already been created and saved to the database.
-    pub fn setup_season(&self, teams: Option<&Vec<TeamCompData>>) {
+    pub fn setup_season(&self, teams: &mut Vec<TeamCompData>) {
         let mut season = Season::fetch_from_db(&self.id, self.get_seasons_amount() - 1);
 
-        if teams.is_some() {
-            season.teams.append(&mut teams.unwrap().clone());
+        while !teams.is_empty() && !season.has_enough_teams(self.min_no_of_teams) {
+            season.teams.push(teams.swap_remove(teams.len() - 1));
         }
 
         if season.has_enough_teams(self.min_no_of_teams) {
@@ -115,16 +115,6 @@ impl Competition {
         }
 
         season.save();
-    }
-}
-
-// Testing.
-impl Competition {
-    // Set up all teams in the competition.
-    fn setup_teams(&self) {
-        /* for id in self.team_ids.iter() {
-            Team::fetch_from_db(id).setup(0, 0);
-        } */
     }
 }
 
@@ -172,6 +162,6 @@ impl CompConnection {
         }
 
         let comp = Competition::fetch_from_db(&self.comp_to_connect).expect(&format!("competition id {} not found", self.comp_to_connect));
-        comp.setup_season(Some(&teamdata));
+        comp.setup_season(&mut teamdata);
     }
 }

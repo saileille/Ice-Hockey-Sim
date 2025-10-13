@@ -1,6 +1,6 @@
 // Functions for generating knockout competitions.
 
-use std::ops::Range;
+use std::{i8, ops::Range};
 
 use ordinal::ToOrdinal as _;
 use rand::{rng, rngs::ThreadRng, Rng};
@@ -15,73 +15,85 @@ pub fn build(
     season_duration: AnnualWindow, // Time when this competition is played.
     match_rules: Vec<match_event::Rules>,    // Match rules for each round. If there are more rounds than elements in this vector, the last element will be applied to remaining rounds.
     wins_required: Vec<u8>, // Wins required to advance from each round. If there are more rounds than elements in this vector, the last element will be applied to remaining rounds.
-    no_of_teams: Vec<u8>,   // Number of teams the knockout competition starts with.
+    teams_in_rounds: Vec<u8>,   // Number of teams the knockout competition has on each round.
     teams_at_end: u8,   // Number of teams the knockout competition ends with.
     connections: Vec<CompConnection>    // Connections to other competitions; where to move which teams after the knockout is over.
 ) {
-    let mut parent_comp = Competition::build_and_save(name, Vec::new(), season_duration, None, connections, Vec::new(), no_of_teams[0]);
-    let mut rounds = create_rounds(&round_names, &match_rules, &wins_required, &no_of_teams, teams_at_end, parent_comp.id);
+    let mut parent_comp = Competition::build_and_save(name, Vec::new(), season_duration, None, connections, Vec::new(), teams_in_rounds[0]);
+
+    let teams_in_rounds = get_teams_in_rounds(&teams_in_rounds, teams_at_end);
+    let mut rounds = create_rounds(&round_names, &match_rules, &wins_required, &teams_in_rounds, parent_comp.id);
+
     set_date_boundaries(&mut rounds, &parent_comp.season_window);
+    finalise_rounds(&mut parent_comp, &mut rounds);
+}
 
-    // Finalising the rounds and giving their IDs to the parent competition.
-    for round in rounds.iter_mut() {
-        round.save_new(&Vec::new());
+// Get how many teams each round should actually have.
+fn get_teams_in_rounds(config_no_of_teams: &Vec<u8>, teams_at_end: u8) -> Vec<u8> {
+    let mut teams_in_rounds = config_no_of_teams.clone();
 
-        let pairs = round.min_no_of_teams / 2;
-        if pairs > teams_at_end {
-            round.connections.push(CompConnection::build([1, pairs], round.id + 1, Seed::Preserve));
-            round.save();
-        }
-
-        parent_comp.child_comp_ids.push(round.id);
+    let mut last_rounds = Vec::new();
+    let mut next_teams = teams_at_end * 2;
+    while next_teams < *teams_in_rounds.last().unwrap() {
+        last_rounds.push(next_teams);
+        next_teams *= 2;
     }
 
-    parent_comp.save();
+    // Return the no of teams for each round here if there is no need for special rounds.
+    if &next_teams == teams_in_rounds.last().unwrap() {
+        last_rounds.reverse();
+        teams_in_rounds.append(&mut last_rounds);
+        return teams_in_rounds;
+    }
+
+    // In case there is need for a special round...
+    let start_teams = teams_in_rounds.swap_remove(teams_in_rounds.len() - 1);
+    let round_size = (start_teams - last_rounds.last().unwrap()) * 2;
+
+    teams_in_rounds.push(round_size);
+    last_rounds.reverse();
+    teams_in_rounds.append(&mut last_rounds);
+
+    return teams_in_rounds;
 }
 
 // Create rounds.
-fn create_rounds(round_names: &Vec<&str>, match_rules: &Vec<match_event::Rules>, wins_required: &Vec<u8>, no_of_teams: &Vec<u8>, teams_at_end: u8, parent_comp_id: CompetitionId) -> Vec<Competition> {
+fn create_rounds(round_names: &Vec<&str>, match_rules: &Vec<match_event::Rules>, wins_required: &Vec<u8>, teams_in_rounds: &Vec<u8>, parent_comp_id: CompetitionId) -> Vec<Competition> {
     let mut rounds = Vec::new();
 
-    let mut index = rounds.len();
-    let mut team_counter = no_of_teams[0];
-    while team_counter > teams_at_end {
+    for (i, round_size) in teams_in_rounds.iter().enumerate() {
         let mut round = Competition::default();
         round.parent_comp_id = parent_comp_id;
-        round.min_no_of_teams = team_counter;
+        round.min_no_of_teams = *round_size;
 
         // Give the round a name from predefined options, or a default one.
-        match index < round_names.len() {
-            true => round.name = round_names[index].to_string(),
-            _ => assign_default_name(&mut round, index)
+        match i < round_names.len() {
+            true => round.name = round_names[i].to_string(),
+            _ => assign_default_name(&mut round, i, teams_in_rounds.len())
         };
 
         round.format = format::Format::build(
             None,
             Some(format::knockout::KnockoutRound::build(
-                get_from_index_or_last(wins_required, index)
+                get_from_index_or_last(wins_required, i)
             )),
-            get_from_index_or_last(match_rules, index)
+            get_from_index_or_last(match_rules, i)
         );
 
         rounds.push(round);
-        index += 1;
-        team_counter = match index < no_of_teams.len() {
-            true => no_of_teams[index],
-            _ => team_counter / 2
-        };
     }
 
     return rounds;
 }
 
 // Get a generic name for a knockout round based on how many teams it has.
-fn assign_default_name(round: &mut Competition, round_index: usize) {
-    // Check if the name can be given.
-    match round.min_no_of_teams {
-        2 => round.name = "Final".to_string(),
-        4 => round.name = "Semi Final".to_string(),
-        8 => round.name = "Quarter Final".to_string(),
+fn assign_default_name(round: &mut Competition, round_index: usize, total_rounds: usize) {
+    let rounds_left = total_rounds - round_index;
+
+    match (rounds_left, round.min_no_of_teams) {
+        (1, 2) => round.name = "Final".to_string(),
+        (2, 4) => round.name = "Semi Final".to_string(),
+        (3, 8) => round.name = "Quarter Final".to_string(),
         _ => round.name = format!("{} Round", (round_index + 1).to_ordinal_string())
     };
 }
@@ -134,5 +146,44 @@ fn get_from_index_or_last<T: Clone>(vector: &Vec<T>, index: usize) -> T {
     match index < vector.len() {
         true => vector[index].clone(),
         _ => vector.last().unwrap().clone()
+    }
+}
+
+// Finalise the rounds.
+fn finalise_rounds(parent_comp: &mut Competition, rounds: &mut Vec<Competition>) {
+    let rounds_clone = rounds.clone();
+    let mut connections = vec![0; rounds.len()];
+    for (i, round) in rounds.iter_mut().enumerate() {
+        round.save_new(&Vec::new());
+        parent_comp.child_comp_ids.push(round.id);
+
+        if i == rounds_clone.len() - 1 { continue; }
+
+        // Doing connections.
+        create_connections(i.clone(), round, &rounds_clone, &mut connections);
+        round.save();
+    }
+
+    parent_comp.save();
+}
+
+// Create connections between knockout rounds.
+fn create_connections(i: usize, round: &mut Competition, rounds: &Vec<Competition>, connections: &mut Vec<u8>) {
+    let mut advancing_teams = convert::u8_to_i8(round.min_no_of_teams / 2);
+
+    let mut last;
+    let mut first;
+    let mut iteration = 0;
+    while advancing_teams > 0 {
+        iteration += 1;
+        let space_in_next_round = rounds[i].min_no_of_teams - connections[i];
+
+        last = advancing_teams;
+        first = (advancing_teams - convert::u8_to_i8(space_in_next_round) + 1).clamp(1, i8::MAX);
+        let added_teams = last - first + 1;
+
+        round.connections.push(CompConnection::build([first as u8, last as u8], round.id + iteration, Seed::Preserve));
+        connections[i] += added_teams as u8;
+        advancing_teams -= added_teams;
     }
 }

@@ -26,7 +26,7 @@ impl Season {
     // Get the round robin standings.
     pub fn display_standings(&mut self) -> String {
         let rr = Competition::fetch_from_db(&self.comp_id).unwrap().format.unwrap().round_robin.unwrap();
-        self.sort_teams(&rr);
+        self.sort_teams(&Some(&rr));
         let mut s = "Rank\tName\tG\tW\tOTW\tD\tOTL\tL\tGF\tGA\tDiff\tPts".to_string();
         for (i, team) in self.teams.iter().enumerate() {
             s += &format!("\n{}.\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
@@ -41,7 +41,7 @@ impl Season {
                 team.goals_scored,
                 team.goals_conceded,
                 team.get_goal_difference(),
-                team.get_points(&rr)
+                team.get_points(&Some(&rr))
             );
         }
 

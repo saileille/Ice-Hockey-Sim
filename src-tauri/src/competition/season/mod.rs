@@ -88,6 +88,15 @@ impl Season {
 
     // Finalise the creation of a season for a particular competition.
     pub fn setup(&mut self, comp: &Competition) {
+        let rr = if comp.format.as_ref().is_none() || comp.format.as_ref().unwrap().round_robin.is_none() {
+            &None
+        } else {
+            &comp.format.as_ref().unwrap().round_robin.as_ref()
+        };
+
+        // Teams must be sorted from best to worst before continuing.
+        self.sort_teams(rr);
+
         if self.round_robin.is_some() {
             self.setup_round_robin(comp);
         }
@@ -97,17 +106,16 @@ impl Season {
 
         // In this case the competition must have child competitions, so set them up instead.
         else {
+            let mut teams = Vec::new();
             for (i, id) in comp.child_comp_ids.iter().enumerate() {
-                let teams = if i == 0 {
-                    // If the stage is the first one, pass down the teams there.
-                    // TODO: Make it possible to have groups.
-                    Some(&self.teams)
+                if i == 0 {
+                    // Set up all the teams here if the child competition is the first one.
+                    // Teams that cannot be added will go to the next rounds.
+                    // Does not support group competitions yet.
+                    teams = self.teams.clone();
                 }
-                else {
-                    None
-                };
 
-                Competition::fetch_from_db(id).unwrap().setup_season(teams);
+                Competition::fetch_from_db(id).unwrap().setup_season(&mut teams);
             }
         }
     }
@@ -171,17 +179,30 @@ impl Season {
 
     // Get the teams in the order of betterhood.
     // TODO: customisable ordering.
-    fn sort_teams(&mut self, rr: &format::round_robin::RoundRobin) {
-        self.teams.sort_by(|a, b| {
-            b.get_points(rr).cmp(&a.get_points(rr))
-            .then(b.get_goal_difference().cmp(&a.get_goal_difference()))
-            .then(b.goals_scored.cmp(&a.goals_scored))
-            .then(b.regular_wins.cmp(&a.regular_wins))
-            .then(b.ot_wins.cmp(&a.ot_wins))
-            .then(b.draws.cmp(&a.draws))
-            .then(b.ot_losses.cmp(&a.ot_losses))
-            .then(Team::fetch_from_db(&a.team_id).name.cmp(&Team::fetch_from_db(&b.team_id).name))
-        });
+    fn sort_teams(&mut self, rr: &Option<&format::round_robin::RoundRobin>) {
+        if self.round_robin.is_some() {
+            self.teams.sort_by(|a, b| {
+                b.get_points(rr).cmp(&a.get_points(rr))
+                .then(b.get_goal_difference().cmp(&a.get_goal_difference()))
+                .then(b.goals_scored.cmp(&a.goals_scored))
+                .then(b.regular_wins.cmp(&a.regular_wins))
+                .then(b.ot_wins.cmp(&a.ot_wins))
+                .then(b.draws.cmp(&a.draws))
+                .then(b.ot_losses.cmp(&a.ot_losses))
+                .then(Team::fetch_from_db(&a.team_id).name.cmp(&Team::fetch_from_db(&b.team_id).name))
+            });
+        }
+
+        else if self.knockout.is_some() {
+            // Do better in the future.
+            self.teams.sort_by(|a, b| a.seed.cmp(&b.seed));
+        }
+
+        else {
+            // Do better in the future.
+            self.teams.sort_by(|a, b| a.seed.cmp(&b.seed));
+        }
+
     }
 
     // Simulate the games for this day.
@@ -238,7 +259,7 @@ impl Season {
 
     // Do round robin post-season tasks.
     fn do_post_season_tasks_rr(&mut self, comp: &Competition) {
-        self.sort_teams(comp.format.as_ref().unwrap().round_robin.as_ref().unwrap());
+        self.sort_teams(&comp.format.as_ref().unwrap().round_robin.as_ref());
 
         for connection in comp.connections.iter() {
             connection.send_teams(&self.teams);
@@ -248,6 +269,7 @@ impl Season {
     // Do knockout post-season tasks.
     fn do_post_season_tasks_ko(&mut self, comp: &Competition) {
         for connection in comp.connections.iter() {
+            // Needs sorting, still.
             connection.send_teams(&self.knockout.as_ref().unwrap().advanced_teams);
         }
     }
