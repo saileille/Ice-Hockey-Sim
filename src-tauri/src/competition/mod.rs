@@ -166,15 +166,17 @@ pub struct CompConnection {
     teams_from_positions: [u8; 2],
     comp_to_connect: CompetitionId,
     team_seeds: Seed,
+    stats_carry_over: bool,
 }
 
 impl CompConnection {
     // Build the element.
-    pub fn build(teams_from_positions: [u8; 2], comp_to_connect: CompetitionId, team_seeds: Seed) -> Self {
+    pub fn build(teams_from_positions: [u8; 2], comp_to_connect: CompetitionId, team_seeds: Seed, stats_carry_over: bool) -> Self {
         Self {
             teams_from_positions: teams_from_positions,
             comp_to_connect: comp_to_connect,
             team_seeds: team_seeds,
+            stats_carry_over: stats_carry_over
         }
     }
 
@@ -188,7 +190,15 @@ impl CompConnection {
                 Seed::Preserve => teams[i as usize].seed,
             };
 
-            teamdata.push(TeamCompData::build(teams[i as usize].team_id, seed));
+            let team = if self.stats_carry_over {
+                let mut t = teams[i as usize].clone();
+                t.seed = seed;
+                t
+            } else {
+                TeamCompData::build(teams[i as usize].team_id, seed)
+            };
+
+            teamdata.push(team);
         }
 
         let comp = Competition::fetch_from_db(&self.comp_to_connect).expect(&format!("competition id {} not found", self.comp_to_connect));

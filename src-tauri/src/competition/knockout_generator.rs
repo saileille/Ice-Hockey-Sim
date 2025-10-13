@@ -184,7 +184,7 @@ fn create_connections(i: usize, round: &mut Competition, rounds: &Vec<Competitio
         first = (advancing_teams - convert::u8_to_i8(space_in_next_round) + 1).clamp(1, i8::MAX);
         let added_teams = last - first + 1;
 
-        round.connections.push(CompConnection::build([first as u8, last as u8], round.id + iteration, Seed::Preserve));
+        round.connections.push(CompConnection::build([first as u8, last as u8], round.id + iteration, Seed::Preserve, false));
         connections[i] += added_teams as u8;
         advancing_teams -= added_teams;
     }

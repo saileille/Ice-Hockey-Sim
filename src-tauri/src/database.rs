@@ -121,7 +121,7 @@ fn add_competition_data() {
         "Regular Season",
         &Vec::new(),
         AnnualWindow::build(9, 1, 4, 1),
-        vec![CompConnection::build([1, 10], 3, Seed::GetFromPosition)],
+        vec![CompConnection::build([1, 10], 3, Seed::GetFromPosition, false)],
         14,
         format::Format::build(
             Some(format::round_robin::RoundRobin::build(4, 0, 3, 2, 1, 1, 0)),
