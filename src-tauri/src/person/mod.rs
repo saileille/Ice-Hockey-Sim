@@ -23,7 +23,7 @@ pub struct Person {
 // Basics.
 impl Person {
     fn build(country_id: CountryId, gender: Gender) -> Self {
-        let mut person: Person = Person::default();
+        let mut person = Person::default();
         person.country_id = country_id;
         (person.forename, person.surname) = Country::fetch_from_db(&person.country_id).generate_name();
 

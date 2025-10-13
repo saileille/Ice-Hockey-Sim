@@ -24,7 +24,7 @@ use self::lineup::LineUp;
 pub struct Team {
     pub id: TeamId,  // id: 0 is reserved
     pub name: String,
-    pub roster: HashSet<PlayerId>,
+    pub roster: Vec<PlayerId>,
     pub lineup: LineUp,
 }
 
@@ -37,16 +37,16 @@ impl Team { // Basics.
         };
     }
 
-    fn build<S: AsRef<str>>(name: S) -> Self {
-        let mut team: Team = Team::default();
-        team.name = String::from(name.as_ref());
+    fn build(name: &str) -> Self {
+        let mut team = Team::default();
+        team.name = name.to_string();
 
         return team;
     }
 
     // Create a team and store it in the database. Return a clone of the Team.
-    pub fn build_and_save<S: AsRef<str>>(name: S) -> Self {
-        let mut team: Self = Self::build(name);
+    pub fn build_and_save(name: &str) -> Self {
+        let mut team = Self::build(name);
         team.create_id(TEAMS.lock().unwrap().len() + 1);
         team.save();
         return team;
@@ -80,7 +80,7 @@ impl Team { // Basics.
 
     // Get every player in the roster as a clone.
     fn get_players(&self) -> Vec<Player> {
-        let mut players: Vec<Player> = Vec::new();
+        let mut players = Vec::new();
 
         for id in self.roster.iter() {
             players.push(Player::fetch_from_db(id).unwrap());
@@ -95,7 +95,7 @@ impl Team {
     pub fn auto_build_lineup(&mut self) {
         self.lineup.clear();
 
-        let mut players: Vec<Player> = self.get_players();
+        let mut players = self.get_players();
         players.sort_by(|a, b| b.ability.cmp(&a.ability));
 
         self.lineup.auto_add(players);
@@ -107,45 +107,43 @@ impl Team {
 impl Team {
     // Generate a basic roster of players for the team.
     fn generate_roster(&mut self, min_ability: u8, max_ability: u8) {
-        self.roster = HashSet::new();
-        let range: Uniform<u8> = Uniform::new_inclusive(min_ability, max_ability)
+        self.roster = Vec::new();
+        let range = Uniform::new_inclusive(min_ability, max_ability)
             .expect(&format!("error: low: {min_ability}, high: {max_ability}"));
 
-        let mut rng: rand::prelude::ThreadRng = rand::rng();
+        let mut rng = rand::rng();
 
-        let country_id: CountryId = Country::fetch_from_db_with_name("Finland").id;
+        let country_id = Country::fetch_from_db_with_name("Finland").id;
 
         // Goalkeepers...
         for _ in 0..2 {
-            let player: Player = Player::build_and_save(country_id, rng.sample(range), PositionId::Goalkeeper);
-            self.roster.insert(player.id);
+            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::Goalkeeper);
+            self.roster.push(player.id);
         }
 
         // Defenders...
         for _ in 0..8 {
-            let player: Player = Player::build_and_save(country_id, rng.sample(range), PositionId::Defender);
-            self.roster.insert(player.id);
+            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::Defender);
+            self.roster.push(player.id);
         }
 
         // Left Wingers...
         for _ in 0..4 {
-            let player: Player = Player::build_and_save(country_id, rng.sample(range), PositionId::LeftWinger);
-            self.roster.insert(player.id);
+            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::LeftWinger);
+            self.roster.push(player.id);
         }
 
         // Centres...
         for _ in 0..4 {
-            let player: Player = Player::build_and_save(country_id, rng.sample(range), PositionId::Centre);
-            self.roster.insert(player.id);
+            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::Centre);
+            self.roster.push(player.id);
         }
 
         // Right Wingers...
         for _ in 0..4 {
-            let player: Player = Player::build_and_save(country_id, rng.sample(range), PositionId::RightWinger);
-            self.roster.insert(player.id);
+            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::RightWinger);
+            self.roster.push(player.id);
         }
-
-        self.save();
     }
 
     // Delete the team's players.
@@ -160,5 +158,6 @@ impl Team {
     // Setup a team before a season.
     pub fn setup(&mut self, min_ability: u8, max_ability: u8) {
         self.generate_roster(min_ability, max_ability);
+        self.save();
     }
 }

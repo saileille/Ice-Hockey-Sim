@@ -1,23 +1,26 @@
-// Competition data.
-pub mod stage;
+// A competition can be its own, contained thing, a part of a bigger competition, or both.
+pub mod season;
+pub mod format;
+pub mod knockout_generator;
 
-use crate::{
-    types::{
-        CompetitionId,
-        StageId,
-        TeamId
-    },
-    database::{COMPETITIONS},
-    team::Team
-};
-use self::stage::Stage;
+use std::{ops::Range};
 
+use crate::{competition::season::{team::TeamCompData, Season}, database::{COMPETITIONS, SEASONS}, team::Team, time::AnnualWindow, types::{convert, CompetitionId, TeamId}};
+
+use self::format::Format;
+
+#[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct Competition {
-    id: CompetitionId,
-    name: String,
-    team_ids: Vec<TeamId>,
-    pub stage_ids: Vec<StageId>,
+    pub id: CompetitionId,
+    pub name: String,
+    pub season_window: AnnualWindow,  // Dates between which this competition is played.
+    connections: Vec<CompConnection>,
+    min_no_of_teams: u8,
+    pub format: Option<Format>,
+
+    pub child_comp_ids: Vec<CompetitionId>,
+    pub parent_comp_id: CompetitionId,
 }
 
 // Basics.
@@ -31,51 +34,87 @@ impl Competition {
     }
 
     // Build a Competition element.
-    pub fn build(name: &str, teams: Vec<Team>, stages: Vec<Stage>) -> Self {
-        let mut comp: Self = Self::default();
+    fn build(name: &str, teams: &Vec<Team>, season_window: AnnualWindow, format: Option<Format>, connections: Vec<CompConnection>, child_comp_ids: Vec<CompetitionId>, min_no_of_teams: u8) -> Self {
+        let mut comp = Self::default();
         comp.name = name.to_string();
+        comp.season_window = season_window;
+        comp.connections = connections;
 
-        // NOTE: build_and_save has already saved these to the database.
-        for team in teams {
-            comp.team_ids.push(team.id);
-        }
+        // If min_no_of_teams is 0, competition must have teams assigned to it.
+        comp.min_no_of_teams = match min_no_of_teams {
+            0 => convert::usize_to_u8(teams.len()),
+            _ => min_no_of_teams
+        };
 
-        // NOTE: build_and_save has already saved these to the database.
-        for stage in stages {
-            comp.stage_ids.push(stage.id);
-        }
+        comp.format = format;
+        comp.child_comp_ids = child_comp_ids;
 
         return comp;
     }
 
-    // Build a Competition element and store it in the database. Return the created element.
-    pub fn build_and_save(name: &str, teams: Vec<Team>, stages: Vec<Stage>) -> Self {
-        let mut comp: Self = Self::build(name, teams, stages);
-        comp.create_id(COMPETITIONS.lock().unwrap().len() + 1);
-        comp.save();
+    // Build a competition element and save it to the database.
+    pub fn build_and_save(name: &str, teams: Vec<Team>, season_window: AnnualWindow, format: Option<Format>, connections: Vec<CompConnection>, child_comp_ids: Vec<CompetitionId>, min_no_of_teams: u8) -> Self {
+        let mut comp = Self::build(name, &teams, season_window, format, connections, child_comp_ids, min_no_of_teams);
+
+        comp.save_new(&teams);
+
         return comp;
     }
 
-    pub fn fetch_from_db(id: &CompetitionId) -> Self {
-        COMPETITIONS.lock().unwrap().get(id)
-            .expect(&format!("no Competition with id {id:#?}")).clone()
+    pub fn fetch_from_db(id: &CompetitionId) -> Option<Self> {
+        COMPETITIONS.lock().unwrap().get(id).cloned()
     }
 
-    // Update the Stage to database.
+    // Save a competition to the database for the first time.
+    fn save_new(&mut self, teams: &Vec<Team>) {
+        self.create_id(COMPETITIONS.lock().unwrap().len() + 1);
+        self.save();
+
+        // Let's create a seasons entry for this competition so we never have to check for its existence.
+        SEASONS.lock().unwrap().insert(self.id, Vec::new());
+
+        // Create and save the first season.
+        let team_ids = teams.iter().map(|a| a.id).collect();
+        Season::build_and_save(self, &team_ids);
+    }
+
+    // Update the Competition to database.
     pub fn save(&self) {
         COMPETITIONS.lock()
             .expect(&format!("something went wrong when trying to update Competition {}: {} to COMPETITIONS", self.id, self.name))
             .insert(self.id, self.clone());
     }
+
+    // Give child competitions this competition's ID.
+    pub fn give_id_to_children_comps(&self) {
+        for id in self.child_comp_ids.iter() {
+            let mut child_comp = Self::fetch_from_db(id).expect(&format!("{}: {} has child comp id of {id}", self.id, self.name));
+            child_comp.parent_comp_id = self.id;
+            child_comp.save();
+        }
+    }
+
+    // Get the amount of seasons this competition has stored.
+    pub fn get_seasons_amount(&self) -> usize {
+        SEASONS.lock().unwrap().get(&self.id).expect(&format!("{}: {} has no seasons", self.id, self.name)).len()
+    }
 }
 
 // Functional.
 impl Competition {
-    // Set up the competition for a new season.
-    pub fn setup(&self) {
-        self.setup_teams();
-        let mut initial_stage: Stage = Stage::fetch_from_db(&self.stage_ids[0]);
-        initial_stage.setup(&self.team_ids);
+    // Set up a season that has already been created and saved to the database.
+    pub fn setup_season(&self, teams: Option<&Vec<TeamCompData>>) {
+        let mut season = Season::fetch_from_db(&self.id, self.get_seasons_amount() - 1);
+
+        if teams.is_some() {
+            season.teams.append(&mut teams.unwrap().clone());
+        }
+
+        if season.has_enough_teams(self.min_no_of_teams) {
+            season.setup(self);
+        }
+
+        season.save();
     }
 }
 
@@ -83,8 +122,56 @@ impl Competition {
 impl Competition {
     // Set up all teams in the competition.
     fn setup_teams(&self) {
-        for id in self.team_ids.iter() {
+        /* for id in self.team_ids.iter() {
             Team::fetch_from_db(id).setup(0, 0);
+        } */
+    }
+}
+
+// What to do with the seed of the team.
+#[derive(Debug)]
+#[derive(Clone)]
+pub enum Seed {
+    // Get the seed from the position the team is given to the connection.
+    GetFromPosition,
+
+    // Preserve the team's seed from the previous competition.
+    Preserve,
+}
+
+// Stores data for which teams to go to which competition.
+#[derive(Debug)]
+#[derive(Clone)]
+pub struct CompConnection {
+    teams_from_positions: [u8; 2],
+    comp_to_connect: CompetitionId,
+    team_seeds: Seed,
+}
+
+impl CompConnection {
+    // Build the element.
+    pub fn build(teams_from_positions: [u8; 2], comp_to_connect: CompetitionId, team_seeds: Seed) -> Self {
+        Self {
+            teams_from_positions: teams_from_positions,
+            comp_to_connect: comp_to_connect,
+            team_seeds: team_seeds,
         }
+    }
+
+    // Send teams onwards to the next stage.
+    fn send_teams(&self, teams: &Vec<TeamCompData>) {
+        let mut teamdata = Vec::new();
+
+        for i in (Range { start: self.teams_from_positions[0] - 1, end: self.teams_from_positions[1] })  {
+            let seed = match self.team_seeds {
+                Seed::GetFromPosition => i + 1,
+                Seed::Preserve => teams[i as usize].seed,
+            };
+
+            teamdata.push(TeamCompData::build(teams[i as usize].team_id, seed));
+        }
+
+        let comp = Competition::fetch_from_db(&self.comp_to_connect).expect(&format!("competition id {} not found", self.comp_to_connect));
+        comp.setup_season(Some(&teamdata));
     }
 }

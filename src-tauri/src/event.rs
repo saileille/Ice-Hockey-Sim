@@ -23,7 +23,7 @@ pub struct Type {
 
 impl Type {    // Basics.
     pub fn build(min_boundary: f64, equilibrium: f64, max_boundary: f64) -> Self {
-        let mut event: Type = Type::default();
+        let mut event = Type::default();
         event.min_boundary = min_boundary;
         event.equilibrium = equilibrium;
         event.max_boundary = max_boundary;
@@ -52,21 +52,21 @@ impl Type {
         else if modifier == 1.0 {return self.max_boundary}
 
         else if modifier > 0.5 {
-            let percentage: f64 = modifier * 2.0 - 1.0;  // Percentage is between 0.0 and 1.0.
-            let scale: f64 = self.max_boundary - self.equilibrium;    // The difference between 1.0 and 0.5 modifier.
+            let percentage = modifier * 2.0 - 1.0;  // Percentage is between 0.0 and 1.0.
+            let scale = self.max_boundary - self.equilibrium;    // The difference between 1.0 and 0.5 modifier.
             return self.equilibrium + scale * percentage;
         }
 
         else {
-            let percentage: f64 = modifier * 2.0;   // Percentage is between 0.0 and 1.0.
-            let scale: f64 = self.equilibrium - self.min_boundary;    // The difference between 0.5 and 0.0 modifier.
+            let percentage = modifier * 2.0;   // Percentage is between 0.0 and 1.0.
+            let scale = self.equilibrium - self.min_boundary;    // The difference between 0.5 and 0.0 modifier.
             return self.min_boundary + scale * percentage;
         }
     }
 
     // Get an outcome of the event that is either true or false.
     pub fn get_outcome(&mut self, modifier: f64) -> bool {
-        let mut rng: ThreadRng = rand::rng();
+        let mut rng = rand::rng();
         return rng.random_bool(self.calculate_likelihood(modifier))
     }
 }

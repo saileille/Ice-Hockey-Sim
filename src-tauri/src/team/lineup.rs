@@ -7,6 +7,7 @@ use crate::{
 };
 
 // A line-up of players used in a match.
+#[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct LineUp {
     gk_ids: [PlayerId; 2],
@@ -22,10 +23,10 @@ impl LineUp {   // Basics.
 
     // Get clones of both goalkeepers.
     pub fn get_goalkeepers(&self) -> Vec<Player> {
-        let mut gks: Vec<Player> = Vec::new();
+        let mut gks = Vec::new();
 
         for id in self.gk_ids.iter() {
-            let gk: Option<Player> = Player::fetch_from_db(id);
+            let gk = Player::fetch_from_db(id);
             if gk.is_some() {
                 gks.push(gk.unwrap());
             }
@@ -118,6 +119,7 @@ impl LineUp {   // Testing functions.
 }
 
 // A pair of defenders used in a line-up.
+#[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct DefencePair {
     pub ld_id: PlayerId,
@@ -164,6 +166,7 @@ impl DefencePairClones {
 }
 
 // A line of forwards used in a line-up.
+#[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct ForwardLine {
     pub lw_id: PlayerId,

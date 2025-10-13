@@ -29,16 +29,16 @@ impl Country {  // Basics.
     }
 
     // Build a country element.
-    fn build<S: AsRef<str>>(name: S) -> Self {
-        let mut country: Self = Self::default();
-        country.name = String::from(name.as_ref());
+    fn build(name: &str) -> Self {
+        let mut country = Self::default();
+        country.name = name.to_string();
         country.assign_names();
         return country;
     }
 
     // Build a Country element and store it in the database. Return the created element.
-    pub fn build_and_save<S: AsRef<str>>(name: S) -> Self {
-        let mut country: Self = Self::build(name.as_ref());
+    pub fn build_and_save(name: &str) -> Self {
+        let mut country = Self::build(name);
         country.create_id(COUNTRIES.lock().unwrap().len() + 1);
 
         country.save();
@@ -58,16 +58,14 @@ impl Country {  // Basics.
     }
 
     // Get a Country from the database with the given name.
-    pub fn fetch_from_db_with_name<S: AsRef<str>>(name: S) -> Self {
-        let name_ref: &str = name.as_ref();
-
+    pub fn fetch_from_db_with_name(name: &str) -> Self {
         for country in COUNTRIES.lock().unwrap().values() {
-            if country.name == name_ref {
+            if country.name == name {
                 return country.clone();
             }
         }
 
-        panic!("country with name {name_ref} does not exist!");
+        panic!("country with name {name} does not exist!");
     }
 
     // Make sure the country does not contain illegal values.
@@ -82,7 +80,7 @@ impl Country {  // Basics.
 impl Country {
     // Assign surnames and forenames to the country.
     fn assign_names(&mut self) {
-        let names: HashMap<String, HashMap<String, u16>> = load_country_names(&self.name);
+        let names = load_country_names(&self.name);
         self.forenames.populate(names.get("forenames").unwrap().clone());
         self.surnames.populate(names.get("surnames").unwrap().clone());
     }
@@ -108,7 +106,7 @@ impl NamePool { // Basics.
             return false;
         }
 
-        let mut sum: usize = 0;
+        let mut sum = 0;
         for weight in self.weights.iter() {
             sum += *weight as usize;
         }
@@ -138,10 +136,10 @@ impl NamePool {
 
     // Get a random index of the weights/names vector.
     fn draw_index(&self) -> usize {
-        let range: Range<usize> = Range { start: 0, end: self.total_weight };
-        let random: usize = random_range(range);
+        let range = Range { start: 0, end: self.total_weight };
+        let random = random_range(range);
 
-        let mut counter: usize = 0;
+        let mut counter = 0;
         for (i, weight) in self.weights.iter().enumerate() {
             counter += *weight as usize;
             if random < counter {

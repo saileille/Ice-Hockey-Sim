@@ -9,10 +9,10 @@ use crate::{
         lineup::{DefencePair, ForwardLine, LineUp},
         Team
     },
-    competition::stage::TeamStageData as StageTeamData
 };
 use super::event::Shot;
 
+#[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct TeamGameData {
     pub team_id: TeamId,
@@ -24,7 +24,7 @@ pub struct TeamGameData {
 
 impl TeamGameData { // Basics.
     pub fn build(team_id: TeamId) -> Self {
-        let mut team_data: TeamGameData = TeamGameData::default();
+        let mut team_data = TeamGameData::default();
         team_data.team_id = team_id;
         return team_data;
     }
@@ -47,7 +47,7 @@ impl TeamGameData {
     }
 
     pub fn get_goal_amount(&self) -> u16 {
-        let mut goal_counter: u16 = 0;
+        let mut goal_counter = 0;
         for shot in self.shots.iter() {
             if shot.is_goal { goal_counter += 1; }
         }
@@ -56,10 +56,10 @@ impl TeamGameData {
 
     // Determine who should go on ice next.
     pub fn change_players_on_ice(&mut self) {
-        let mut players_on_ice: PlayersOnIce = PlayersOnIce::default();
+        let mut players_on_ice = PlayersOnIce::default();
 
         // The better goalkeeper is always on ice (for now).
-        let mut goalkeepers: Vec<Player> = self.lineup.get_goalkeepers();
+        let mut goalkeepers = self.lineup.get_goalkeepers();
         goalkeepers.sort_by(|a, b| b.ability.cmp(&a.ability));
 
         players_on_ice.gk_id = goalkeepers[0].id;
@@ -67,45 +67,26 @@ impl TeamGameData {
         // Simple randomness to determine which line is playing.
         // This should be player-editable in the future.
         // 1st line: 40%, 2nd line: 30%, 3rd line: 20%, 4th line: 40%
-        let weights: [u32; 4] = [4, 3, 2, 1];
-        let builder: WalkerTableBuilder = WalkerTableBuilder::new(&weights);
-        let wa_table: WalkerTable = builder.build();
+        let weights = [4, 3, 2, 1];
+        let builder = WalkerTableBuilder::new(&weights);
+        let wa_table = builder.build();
 
-        let index: usize = wa_table.next();
+        let index = wa_table.next();
 
-        let d_pair: DefencePair = self.lineup.defence_pairs[index].clone();
+        let d_pair = self.lineup.defence_pairs[index].clone();
         players_on_ice.ld_id = d_pair.ld_id;
         players_on_ice.rd_id = d_pair.rd_id;
 
-        let f_line: ForwardLine = self.lineup.forward_lines[index].clone();
+        let f_line = self.lineup.forward_lines[index].clone();
         players_on_ice.lw_id = f_line.lw_id;
         players_on_ice.c_id = f_line.c_id;
         players_on_ice.rw_id = f_line.rw_id;
 
         self.players_on_ice = Some(players_on_ice);
     }
-
-    // Update the team data for the stage the match is part of.
-    pub fn update_stagedata(&self, opponent: &TeamGameData, had_overtime: bool, stagedata: &mut StageTeamData) {
-        let self_goals: u16 = self.get_goal_amount();
-        let opp_goals: u16 = opponent.get_goal_amount();
-
-        // This team won.
-        if self_goals > opp_goals {
-            if !had_overtime { stagedata.regular_wins += 1; }
-            else { stagedata.ot_wins += 1; }
-        }
-        else if self_goals < opp_goals {
-            if !had_overtime { stagedata.regular_losses += 1; }
-            else { stagedata.ot_losses += 1; }
-        }
-        else { stagedata.draws += 1; }
-
-        stagedata.goals_scored += self_goals;
-        stagedata.goals_conceded += opp_goals;
-    }
 }
 
+#[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct PlayersOnIce {
     pub gk_id: PlayerId,
@@ -155,7 +136,7 @@ impl PlayersOnIce {
 impl PlayersOnIce {
     fn count(&self) -> u8 {
         // Count how many players are on ice.
-        let mut counter: u8 = 0;
+        let mut counter = 0;
         if self.gk_id != 0 {
             counter += 1;
         } if self.ld_id != 0 {
@@ -203,8 +184,8 @@ impl PlayersOnIceClones {   // Basics.
 impl PlayersOnIceClones {
     // Get the total ability of skaters (not goalkeeper).
     fn get_skaters_ability(&self) -> u16 {
-        let mut total_ability: u16 = 0;
-        let skaters: Vec<Player> = self.get_skaters_in_vector();
+        let mut total_ability = 0;
+        let skaters = self.get_skaters_in_vector();
 
         for skater in skaters.iter() {
             total_ability += skater.ability as u16;
@@ -215,9 +196,9 @@ impl PlayersOnIceClones {
 
     // Compare the ability of skaters on ice to the opponent.
     pub fn get_skaters_ability_ratio(&self, opponent_ids: &PlayersOnIce) -> f64 {
-        let opponent: PlayersOnIceClones = opponent_ids.get();
-        let ability: f64 = self.get_skaters_ability() as f64;
-        let both_sides_ability: f64 = ability + (opponent.get_skaters_ability() as f64);
+        let opponent = opponent_ids.get();
+        let ability = self.get_skaters_ability() as f64;
+        let both_sides_ability = ability + (opponent.get_skaters_ability() as f64);
 
         // To avoid dividing by zero.
         match both_sides_ability {
@@ -228,7 +209,7 @@ impl PlayersOnIceClones {
 
     // Get the valid skaters in a vector.
     pub fn get_skaters_in_vector(&self) -> Vec<Player> {
-        let mut players: Vec<Player> = Vec::new();
+        let mut players = Vec::new();
 
         if self.ld.is_some() {players.push(self.ld.as_ref().unwrap().clone())}
         if self.rd.is_some() {players.push(self.rd.as_ref().unwrap().clone())}

@@ -1,19 +1,11 @@
 mod event;
-mod team;
+pub mod team;
 
 use std::collections::HashMap;
-use time::Date;
 
 use crate::{
-    competition::stage::{
-        Stage,
-        TeamStageData as StageTeamData,
-    },
-    team::Team,
-    database::{GAMES, TODAY},
-    event as logic_event,
-    time::db_string_to_date, types::{
-        convert, GameId, StageId, TeamId
+    competition::Competition, event as logic_event, team::Team, types::{
+        convert, CompetitionId, TeamId
     }
 };
 use self::{
@@ -21,143 +13,29 @@ use self::{
     event::Shot
 };
 
+#[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct Game {
     pub date: String,
-    pub id: GameId,
-    home: TeamGameData,
-    away: TeamGameData,
+    pub home: TeamGameData,
+    pub away: TeamGameData,
     clock: Clock,
-    stage_id: StageId,
+    comp_id: CompetitionId,
     attacker: Option<TeamGameData>,
     defender: Option<TeamGameData>,
 }
 
-impl Game { // Basics.
-    // Create an ID.
-    fn create_id(&mut self, id: usize) {
-        self.id = match id.try_into() {
-            Ok(n) => n,
-            Err(e) => panic!("{e}")
-        };
-    }
-
-    pub fn build(home: TeamId, away: TeamId, stage: StageId) -> Self {
-        let mut game: Game = Game::default();
-
+// Basics.
+impl Game {
+    pub fn build(home: TeamId, away: TeamId, comp_id: CompetitionId, date: &str) -> Self {
+        let mut game = Game::default();
         game.home = TeamGameData::build(home);
         game.away = TeamGameData::build(away);
         game.clock = Clock::default();
-        game.stage_id = stage;
-
-        return game;
-    }
-
-    pub fn build_and_save(home: TeamId, away: TeamId, stage: StageId, date: &str) -> Self {
-        let mut game: Self = Self::build(home, away, stage);
+        game.comp_id = comp_id;
         game.date = date.to_string();
-        game.save();
 
         return game;
-    }
-
-    pub fn fetch_from_db<S: AsRef<str>>(date: S, id: &GameId) -> Self {
-        let games = GAMES.lock().unwrap();
-        let date: &HashMap<u8, Game> = games.get(date.as_ref())
-            .expect(&format!("no Game with date {:?}", date.as_ref()));
-
-        date.get(id).expect(&format!("no Game with id {id}")).clone()
-    }
-
-    // Update the Game to database. Create ID if one does not already exist.
-    pub fn save(&mut self) {
-        let mut games: HashMap<String, HashMap<u8, Self>> = GAMES.lock().unwrap().clone();
-
-        let date: &mut HashMap<u8, Self> = match games.get_mut(&self.date) {
-            Some(d) => d,
-            None => {
-                games.insert(self.date.clone(), HashMap::new());
-                games.get_mut(&self.date).unwrap()
-            }
-        };
-
-        if self.id == 0 { self.create_id(date.len() + 1); }
-
-        date.insert(self.id, self.clone());
-        *GAMES.lock().unwrap() = games;
-    }
-
-    // Delete the Game from the database.
-    pub fn delete_from_db(&self) {
-        let mut games = GAMES.lock().unwrap();
-        let date: &mut HashMap<u8, Game> = games.get_mut(&self.date).expect(&format!("Could not find date {:?} in GAMES", &self.date));
-
-        date.remove(&self.id);
-        *GAMES.lock().unwrap() = games.clone();
-    }
-
-    // Get all matches that are part of the specific stage.
-    pub fn fetch_stage_matches(stage_id: StageId) -> Vec<Self> {
-        let stage: Stage = Stage::fetch_from_db(&stage_id);
-        let start_date: Date = stage.get_previous_start_date();
-        let end_date: Date = stage.get_next_end_date();
-
-        let mut games: Vec<Self> = Vec::new();
-        for (date_s, date_games) in GAMES.lock().unwrap().iter() {
-            let date: Date = db_string_to_date(date_s);
-
-            // We can skip this date if it does not fit.
-            if date < start_date || date > end_date { continue; }
-
-            for game in date_games.values() {
-                if game.stage_id == stage_id { games.push(game.clone()) }
-            }
-        }
-
-        return games;
-    }
-
-    // Get matches of a stage arranged by date.
-    pub fn fetch_stage_matches_by_date(stage_id: StageId) -> Vec<(Date, Vec<Game>)> {
-        let stage: Stage = Stage::fetch_from_db(&stage_id);
-        let start_date: Date = stage.get_previous_start_date();
-        let end_date: Date = stage.get_next_end_date();
-
-        let mut dates_and_games: Vec<(Date, Vec<Game>)> = Vec::new();
-        for (date_s, date_games) in GAMES.lock().unwrap().iter() {
-            let date: Date = db_string_to_date(date_s);
-
-            // We can skip this date if it does not fit.
-            if date < start_date || date > end_date { continue; }
-
-            let mut stage_games: Vec<Game> = Vec::new();
-            for game in date_games.values() {
-                if game.stage_id == stage_id { stage_games.push(game.clone()) }
-            }
-
-            if date_games.len() > 0 {
-                dates_and_games.push((date, stage_games));
-            }
-        }
-
-        dates_and_games.sort_by(|a, b|a.0.cmp(&b.0));
-        return dates_and_games;
-    }
-
-    // Remove future matches of a stage played by specific teams.
-    pub fn remove_future_matches(stage_id: StageId, team_ids: Vec<TeamId>) {
-        let mut all_games = GAMES.lock().unwrap();
-        let today: Date = TODAY.lock().unwrap().clone();
-
-        for (date_s, games) in all_games.iter_mut() {
-            if today >= db_string_to_date(date_s) { continue; }
-            games.retain(|_, game|
-                (stage_id != game.stage_id) ||
-                (!team_ids.contains(&game.home.team_id) && !team_ids.contains(&game.away.team_id))
-            );
-        }
-
-        *GAMES.lock().unwrap() = all_games.clone();
     }
 
     // Make sure the game does not contain illegal values.
@@ -167,12 +45,12 @@ impl Game { // Basics.
 
     // Get the game rules.
     fn get_rules(&self) -> Rules {
-        Stage::fetch_from_db(&self.stage_id).match_rules
+        Competition::fetch_from_db(&self.comp_id).unwrap().format.as_ref().unwrap().match_rules.clone()
     }
 
-    // Get the stage of the game.
-    fn get_stage(&self) -> Stage {
-        Stage::fetch_from_db(&self.stage_id)
+    // Get the competition of the game.
+    fn get_comp(&self) -> Competition {
+        Competition::fetch_from_db(&self.comp_id).unwrap()
     }
 }
 
@@ -185,10 +63,10 @@ impl Game {
 
     // Call when both teams must submit their lineups.
     fn get_team_lineups(&mut self) {
-        let mut home: Team = self.home.get_team();
-        let mut away: Team = self.away.get_team();
+        let mut home = self.home.get_team();
+        let mut away = self.away.get_team();
 
-        // Player lineup should not be auto-built.
+        // The human's lineup should not be auto-built.
         home.auto_build_lineup();
         away.auto_build_lineup();
 
@@ -205,16 +83,9 @@ impl Game {
     fn do_post_game_tasks(&mut self) {
         self.attacker = None;
         self.defender = None;
-        self.save();
 
-        // Update the teams' stage datas.
-        let mut stage: Stage = self.get_stage();
-        let had_overtime: bool = self.has_overtime();
-
-        self.home.update_stagedata(&self.away, had_overtime, stage.teams.get_mut(&self.home.team_id).unwrap());
-        self.away.update_stagedata(&self.home, had_overtime, stage.teams.get_mut(&self.away.team_id).unwrap());
-
-        stage.save();
+        // Update the teams' comp datas.
+        // self.get_comp().update_teamdata(&self.home, &self.away, self.has_overtime());
     }
 
     // Play the game.
@@ -272,7 +143,7 @@ impl Game {
 
     // Change which team has the puck.
     fn change_puck_possession(&mut self) {
-        let modifier: f64 = self.home.players_on_ice.as_ref().unwrap().get().get_skaters_ability_ratio(
+        let modifier = self.home.players_on_ice.as_ref().unwrap().get().get_skaters_ability_ratio(
             self.away.players_on_ice.as_ref().unwrap());
 
         if logic_event::Type::fetch_from_db(&logic_event::Id::PuckPossessionChange).get_outcome(modifier) {
@@ -287,15 +158,15 @@ impl Game {
 
     // The attacking team attempts to shoot the puck.
     fn attempt_shot(&mut self) {
-        let attacker: &mut TeamGameData = self.attacker.as_mut().unwrap();
-        let attacker_players: &team::PlayersOnIce = attacker.players_on_ice.as_ref().unwrap();
+        let attacker = self.attacker.as_mut().unwrap();
+        let attacker_players = attacker.players_on_ice.as_ref().unwrap();
         let defender_players = self.defender.as_ref().unwrap().players_on_ice.as_ref().unwrap();
 
-        let modifier: f64 = attacker_players.get().get_skaters_ability_ratio(defender_players);
-        let success: bool = logic_event::Type::fetch_from_db(&logic_event::Id::ShotAtGoal).get_outcome(modifier);
+        let modifier = attacker_players.get().get_skaters_ability_ratio(defender_players);
+        let success = logic_event::Type::fetch_from_db(&logic_event::Id::ShotAtGoal).get_outcome(modifier);
 
         if success {
-            let mut shot: Shot = Shot::build(self.clock.clone(), attacker_players, defender_players);
+            let mut shot = Shot::build(self.clock.clone(), attacker_players, defender_players);
             shot.create_shooter_and_assisters();
             shot.calculate_goal();
             attacker.shots.push(shot);
@@ -304,8 +175,8 @@ impl Game {
 
     // Update the attacker and defender teamdata.
     fn update_teamdata(&mut self) {
-        let attacker: &TeamGameData = self.attacker.as_ref().unwrap();
-        let defender: &TeamGameData = self.defender.as_ref().unwrap();
+        let attacker = self.attacker.as_ref().unwrap();
+        let defender = self.defender.as_ref().unwrap();
 
         if attacker.team_id == self.home.team_id {
             self.home = attacker.clone();
@@ -327,7 +198,7 @@ impl Game {
     }
 
     // Get the home and away team names.
-    fn get_name(&self) -> String {
+    pub fn get_name(&self) -> String {
         format!("{} - {}", self.home.get_team().name, self.away.get_team().name)
     }
 
@@ -410,7 +281,7 @@ impl Game {
     }
 
     // Check if the game has or had overtime.
-    fn has_overtime(&self) -> bool {
+    pub fn has_overtime(&self) -> bool {
         self.get_time_expired_in_overtime() > 0
     }
 }
@@ -419,7 +290,7 @@ impl Game {
 impl Game {
     // Generate an ascetic infodump about which team scored and when.
     pub fn get_simple_boxscore(&self) -> String {
-        let rules: Rules = self.get_rules();
+        let rules = self.get_rules();
 
         struct BoxscoreGoal {
             team: String,
@@ -427,10 +298,10 @@ impl Game {
             total_seconds: u32,
         }
 
-        let home_name: String = self.home.get_team().name;
-        let away_name: String = self.away.get_team().name;
+        let home_name = self.home.get_team().name;
+        let away_name = self.away.get_team().name;
 
-        let mut events: Vec<BoxscoreGoal> = Vec::new();
+        let mut events = Vec::new();
         for goal in self.home.shots.iter() {
             if goal.is_goal {
                 events.push(BoxscoreGoal {
@@ -455,7 +326,7 @@ impl Game {
 
         events.sort_by(|a: &BoxscoreGoal, b: &BoxscoreGoal| a.total_seconds.cmp(&b.total_seconds));
 
-        let mut boxscore: String = String::new();
+        let mut boxscore = String::new();
         let mut home_goal_counter: u16 = 0;
         let mut away_goal_counter: u16 = 0;
         for event in events.iter() {
@@ -473,6 +344,7 @@ impl Game {
     }
 }
 
+#[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct Rules {
     periods: u8,
@@ -506,6 +378,7 @@ impl Rules {
     }
 }
 
+#[derive(Debug)]
 #[derive(Default, Clone, PartialEq)]
 struct Clock {
     periods_completed: u8,

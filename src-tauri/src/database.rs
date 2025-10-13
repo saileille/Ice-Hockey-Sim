@@ -8,25 +8,23 @@ use lazy_static::lazy_static;
 
 use crate::{
     competition::{
-        stage::{knockout::Knockout, round_robin::RoundRobin, Stage, StageConnection}, Competition
+        format::{self}, knockout_generator, season::Season, CompConnection, Competition, Seed
     }, country::Country, event, io, match_event, person::player::{
         position::{Position, PositionId}, Player
-    }, team::Team, types
+    }, team::Team, time::AnnualWindow, types::{CompetitionId, CountryId, PlayerId, TeamId}
 };
 
 // The current date in the game.
 pub static TODAY: LazyLock<Mutex<Date>> = LazyLock::new(|| Mutex::new(date!(2025-08-01)));
 
-pub static COUNTRIES: LazyLock<Mutex<HashMap<types::CountryId, Country>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-pub static COMPETITIONS: LazyLock<Mutex<HashMap<types::CompetitionId, Competition>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-pub static STAGES: LazyLock<Mutex<HashMap<types::StageId, Stage>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+pub static COUNTRIES: LazyLock<Mutex<HashMap<CountryId, Country>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+pub static COMPETITIONS: LazyLock<Mutex<HashMap<CompetitionId, Competition>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-// NOTE: GAMES is exceptional in that the games are stored first based on date and then GameId.
-pub static GAMES: LazyLock<Mutex<
-    HashMap<String, HashMap<types::GameId, match_event::Game>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+// Seasons are special in that they are stored in vectors by competition ID.
+pub static SEASONS: LazyLock<Mutex<HashMap<CompetitionId, Vec<Season>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub static TEAMS: LazyLock<Mutex<HashMap<types::TeamId, Team>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-pub static PLAYERS: LazyLock<Mutex<HashMap<types::PlayerId, Player>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+pub static TEAMS: LazyLock<Mutex<HashMap<TeamId, Team>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+pub static PLAYERS: LazyLock<Mutex<HashMap<PlayerId, Player>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 lazy_static! {
     pub static ref POSITIONS: HashMap<PositionId, Position> = {
@@ -72,52 +70,76 @@ lazy_static! {
 pub fn initialise() {
     add_competition_data();
 
+    let comps = COMPETITIONS.lock().unwrap().clone();
+    for comp in comps.values() {
+        // Add parent IDs.
+        comp.give_id_to_children_comps();
+
+        // Set up seasons, starting from the top level.
+        if comp.parent_comp_id == 0 {
+            comp.setup_season(None);
+        }
+    }
+
     // Creating the countries.
-    let country_names: Vec<String> = io::get_countries_from_name_files();
-    for name in country_names {
+    let country_names = io::get_countries_from_name_files();
+    for name in country_names.iter() {
         Country::build_and_save(name);
     }
 }
 
 // Add competitions.
 fn add_competition_data() {
+    // 1: Liiga
     Competition::build_and_save(
         "Liiga",
         vec![
-            Team::build_and_save("Blues"),
-            Team::build_and_save("HIFK"),
-            Team::build_and_save("HPK"),
-            Team::build_and_save("Ilves"),
-            Team::build_and_save("Jokerit"),
-            Team::build_and_save("JYP"),
-            Team::build_and_save("KalPa"),
-            Team::build_and_save("Kärpät"),
-            Team::build_and_save("Lukko"),
-            Team::build_and_save("Pelican"),
-            Team::build_and_save("SaiPa"),
-            Team::build_and_save("Tappara"),
-            Team::build_and_save("TPS"),
-            Team::build_and_save("Ässät"),
+            Team::build_and_save("Blues"),      // 1
+            Team::build_and_save("HIFK"),       // 2
+            Team::build_and_save("HPK"),        // 3
+            Team::build_and_save("Ilves"),      // 4
+            Team::build_and_save("Jokerit"),    // 5
+            Team::build_and_save("JYP"),        // 6
+            Team::build_and_save("KalPa"),      // 7
+            Team::build_and_save("Kärpät"),     // 8
+            Team::build_and_save("Lukko"),      // 9
+            Team::build_and_save("Pelican"),    // 10
+            Team::build_and_save("SaiPa"),      // 11
+            Team::build_and_save("Tappara"),    // 12
+            Team::build_and_save("TPS"),        // 13
+            Team::build_and_save("Ässät"),      // 14
         ],
-        vec![
-            /* Stage::build_and_save(
-                "Regular Season",
-                Some(RoundRobin::build(4, 0, 3, 2, 1, 1, 0)),
-                None,
-                match_event::Rules::build(3, 1200, 300, false),
-                [9, 1],
-                [4, 1],
-                vec![StageConnection::build(0..7, 0)]
-            ) */
-            Stage::build_and_save(
-                "Playoffs",
-                None,
-                Some(Knockout::build(vec![4], 1)),
-                match_event::Rules::build(3, 1200, 0, true),
-                [4, 2],
-                [6, 1],
-                Vec::new()
-            )
-        ]
+        AnnualWindow::build(9, 1, 6, 1),
+        None,
+        Vec::new(),
+        vec![2, 3],
+        0
     );
+    // 2: Liiga Regular Season.
+    Competition::build_and_save(
+        "Regular Season",
+        Vec::new(),
+        AnnualWindow::build(9, 1, 4, 1),
+        format::Format::build(
+            Some(format::round_robin::RoundRobin::build(4, 0, 3, 2, 1, 1, 0)),
+            None,
+            match_event::Rules::build(3, 1200, 300, false)
+        ),
+        vec![CompConnection::build([1, 8], 3, Seed::GetFromPosition)],
+        Vec::new(),
+        14
+    );
+    // 3: Liiga Playoffs.
+    knockout_generator::build(
+        "Playoffs",
+        Vec::new(),
+        AnnualWindow::build(4, 2, 6, 1),
+        vec![match_event::Rules::build(3, 1200, 0, true)],
+        vec![4],
+        vec![8],
+        1,
+        Vec::new()
+    );
+
+
 }

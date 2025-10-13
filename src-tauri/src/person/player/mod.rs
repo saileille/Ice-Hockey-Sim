@@ -25,7 +25,7 @@ impl Player {   // Basics.
     }
 
     fn build(country_id: CountryId, ability: u8, position_id: PositionId) -> Self {
-        let mut player: Self = Self::default();
+        let mut player = Self::default();
         player.person = Person::build(country_id, Gender::Male);
         player.ability = ability;
         player.position_id = position_id;
@@ -35,7 +35,7 @@ impl Player {   // Basics.
 
     // Create a player and store it in the database. Return a clone of the Player.
     pub fn build_and_save(country_id: CountryId, ability: u8, position_id: PositionId) -> Self {
-        let mut player: Self = Self::build(country_id, ability, position_id);
+        let mut player = Self::build(country_id, ability, position_id);
         player.create_id(PLAYERS.lock().unwrap().len() + 1);
         player.save();
         return player;
