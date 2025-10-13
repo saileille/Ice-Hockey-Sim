@@ -1,11 +1,13 @@
 // Scheduling-related methods that are valid for both Knockout and RoundRobin.
 
+mod sorting;
+
 use std::{collections::{HashMap, HashSet}, ops::Range};
 use rand::{rng, rngs::ThreadRng, seq::SliceRandom, Rng};
 use ::time::Date;
 
 use crate::{
-    competition::{format::{self, round_robin::MatchGenType}, season::{knockout::{KnockoutPair, KnockoutRound}, sorting, team::TeamCompData, Season}, Competition}, match_event::Game, team::Team, time::{date_to_db_string, db_string_to_date, get_dates}, types::{convert, CompetitionId, TeamId}
+    competition::{format::{self, round_robin::MatchGenType}, season::{knockout::{KnockoutPair, KnockoutRound}, team::TeamCompData, Season}, Competition}, match_event::Game, team::Team, time::{date_to_db_string, db_string_to_date, get_dates}, types::{convert, CompetitionId, TeamId}
 };
 
 impl Season {

@@ -11,7 +11,7 @@ use crate::{competition::{season::{schedule_generator::{assign_dates, generate_m
 pub struct KnockoutRound {
     pub pairs: Vec<KnockoutPair>,
     pub advanced_teams: Vec<TeamCompData>,
-    eliminated_teams: Vec<TeamCompData>,
+    pub eliminated_teams: Vec<TeamCompData>,
 }
 
 impl KnockoutRound {

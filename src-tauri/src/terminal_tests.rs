@@ -1,10 +1,9 @@
 
 // Functions for testing things on the terminal.
-use std::{collections::HashMap, time::Instant};
-use time::Date;
+use std::{time::Instant};
 
 use crate::{
-    commands::go_to_next_day, competition::{season::Season, Competition}, database::{COMPETITIONS, SEASONS, TEAMS, TODAY}, time::{date_to_db_string, db_string_to_date}, types::CompetitionId
+    commands::go_to_next_day, competition::{season::Season, Competition}, database::{TEAMS, TODAY}, time::db_string_to_date
 };
 
 pub fn test_comp_generation() {
@@ -49,6 +48,8 @@ pub fn test_comp_generation() {
     let playoffs_comp = Competition::fetch_from_db(&playoffs_id).unwrap();
 
     println!("\n{}", playoffs.display_match_schedule(&playoffs_comp));
+
+    println!("\n{}", Season::fetch_from_db(&liiga_id, 0).display_final_ranking());
 
     println!("\nCompleted in {} seconds", start_time.elapsed().as_secs());
 }

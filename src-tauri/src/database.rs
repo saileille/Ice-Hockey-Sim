@@ -8,7 +8,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     competition::{
-        format::{self}, knockout_generator, season::Season, CompConnection, Competition, Seed
+        format::{self}, knockout_generator, season::{ranking::RankCriteria, Season}, CompConnection, Competition, Seed
     }, country::Country, event, io, match_event, person::player::{
         position::{Position, PositionId}, Player
     }, team::Team, time::AnnualWindow, types::{CompetitionId, CountryId, PlayerId, TeamId}
@@ -93,7 +93,7 @@ fn add_competition_data() {
     // 1: Liiga
     Competition::build_and_save(
         "Liiga",
-        vec![
+        &vec![
             Team::build_and_save("Blues"),      // 1
             Team::build_and_save("HIFK"),       // 2
             Team::build_and_save("HPK"),        // 3
@@ -110,24 +110,35 @@ fn add_competition_data() {
             Team::build_and_save("Ässät"),      // 14
         ],
         AnnualWindow::build(9, 1, 6, 1),
-        None,
         Vec::new(),
-        vec![2, 3],
-        0
+        0,
+        None,
+        vec![RankCriteria::ChildCompRanking],
+        vec![2, 3]
     );
     // 2: Liiga Regular Season.
     Competition::build_and_save(
         "Regular Season",
-        Vec::new(),
+        &Vec::new(),
         AnnualWindow::build(9, 1, 4, 1),
+        vec![CompConnection::build([1, 10], 3, Seed::GetFromPosition)],
+        14,
         format::Format::build(
             Some(format::round_robin::RoundRobin::build(4, 0, 3, 2, 1, 1, 0)),
             None,
             match_event::Rules::build(3, 1200, 300, false)
         ),
-        vec![CompConnection::build([1, 10], 3, Seed::GetFromPosition)],
-        Vec::new(),
-        14
+        vec![
+            RankCriteria::Points,
+            RankCriteria::GoalDifference,
+            RankCriteria::GoalsScored,
+            RankCriteria::TotalWins,
+            RankCriteria::RegularWins,
+            RankCriteria::OvertimeWins,
+            RankCriteria::Draws,
+            RankCriteria::RegularLosses,
+        ],
+        Vec::new()
     );
     // 3: Liiga Playoffs.
     knockout_generator::build(
@@ -138,7 +149,8 @@ fn add_competition_data() {
         vec![2, 4],
         vec![10],
         1,
-        Vec::new()
+        Vec::new(),
+        vec![RankCriteria::Seed]
     );
 
 

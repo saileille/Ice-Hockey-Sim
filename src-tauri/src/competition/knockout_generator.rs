@@ -6,23 +6,24 @@ use ordinal::ToOrdinal as _;
 use rand::{rng, rngs::ThreadRng, Rng};
 use time::Date;
 
-use crate::{competition::{format, CompConnection, Competition, Seed}, match_event, time::{get_dates, get_duration_from_days, AnnualWindow}, types::{convert, CompetitionId}};
+use crate::{competition::{format, season::ranking::RankCriteria, CompConnection, Competition, Seed}, match_event, time::{get_dates, get_duration_from_days, AnnualWindow}, types::{convert, CompetitionId}};
 
 // Generate a knockout competition with each round being represented as its own competition element.
 pub fn build(
     name: &str, // Name of the knockout competition itself.
     round_names: Vec<&str>, // Names for the rounds to be generated. If there are more rounds than names, the remaining round will have automatically generated names.
-    season_duration: AnnualWindow, // Time when this competition is played.
+    season_window: AnnualWindow, // Time when this competition is played.
     match_rules: Vec<match_event::Rules>,    // Match rules for each round. If there are more rounds than elements in this vector, the last element will be applied to remaining rounds.
     wins_required: Vec<u8>, // Wins required to advance from each round. If there are more rounds than elements in this vector, the last element will be applied to remaining rounds.
     teams_in_rounds: Vec<u8>,   // Number of teams the knockout competition has on each round.
     teams_at_end: u8,   // Number of teams the knockout competition ends with.
-    connections: Vec<CompConnection>    // Connections to other competitions; where to move which teams after the knockout is over.
+    connections: Vec<CompConnection>,    // Connections to other competitions; where to move which teams after the knockout is over.
+    rank_criteria: Vec<RankCriteria>
 ) {
-    let mut parent_comp = Competition::build_and_save(name, Vec::new(), season_duration, None, connections, Vec::new(), teams_in_rounds[0]);
+    let mut parent_comp = Competition::build_and_save(name, &Vec::new(), season_window, connections, teams_in_rounds[0], None, Vec::new(), Vec::new());
 
     let teams_in_rounds = get_teams_in_rounds(&teams_in_rounds, teams_at_end);
-    let mut rounds = create_rounds(&round_names, &match_rules, &wins_required, &teams_in_rounds, parent_comp.id);
+    let mut rounds = create_rounds(&round_names, &match_rules, &wins_required, &teams_in_rounds, rank_criteria, parent_comp.id);
 
     set_date_boundaries(&mut rounds, &parent_comp.season_window);
     finalise_rounds(&mut parent_comp, &mut rounds);
@@ -58,13 +59,14 @@ fn get_teams_in_rounds(config_no_of_teams: &Vec<u8>, teams_at_end: u8) -> Vec<u8
 }
 
 // Create rounds.
-fn create_rounds(round_names: &Vec<&str>, match_rules: &Vec<match_event::Rules>, wins_required: &Vec<u8>, teams_in_rounds: &Vec<u8>, parent_comp_id: CompetitionId) -> Vec<Competition> {
+fn create_rounds(round_names: &Vec<&str>, match_rules: &Vec<match_event::Rules>, wins_required: &Vec<u8>, teams_in_rounds: &Vec<u8>, rank_criteria: Vec<RankCriteria>, parent_comp_id: CompetitionId) -> Vec<Competition> {
     let mut rounds = Vec::new();
 
     for (i, round_size) in teams_in_rounds.iter().enumerate() {
         let mut round = Competition::default();
         round.parent_comp_id = parent_comp_id;
         round.min_no_of_teams = *round_size;
+        round.rank_criteria = rank_criteria.clone();
 
         // Give the round a name from predefined options, or a default one.
         match i < round_names.len() {

@@ -3,9 +3,9 @@ pub mod season;
 pub mod format;
 pub mod knockout_generator;
 
-use std::{ops::Range};
+use std::{cmp::Ordering, ops::Range};
 
-use crate::{competition::season::{team::TeamCompData, Season}, database::{COMPETITIONS, SEASONS}, team::Team, time::AnnualWindow, types::{convert, CompetitionId, TeamId}};
+use crate::{competition::season::{ranking::{get_sort_functions, RankCriteria}, team::TeamCompData, Season}, database::{COMPETITIONS, SEASONS}, team::Team, time::AnnualWindow, types::{convert, CompetitionId, TeamId}};
 
 use self::format::Format;
 
@@ -18,6 +18,7 @@ pub struct Competition {
     connections: Vec<CompConnection>,
     min_no_of_teams: u8,
     pub format: Option<Format>,
+    rank_criteria: Vec<RankCriteria>,
 
     pub child_comp_ids: Vec<CompetitionId>,
     pub parent_comp_id: CompetitionId,
@@ -34,7 +35,8 @@ impl Competition {
     }
 
     // Build a Competition element.
-    fn build(name: &str, teams: &Vec<Team>, season_window: AnnualWindow, format: Option<Format>, connections: Vec<CompConnection>, child_comp_ids: Vec<CompetitionId>, min_no_of_teams: u8) -> Self {
+    fn build(name: &str, teams: &Vec<Team>, season_window: AnnualWindow, connections: Vec<CompConnection>,
+    min_no_of_teams: u8, format: Option<Format>, rank_criteria: Vec<RankCriteria>, child_comp_ids: Vec<CompetitionId>) -> Self {
         let mut comp = Self::default();
         comp.name = name.to_string();
         comp.season_window = season_window;
@@ -47,14 +49,17 @@ impl Competition {
         };
 
         comp.format = format;
+        comp.rank_criteria = rank_criteria;
+
         comp.child_comp_ids = child_comp_ids;
 
         return comp;
     }
 
     // Build a competition element and save it to the database.
-    pub fn build_and_save(name: &str, teams: Vec<Team>, season_window: AnnualWindow, format: Option<Format>, connections: Vec<CompConnection>, child_comp_ids: Vec<CompetitionId>, min_no_of_teams: u8) -> Self {
-        let mut comp = Self::build(name, &teams, season_window, format, connections, child_comp_ids, min_no_of_teams);
+    pub fn build_and_save(name: &str, teams: &Vec<Team>, season_window: AnnualWindow, connections: Vec<CompConnection>,
+    min_no_of_teams: u8, format: Option<Format>, rank_criteria: Vec<RankCriteria>, child_comp_ids: Vec<CompetitionId>) -> Self {
+        let mut comp = Self::build(name, &teams, season_window, connections, min_no_of_teams, format, rank_criteria, child_comp_ids);
 
         comp.save_new(&teams);
 
@@ -98,6 +103,15 @@ impl Competition {
     pub fn get_seasons_amount(&self) -> usize {
         SEASONS.lock().unwrap().get(&self.id).expect(&format!("{}: {} has no seasons", self.id, self.name)).len()
     }
+
+    // Get the round robin format, if competition has one.
+    fn get_round_robin_format(&self) -> Option<format::round_robin::RoundRobin> {
+        if self.format.is_none() {
+            None
+        } else {
+            self.format.as_ref().unwrap().round_robin.clone()
+        }
+    }
 }
 
 // Functional.
@@ -116,13 +130,29 @@ impl Competition {
 
         season.save();
     }
+
+    // Sort a given list of teams with the competition's sort criteria.
+    fn sort_some_teams(&self, teams: &mut Vec<TeamCompData>) {
+        let sort_functions = get_sort_functions();
+        let rr = self.get_round_robin_format();
+
+        teams.sort_by(|a, b| {
+            let mut order = Ordering::Equal;
+            for criterium in self.rank_criteria.iter() {
+                order = sort_functions[&criterium](a, b, &rr);
+
+                if order.is_ne() { break; }
+            }
+            order
+        });
+    }
 }
 
 // What to do with the seed of the team.
 #[derive(Debug)]
 #[derive(Clone)]
 pub enum Seed {
-    // Get the seed from the position the team is given to the connection.
+    // Get the seed from the team's final standing in the previous competition.
     GetFromPosition,
 
     // Preserve the team's seed from the previous competition.

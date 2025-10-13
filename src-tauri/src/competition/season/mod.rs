@@ -2,8 +2,8 @@
 pub mod team;
 pub mod round_robin;
 pub mod knockout;
+pub mod ranking;
 mod schedule_generator;
-mod sorting;
 
 use time::Date;
 
@@ -88,14 +88,8 @@ impl Season {
 
     // Finalise the creation of a season for a particular competition.
     pub fn setup(&mut self, comp: &Competition) {
-        let rr = if comp.format.as_ref().is_none() || comp.format.as_ref().unwrap().round_robin.is_none() {
-            &None
-        } else {
-            &comp.format.as_ref().unwrap().round_robin.as_ref()
-        };
-
-        // Teams must be sorted from best to worst before continuing.
-        self.sort_teams(rr);
+        // The order of the teams becomes correct by reversing.
+        self.teams.reverse();
 
         if self.round_robin.is_some() {
             self.setup_round_robin(comp);
@@ -177,34 +171,6 @@ impl Season {
         return games;
     }
 
-    // Get the teams in the order of betterhood.
-    // TODO: customisable ordering.
-    fn sort_teams(&mut self, rr: &Option<&format::round_robin::RoundRobin>) {
-        if self.round_robin.is_some() {
-            self.teams.sort_by(|a, b| {
-                b.get_points(rr).cmp(&a.get_points(rr))
-                .then(b.get_goal_difference().cmp(&a.get_goal_difference()))
-                .then(b.goals_scored.cmp(&a.goals_scored))
-                .then(b.regular_wins.cmp(&a.regular_wins))
-                .then(b.ot_wins.cmp(&a.ot_wins))
-                .then(b.draws.cmp(&a.draws))
-                .then(b.ot_losses.cmp(&a.ot_losses))
-                .then(Team::fetch_from_db(&a.team_id).name.cmp(&Team::fetch_from_db(&b.team_id).name))
-            });
-        }
-
-        else if self.knockout.is_some() {
-            // Do better in the future.
-            self.teams.sort_by(|a, b| a.seed.cmp(&b.seed));
-        }
-
-        else {
-            // Do better in the future.
-            self.teams.sort_by(|a, b| a.seed.cmp(&b.seed));
-        }
-
-    }
-
     // Simulate the games for this day.
     pub fn simulate_day(&mut self, comp: &Competition, today: &Date) {
         let mut games = Vec::new();
@@ -259,7 +225,7 @@ impl Season {
 
     // Do round robin post-season tasks.
     fn do_post_season_tasks_rr(&mut self, comp: &Competition) {
-        self.sort_teams(&comp.format.as_ref().unwrap().round_robin.as_ref());
+        self.rank_teams(comp);
 
         for connection in comp.connections.iter() {
             connection.send_teams(&self.teams);
