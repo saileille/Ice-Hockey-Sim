@@ -14,9 +14,8 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "ice-hockey-sim",
-        "width": 800,
-        "height": 600
+        "label": "main",
+        "title": "ice-hockey-sim"
       }
     ],
     "security": {

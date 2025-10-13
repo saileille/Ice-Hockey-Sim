@@ -19,7 +19,7 @@ pub fn run() {
 
     // terminal testing...
     #[cfg(dev)] {
-        terminal_tests::test_comp_generation();
+        // terminal_tests::test_comp_generation();
     }
 
     tauri::Builder::default()
@@ -31,9 +31,12 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![commands::tests::test_game])
-        .invoke_handler(tauri::generate_handler![commands::tests::test_comp])
-        .invoke_handler(tauri::generate_handler![commands::go_to_next_day])
+        .invoke_handler(tauri::generate_handler![
+            commands::tests::test_game,
+            commands::tests::test_comp,
+            commands::go_to_next_day,
+            commands::get_date_string,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

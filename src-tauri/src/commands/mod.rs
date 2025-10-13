@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 // Functions that allow the user to interact with backend.
 use ::time::Date;
-use crate::{competition::{season::Season, Competition}, database::{COMPETITIONS, TODAY}, types::CompetitionId};
+use crate::{competition::{season::Season, Competition}, database::{COMPETITIONS, TODAY}, time::{date_to_db_string, db_string_to_date}, types::CompetitionId};
 
 pub mod tests;
 
 // Advance the time with one day.
 #[tauri::command]
-pub fn go_to_next_day() {
+pub fn go_to_next_day() -> String {
     let today = TODAY.lock().unwrap().clone();
 
     let comps = COMPETITIONS.lock().unwrap().clone();
@@ -20,19 +20,18 @@ pub fn go_to_next_day() {
         }
     }
 
-    // DO EVERYTHING AGAIN
-
-
-    // Check against days with no games.
-    /*let mut games = match GAMES.lock().unwrap().get(&date_to_db_string(&today)) {
-        Some(g) => g.values().cloned().collect(),
-        _ => Vec::new()
-    };
-
-    for game in games.iter_mut() {
-        game.play();
-    }*/
-
-    // Advance the day.
     *TODAY.lock().unwrap() = today.next_day().unwrap();
+    return date_to_db_string(&TODAY.lock().unwrap());
+}
+
+// Get the current date as a string.
+#[tauri::command]
+pub fn get_date_string() -> String {
+    date_to_db_string(&TODAY.lock().unwrap())
+}
+
+// Get all competitions that are not part of another competition.
+#[tauri::command]
+pub fn get_all_full_competitions() {
+    // let comps = HashMap::new();
 }
