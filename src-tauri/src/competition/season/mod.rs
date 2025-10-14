@@ -107,13 +107,19 @@ impl Season {
 
     // Get some nice JSON for a competition screen.
     pub fn get_comp_screen_json(&self, comp: &Competition) -> serde_json::Value {
-        let teams: Vec<serde_json::Value> = self.teams.iter().map(|a| a.get_json(comp)).collect();
+        let teams: Vec<serde_json::Value> = self.teams.iter().enumerate().map(|(i, a)| a.get_json(comp, i)).collect();
         let upcoming_games: Vec<serde_json::Value> = self.upcoming_games.iter().map(|a| a.get_comp_screen_json()).collect();
         let played_games: Vec<serde_json::Value> = self.played_games.iter().map(|a| a.get_comp_screen_json()).collect();
 
         json!({
             "name": self.name,
             "teams": teams,
+            "knockout": if self.knockout.is_none() {
+                serde_json::Value::Null
+            }
+            else {
+                self.knockout.as_ref().unwrap().get_comp_screen_json()
+            },
             "upcoming_games": upcoming_games,
             "played_games": played_games
         })
@@ -242,40 +248,45 @@ impl Season {
 
     // Check if the season has ended, and react appropriately.
     // Return whether over or not.
-    fn check_if_over(&mut self, comp: &Competition) -> bool {
+    pub fn check_if_over(&mut self, comp: &Competition) -> bool {
         // No need to do more.
         if self.is_over { return true; }
 
         if self.round_robin.is_some() {
             if !self.upcoming_games.is_empty() { return false; }
-            self.is_over = true;
-            self.do_post_season_tasks_rr(comp);
         }
 
-        if self.knockout.is_some() {
-            if self.knockout.as_mut().unwrap().check_if_over(comp, &mut self.upcoming_games) {
-                self.is_over = true;
-                self.do_post_season_tasks_ko(comp);
+        else if self.knockout.is_some() {
+            if !self.knockout.as_mut().unwrap().check_if_over(comp, &mut self.upcoming_games) {
+                return false;
             }
         }
+
+        // Check for a parent competition.
+        else {
+            for id in comp.child_comp_ids.iter() {
+                let child_comp = Competition::fetch_from_db(id).unwrap();
+                let mut season = Season::fetch_from_db(&child_comp.id, child_comp.get_seasons_amount() - 1);
+                if !season.check_if_over(&child_comp) {
+                    return false;
+                }
+            }
+
+        }
+
+        self.is_over = true;
+        self.do_post_season_tasks(comp);
+
+        self.save();
 
         return true;
     }
 
-    // Do round robin post-season tasks.
-    fn do_post_season_tasks_rr(&mut self, comp: &Competition) {
+    // Do post-season tasks for any kind of competition.
+    fn do_post_season_tasks(&mut self, comp: &Competition) {
         self.rank_teams(comp);
-
         for connection in comp.connections.iter() {
             connection.send_teams(&self.teams);
-        }
-    }
-
-    // Do knockout post-season tasks.
-    fn do_post_season_tasks_ko(&mut self, comp: &Competition) {
-        for connection in comp.connections.iter() {
-            // Needs sorting, still.
-            connection.send_teams(&self.knockout.as_ref().unwrap().advanced_teams);
         }
     }
 }

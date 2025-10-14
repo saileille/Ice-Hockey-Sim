@@ -82,7 +82,7 @@ impl Competition {
 
         // Create and save the first season.
         let team_ids = teams.iter().map(|a| a.id).collect();
-        Season::build_and_save(self, &team_ids);
+        self.create_new_season(&team_ids);
     }
 
     // Update the Competition to database.
@@ -90,6 +90,21 @@ impl Competition {
         COMPETITIONS.lock()
             .expect(&format!("something went wrong when trying to update Competition {}: {} to COMPETITIONS", self.id, self.name))
             .insert(self.id, self.clone());
+    }
+
+    // Create a new season for the competition.
+    fn create_new_season(&self, teams: &Vec<TeamId>) {
+        Season::build_and_save(self, teams);
+    }
+
+    // Create new season for this competition and its child competitions.
+    pub fn create_and_setup_seasons(&self, teams: &Vec<TeamId>) {
+        self.create_new_season(teams);
+        for id in self.child_comp_ids.iter() {
+            Competition::fetch_from_db(id).unwrap().create_new_season(&Vec::new());
+        }
+
+        self.setup_season(&mut Vec::new());
     }
 
     // Give child competitions this competition's ID.

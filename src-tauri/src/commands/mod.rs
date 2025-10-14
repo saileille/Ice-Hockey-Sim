@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use crate::{competition::{season::{team::TeamCompData, Season}, Competition}, database::{COMPETITIONS, SEASONS, TODAY}, team::Team, time::date_to_db_string, types::CompetitionId};
+use crate::{competition::{season::{team::TeamCompData, Season}, Competition}, database::{COMPETITIONS, SEASONS, TODAY}, team::Team, time::{date_to_db_string, db_string_to_date}, types::{CompetitionId, TeamId}};
 use serde_json::json;
 
 pub mod tests;
@@ -10,12 +10,20 @@ pub mod tests;
 pub fn go_to_next_day() -> String {
     let today = TODAY.lock().unwrap().clone();
 
-    let comps = COMPETITIONS.lock().unwrap().clone();
-    for comp in comps.values() {
+    let mut comps = COMPETITIONS.lock().unwrap().clone();
+    for comp in comps.values_mut() {
+        let mut season = Season::fetch_from_db(&comp.id, comp.get_seasons_amount() - 1);
+
         // Simulate all games that happen today.
         if comp.format.is_some() {
-            let mut season = Season::fetch_from_db(&comp.id, comp.get_seasons_amount() - 1);
             season.simulate_day(&comp, &today);
+        }
+
+        // Create new seasons for competitions that are over.
+        else if today > db_string_to_date(&season.end_date) {
+            // Can only take the same teams for the next season as well, for now.
+            let teams: Vec<TeamId> = season.teams.iter().map(|a | a.team_id).collect();
+            comp.create_and_setup_seasons(&teams);
         }
     }
 

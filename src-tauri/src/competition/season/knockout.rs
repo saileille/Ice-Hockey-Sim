@@ -3,6 +3,7 @@
 use std::ops::Range;
 
 use rand::{rng, rngs::ThreadRng, Rng};
+use serde_json::json;
 
 use crate::{competition::{season::{schedule_generator::{assign_dates, generate_matchdays}, team::TeamCompData, Season}, Competition}, match_event::Game, time::db_string_to_date, types::{CompetitionId, TeamId}};
 
@@ -18,6 +19,14 @@ impl KnockoutRound {
     // Build it.
     pub fn build() -> Self {
         Self::default()
+    }
+
+    // Get relevant information for a competition screen.
+    pub fn get_comp_screen_json(&self) -> serde_json::Value {
+        let pairs: Vec<serde_json::Value> = self.pairs.iter().map(|a | a.get_comp_screen_json()).collect();
+        json!({
+            "pairs": pairs
+        })
     }
 
     // Set up a knockout round.
@@ -142,6 +151,22 @@ impl KnockoutPair {
         pair.away = away;
 
         return pair;
+    }
+
+    // Get nice JSON for comp screen.
+    fn get_comp_screen_json(&self) -> serde_json::Value {
+        json!({
+            "home": {
+                "name": self.home.get_team().name,
+                "wins": self.home.get_wins(),
+                "seed": self.home.seed
+            },
+            "away": {
+                "name": self.away.get_team().name,
+                "wins": self.away.get_wins(),
+                "seed": self.away.seed
+            }
+        })
     }
 
     // Get the victor and the loser of the pair, or None if neither has won.

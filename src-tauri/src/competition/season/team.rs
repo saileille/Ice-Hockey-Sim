@@ -1,5 +1,6 @@
 // Data for teams.
 
+use ordinal::ToOrdinal;
 use serde_json::json;
 
 use crate::{competition::{format, Competition}, match_event::team::TeamGameData, team::Team, types::{convert, TeamId}};
@@ -33,15 +34,16 @@ impl TeamCompData {
     }
 
     // Get the team element tied to this TeamData.
-    fn get_team(&self) -> Team {
+    pub fn get_team(&self) -> Team {
         Team::fetch_from_db(&self.team_id)
     }
 
     // Get relevant information for a competition screen.
-    pub fn get_json(&self, comp: &Competition) -> serde_json::Value {
+    pub fn get_json(&self, comp: &Competition, index: usize) -> serde_json::Value {
         json!({
             "id": self.team_id,
             "name": self.get_team().name,
+            "rank": (index + 1).to_ordinal_string(),
             "games": self.get_game_count(),
             "wins": self.regular_wins,
             "ot_wins": self.ot_wins,

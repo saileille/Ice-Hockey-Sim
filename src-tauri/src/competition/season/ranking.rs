@@ -11,18 +11,18 @@ use crate::{competition::{format, season::{team::TeamCompData, Season}, Competit
 #[derive(Eq, Hash, PartialEq)]
 #[derive(Clone)]
 pub enum RankCriteria {
-    Seed,
+    Seed,   // Lower is better.
     Points,
     GoalDifference,
     GoalsScored,
-    GoalsConceded,
+    GoalsConceded,  // Lower is better.
     RegularWins,
     TotalWins,
     OvertimeWins,
     Draws,
     OvertimeLosses,
-    RegularLosses,
-    TotalLosses,
+    RegularLosses,  // Lower is better.
+    TotalLosses,    // Lower is better.
 
     // Takes rankings from all child competitions, with latest competition having highest priority.
     ChildCompRanking,

@@ -42,7 +42,7 @@ export const populateCompSelect = async (id: number) => {
         compData = await invoke("get_child_competitions", { id: id });
     }
 
-    for (let comp of compData) {
+    for (const comp of compData) {
         select.appendChild(createElement("option", {
             "value": comp[0],
             "textContent": comp[1]
@@ -51,7 +51,6 @@ export const populateCompSelect = async (id: number) => {
 };
 
 const toNextDay: Listener = async (_e: Event) => {
-    console.log("toNextDay works");
     const dateDiv: HTMLDivElement = document.querySelector("#date") as HTMLDivElement;
     const dateString: string = await invoke("go_to_next_day");
 
@@ -69,12 +68,10 @@ const goToCompetition = (query: string) => {
 
 // Go to a competition page.
 const goToParentCompetition: Listener = (_e: Event) => {
-    console.log("goToParentCompetition works");
     goToCompetition("#comps");
 };
 
 export const goToChildCompetition: Listener = (_e: Event) => {
-    console.log("goToChildCompetition works");
     goToCompetition("#child-comps");
 };
 
