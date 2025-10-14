@@ -3,6 +3,8 @@ pub mod team;
 
 use std::collections::HashMap;
 
+use serde_json::json;
+
 use crate::{
     competition::Competition, event as logic_event, team::Team, types::{
         convert, CompetitionId, TeamId
@@ -13,7 +15,7 @@ use self::{
     event::Shot
 };
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct Game {
     pub date: String,
@@ -51,6 +53,19 @@ impl Game {
     // Get the competition of the game.
     fn get_comp(&self) -> Competition {
         Competition::fetch_from_db(&self.comp_id).unwrap()
+    }
+
+    // Get nice data for a competition screen.
+    pub fn get_comp_screen_json(&self) -> serde_json::Value {
+        json!({
+            "home": self.home.get_team().name,
+            "away": self.away.get_team().name,
+            "date": self.date,
+            "home_goals": self.home.get_goal_amount(),
+            "away_goals": self.away.get_goal_amount(),
+            "had_overtime": self.has_overtime(),
+            "is_over": self.clock != Clock::default()
+        })
     }
 }
 
@@ -344,7 +359,7 @@ impl Game {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct Rules {
     periods: u8,
@@ -378,7 +393,7 @@ impl Rules {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone, PartialEq)]
 struct Clock {
     periods_completed: u8,

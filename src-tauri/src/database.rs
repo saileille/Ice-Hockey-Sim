@@ -86,6 +86,13 @@ pub fn initialise() {
     for name in country_names.iter() {
         Country::build_and_save(name);
     }
+
+    // FOR TESTING ONLY.
+    // Give teams some players.
+    let mut teams = TEAMS.lock().unwrap().clone();
+    for team in teams.values_mut() {
+        team.setup(0, 0);
+    }
 }
 
 // Add competitions.
@@ -103,7 +110,7 @@ fn add_competition_data() {
             Team::build_and_save("KalPa"),      // 7
             Team::build_and_save("Kärpät"),     // 8
             Team::build_and_save("Lukko"),      // 9
-            Team::build_and_save("Pelican"),    // 10
+            Team::build_and_save("Pelicans"),   // 10
             Team::build_and_save("SaiPa"),      // 11
             Team::build_and_save("Tappara"),    // 12
             Team::build_and_save("TPS"),        // 13

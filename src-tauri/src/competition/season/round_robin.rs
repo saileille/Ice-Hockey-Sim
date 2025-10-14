@@ -2,7 +2,7 @@
 
 use crate::{competition::{format, season::{team::TeamCompData, Season}, Competition}, team::Team, types::convert};
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct RoundRobin {
 

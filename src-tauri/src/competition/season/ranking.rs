@@ -7,7 +7,7 @@ use rand::{rng, seq::IndexedRandom};
 use crate::{competition::{format, season::{team::TeamCompData, Season}, Competition}, team::Team};
 
 // What ranking criteria a competition has.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Eq, Hash, PartialEq)]
 #[derive(Clone)]
 pub enum RankCriteria {
@@ -115,23 +115,25 @@ pub fn get_sort_functions() -> HashMap<RankCriteria, CmpFunc> {
 
 impl Season {
     // Get the teams in the order of betterhood.
-    pub fn rank_teams(&mut self, comp: &Competition) {
+    // Return a boolean for whether any sorting was done.
+    pub fn rank_teams(&mut self, comp: &Competition) -> bool {
         if self.round_robin.is_some() {
             comp.sort_some_teams(&mut self.teams);
+            return true;
         }
         else if self.knockout.is_some() {
-            self.sort_knockout_round(comp);
+            return self.sort_knockout_round(comp);
         }
 
         // Parent competition stuff here...
         // For now, it only does ChildCompRanking.
         else {
-            self.sort_parent_competition(comp);
+            return self.sort_child_competitions(comp);
         }
     }
 
-    // Sorting a knockout round is a bit more complex..
-    fn sort_knockout_round(&mut self, comp: &Competition) {
+    // Sort a knockout round.
+    fn sort_knockout_round(&mut self, comp: &Competition) -> bool {
         let mut advanced_teams = self.knockout.as_ref().unwrap().advanced_teams.clone();
         let mut eliminated_teams = self.knockout.as_ref().unwrap().eliminated_teams.clone();
 
@@ -141,18 +143,22 @@ impl Season {
         advanced_teams.append(&mut eliminated_teams);
         if advanced_teams.len() >= self.teams.len() {
             self.teams = advanced_teams;
+            return true;
         }
+        return false;
     }
 
-    // Sorting a parent competition is bound to be even more complex...
-    fn sort_parent_competition(&mut self, comp: &Competition) {
+    // Sort child competitions and determine the ranking based on them.
+    fn sort_child_competitions(&mut self, comp: &Competition) -> bool {
         let mut ranks = Vec::new();
         for id in comp.child_comp_ids.iter() {
             let comp = Competition::fetch_from_db(id).unwrap();
             let mut season = Season::fetch_from_db(id, self.index);
 
-            season.rank_teams(&comp);
-            ranks.push(season.teams.clone());
+            let sorted = season.rank_teams(&comp);
+            if sorted {
+                ranks.push(season.teams.clone());
+            }
         }
 
         let mut team_ranking: Vec<TeamCompData> = Vec::new();
@@ -174,7 +180,9 @@ impl Season {
 
         if team_ranking.len() >= self.teams.len() {
             self.teams = team_ranking;
+            return true;
         }
+        return false;
     }
 }
 

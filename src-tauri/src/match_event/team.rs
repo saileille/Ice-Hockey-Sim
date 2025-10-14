@@ -1,18 +1,17 @@
 use weighted_rand::{
-    builder::{NewBuilder, WalkerTableBuilder},
-    table::WalkerTable
+    builder::{NewBuilder, WalkerTableBuilder}
 };
 
 use crate::{
     types::{convert, PlayerId, TeamId},
     person::player::Player, team::{
-        lineup::{DefencePair, ForwardLine, LineUp},
+        lineup::LineUp,
         Team
     },
 };
 use super::event::Shot;
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct TeamGameData {
     pub team_id: TeamId,
@@ -86,7 +85,7 @@ impl TeamGameData {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct PlayersOnIce {
     pub gk_id: PlayerId,

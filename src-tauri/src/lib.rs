@@ -36,6 +36,9 @@ pub fn run() {
             commands::tests::test_comp,
             commands::go_to_next_day,
             commands::get_date_string,
+            commands::get_all_full_competitions,
+            commands::get_child_competitions,
+            commands::get_comp_screen_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -11,7 +11,7 @@ pub enum MatchGenType {
     Alternating,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct RoundRobin {
     pub rounds: u8, // How many times each team plays one another.

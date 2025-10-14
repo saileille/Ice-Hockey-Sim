@@ -6,7 +6,7 @@ use rand::{rng, rngs::ThreadRng, Rng};
 
 use crate::{competition::{season::{schedule_generator::{assign_dates, generate_matchdays}, team::TeamCompData, Season}, Competition}, match_event::Game, time::db_string_to_date, types::{CompetitionId, TeamId}};
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct KnockoutRound {
     pub pairs: Vec<KnockoutPair>,
@@ -125,7 +125,7 @@ impl KnockoutRound {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct KnockoutPair {
     pub home: TeamCompData,

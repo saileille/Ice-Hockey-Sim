@@ -1,8 +1,10 @@
 // Data for teams.
 
-use crate::{competition::format, match_event::team::TeamGameData, team::Team, types::{convert, TeamId}};
+use serde_json::json;
 
-#[derive(Debug)]
+use crate::{competition::{format, Competition}, match_event::team::TeamGameData, team::Team, types::{convert, TeamId}};
+
+#[derive(Debug, serde::Serialize)]
 #[derive(PartialEq)]
 #[derive(Default, Clone)]
 pub struct TeamCompData {
@@ -33,6 +35,27 @@ impl TeamCompData {
     // Get the team element tied to this TeamData.
     fn get_team(&self) -> Team {
         Team::fetch_from_db(&self.team_id)
+    }
+
+    // Get relevant information for a competition screen.
+    pub fn get_json(&self, comp: &Competition) -> serde_json::Value {
+        json!({
+            "id": self.team_id,
+            "name": self.get_team().name,
+            "games": self.get_game_count(),
+            "wins": self.regular_wins,
+            "ot_wins": self.ot_wins,
+            "draws": self.draws,
+            "ot_losses": self.ot_losses,
+            "losses": self.regular_losses,
+            "total_wins": self.get_wins(),
+            "total_losses": self.get_losses(),
+            "goals_scored": self.goals_scored,
+            "goals_conceded": self.goals_conceded,
+            "goal_difference": self.get_goal_difference(),
+            "points": self.get_points(&comp.get_round_robin_format()),
+            "seed": self.seed
+        })
     }
 }
 

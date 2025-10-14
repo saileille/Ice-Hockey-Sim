@@ -5,11 +5,13 @@ pub mod knockout_generator;
 
 use std::{cmp::Ordering, ops::Range};
 
+use serde_json::json;
+
 use crate::{competition::season::{ranking::{get_sort_functions, RankCriteria}, team::TeamCompData, Season}, database::{COMPETITIONS, SEASONS}, team::Team, time::AnnualWindow, types::{convert, CompetitionId, TeamId}};
 
 use self::format::Format;
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct Competition {
     pub id: CompetitionId,
@@ -93,10 +95,25 @@ impl Competition {
     // Give child competitions this competition's ID.
     pub fn give_id_to_children_comps(&self) {
         for id in self.child_comp_ids.iter() {
-            let mut child_comp = Self::fetch_from_db(id).expect(&format!("{}: {} has child comp id of {id}", self.id, self.name));
+            let mut child_comp = Competition::fetch_from_db(id).unwrap();
             child_comp.parent_comp_id = self.id;
             child_comp.save();
         }
+    }
+
+    // Get the name of this competition with all parent competition names.
+    fn get_full_name(&self, string: Option<String>) -> String {
+        let mut name = if string.is_none() {
+            self.name.clone()
+        } else {
+            format!("{} {}", self.name, string.unwrap())
+        };
+
+        if self.parent_comp_id != 0 {
+            name = Competition::fetch_from_db(&self.parent_comp_id).unwrap().get_full_name(Some(name));
+        }
+
+        return name;
     }
 
     // Get the amount of seasons this competition has stored.
@@ -105,7 +122,7 @@ impl Competition {
     }
 
     // Get the round robin format, if competition has one.
-    fn get_round_robin_format(&self) -> Option<format::round_robin::RoundRobin> {
+    pub fn get_round_robin_format(&self) -> Option<format::round_robin::RoundRobin> {
         if self.format.is_none() {
             None
         } else {
@@ -146,10 +163,27 @@ impl Competition {
             order
         });
     }
+
+    // Get relevant information for a competition screen.
+    pub fn get_comp_screen_json(&self) -> serde_json::Value {
+        let season = Season::fetch_from_db(&self.id, self.get_seasons_amount() - 1);
+
+        json!({
+            "name": self.name,
+            "full_name": self.get_full_name(None),
+            "format": if self.format.is_none() {
+                serde_json::Value::Null
+            } else {
+                self.format.as_ref().unwrap().get_comp_screen_json()
+            },
+            "season": season.get_comp_screen_json(self),
+            "child_comp_ids": self.child_comp_ids
+        })
+    }
 }
 
 // What to do with the seed of the team.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Clone)]
 pub enum Seed {
     // Get the seed from the team's final standing in the previous competition.
@@ -160,7 +194,7 @@ pub enum Seed {
 }
 
 // Stores data for which teams to go to which competition.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Clone)]
 pub struct CompConnection {
     teams_from_positions: [u8; 2],
@@ -201,7 +235,6 @@ impl CompConnection {
             teamdata.push(team);
         }
 
-        let comp = Competition::fetch_from_db(&self.comp_to_connect).expect(&format!("competition id {} not found", self.comp_to_connect));
-        comp.setup_season(&mut teamdata);
+        Competition::fetch_from_db(&self.comp_to_connect).unwrap().setup_season(&mut teamdata);
     }
 }

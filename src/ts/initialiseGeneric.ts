@@ -1,0 +1,81 @@
+// Show the current date.
+import { invoke } from "@tauri-apps/api/core";
+import { Listener, createEventListener, createElement } from "./main.ts";
+import { drawScreen as drawCompScreen } from "./competitionScreen/main.ts";
+
+export const initialiseAll = () => {
+    document.body.innerHTML = `
+        <div id="date"></div>
+        <button id="continue">Continue</button>
+        <select id="comps"></select>
+    `;
+
+    displayDate();
+    populateCompSelect(0);
+
+    createEventListener("#comps", "change", goToParentCompetition);
+    createEventListener("#continue", "click", toNextDay);
+};
+
+const displayDate = async () => {
+    const dateDiv: HTMLDivElement = document.querySelector("#date") as HTMLDivElement;
+    const dateString: string = await invoke("get_date_string");
+    dateDiv.textContent = dateString;
+};
+
+// Give items to the competition selection dropdown.
+export const populateCompSelect = async (id: number) => {
+    let query: string;
+    // Normal situation.
+    if (id === 0) { query = "#comps"; }
+
+    // In case we need child competitions.
+    else { query = "#child-comps"; }
+
+    const select: HTMLSelectElement = document.querySelector(query) as HTMLSelectElement;
+
+    let compData: Array<Array<string>>;
+    if (id === 0) {
+        compData = await invoke("get_all_full_competitions");
+    }
+    else {
+        compData = await invoke("get_child_competitions", { id: id });
+    }
+
+    for (let comp of compData) {
+        select.appendChild(createElement("option", {
+            "value": comp[0],
+            "textContent": comp[1]
+        }));
+    }
+};
+
+const toNextDay: Listener = async (_e: Event) => {
+    console.log("toNextDay works");
+    const dateDiv: HTMLDivElement = document.querySelector("#date") as HTMLDivElement;
+    const dateString: string = await invoke("go_to_next_day");
+
+    // Should update a whole lot more.
+    dateDiv.textContent = dateString;
+};
+
+const goToCompetition = (query: string) => {
+    const compSelect: HTMLSelectElement = document.querySelector(query) as HTMLSelectElement;
+
+    // This is the default option, we do not want that.
+    if (compSelect.value === "0") { return; }
+    drawCompScreen(Number(compSelect.value));
+}
+
+// Go to a competition page.
+const goToParentCompetition: Listener = (_e: Event) => {
+    console.log("goToParentCompetition works");
+    goToCompetition("#comps");
+};
+
+export const goToChildCompetition: Listener = (_e: Event) => {
+    console.log("goToChildCompetition works");
+    goToCompetition("#child-comps");
+};
+
+initialiseAll();

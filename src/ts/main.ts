@@ -1,7 +1,31 @@
-import { invoke } from "@tauri-apps/api/core";
+type QuerySelector = Document["querySelector"];
 
-/* let greetInputEl: HTMLInputElement | null;
-let greetMsgEl: HTMLElement | null; */
+type Query = Parameters<QuerySelector>[0];
+type QueryResult = ReturnType<QuerySelector>;
+
+type EventType = Parameters<NonNullable<QueryResult>["addEventListener"]>[0];
+export type Listener = Parameters<NonNullable<QueryResult>["addEventListener"]>[1];
+
+type CreateElement = Document["createElement"];
+type TagName = Parameters<CreateElement>[0];
+
+// A generic helper function to alleviate the tedious verbosity.
+// Do not touch anything, It Just Works™.
+export const createEventListener = (query: Query, event: EventType, listener: Listener) => {
+    document.querySelector(query)?.addEventListener(event, listener)
+};
+
+// Create an HTML element, give it values that you want and return it.
+export const createElement = (elementType: TagName, attributes: any) => {
+    let element: any = document.createElement(elementType);
+    for (const [key, value] of Object.entries(attributes)) {
+        element[key] = value;
+    }
+    return element;
+};
+
+/* const greetInputEl: HTMLInputElement | null;
+const greetMsgEl: HTMLElement | null; */
 
 /*const greet = async () => {
     if (greetMsgEl && greetInputEl) {
@@ -10,27 +34,6 @@ let greetMsgEl: HTMLElement | null; */
             name: greetInputEl.value,
         });
     }
-};*/
-
-const toNextDay = async () => {
-    let dateDiv = document.querySelector("#date");
-    if (dateDiv === null) { return; }
-
-    let dateString: string = await invoke("go_to_next_day");
-    dateDiv.textContent = dateString;
-};
-
-/* const testGame = async () => {
-    if (greetMsgEl && greetInputEl) {
-        let texts: Array<string> = await invoke("test_game");
-        greetMsgEl.textContent = texts[0];
-        console.log(texts[1]);
-    }
-}; */
-
-/*const testComp = async () => {
-    let texts: String = await invoke("test_comp");
-    console.log(texts);
 };*/
 
 /* window.addEventListener("DOMContentLoaded", () => {
@@ -42,10 +45,3 @@ const toNextDay = async () => {
         testComp();
     });
 }); */
-
-window.addEventListener("DOMContentLoaded", () => {
-    document.querySelector("#continue")?.addEventListener("click", (e) => {
-        e.preventDefault();
-        toNextDay();
-    });
-});

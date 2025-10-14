@@ -5,15 +5,17 @@ pub mod knockout;
 pub mod ranking;
 mod schedule_generator;
 
+use serde_json::json;
 use time::Date;
 
-use crate::{competition::{format, season::{self, team::TeamCompData}, Competition}, database::SEASONS, match_event::Game, team::Team, time::{date_to_db_string, db_string_to_date}, types::{convert, CompetitionId, TeamId}};
+use crate::{competition::{season::{self, team::TeamCompData}, Competition}, database::SEASONS, match_event::Game, time::{date_to_db_string, db_string_to_date}, types::{convert, CompetitionId, TeamId}};
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct Season {
     index: usize,   // For easier saving of the season.
     comp_id: CompetitionId,
+    name: String,   // Years during which the season takes place.
     pub teams: Vec<TeamCompData>,
     start_date: String,
     pub end_date: String,
@@ -33,8 +35,20 @@ impl Season {
         let mut season = Self::default();
         season.comp_id = comp.id;
         season.teams = teams.iter().map(|id | TeamCompData::build(*id, 0)).collect();
-        season.start_date = date_to_db_string(&comp.season_window.get_next_start_date());
-        season.end_date = date_to_db_string(&comp.season_window.get_next_end_date());
+
+        let start_date = comp.season_window.get_next_start_date();
+        let end_date = comp.season_window.get_next_end_date();
+
+        season.start_date = date_to_db_string(&start_date);
+        season.end_date = date_to_db_string(&end_date);
+
+        season.name = if start_date.year() == end_date.year() {
+            start_date.year().to_string()
+        }
+        else {
+            format!("{}-{}", start_date.year(), end_date.year())
+        };
+
 
         let format = &comp.format.as_ref();
         if format.is_none() { return season; }
@@ -80,6 +94,31 @@ impl Season {
             .expect(&format!("no Competition with id {}", self.comp_id))[self.index] = self.clone();
     }
 
+    // Get the competition of the season.
+    fn get_competition(&self) -> Competition {
+        Competition::fetch_from_db(&self.comp_id).unwrap()
+    }
+
+    // Get the full name of the season, with all parent competition names included.
+    fn get_full_name(&self) -> String {
+        let comp_name = self.get_competition().get_full_name(None);
+        format!("{} {}", comp_name, self.name)
+    }
+
+    // Get some nice JSON for a competition screen.
+    pub fn get_comp_screen_json(&self, comp: &Competition) -> serde_json::Value {
+        let teams: Vec<serde_json::Value> = self.teams.iter().map(|a| a.get_json(comp)).collect();
+        let upcoming_games: Vec<serde_json::Value> = self.upcoming_games.iter().map(|a| a.get_comp_screen_json()).collect();
+        let played_games: Vec<serde_json::Value> = self.played_games.iter().map(|a| a.get_comp_screen_json()).collect();
+
+        json!({
+            "name": self.name,
+            "teams": teams,
+            "upcoming_games": upcoming_games,
+            "played_games": played_games
+        })
+    }
+
     // Check if the season has enough teams to begin.
     // min_no_of_teams must be the competition's min_no_of_teams field.
     pub fn has_enough_teams(&self, min_no_of_teams: u8) -> bool {
@@ -108,7 +147,6 @@ impl Season {
                     // Does not support group competitions yet.
                     teams = self.teams.clone();
                 }
-
                 Competition::fetch_from_db(id).unwrap().setup_season(&mut teams);
             }
         }
@@ -145,6 +183,8 @@ impl Season {
         if self.knockout.is_some() {
             self.knockout.as_mut().unwrap().update_teamdata(games);
         }
+
+        self.rank_teams(comp);
 
         // We are not saving the season here, because we are doing it after updating the played_games vector.
         // self.save();
@@ -197,7 +237,6 @@ impl Season {
         self.played_games.append(&mut games);
 
         self.check_if_over(comp);
-
         self.save();
     }
 

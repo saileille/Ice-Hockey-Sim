@@ -12,7 +12,7 @@ static DB_DATE_FORMAT: &[BorrowedFormatItem<'_>] = format_description!("[year]-[
 static SECONDS_IN_DAY: u64 = 86400;
 
 // A struct that represents an annual time period with fixed start and end dates. Both start and end are given as [month, day].
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct AnnualWindow {
     start: [u8; 2],

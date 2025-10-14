@@ -1,11 +1,13 @@
 pub mod round_robin;
 pub mod knockout;
 
+use serde_json::json;
+
 use crate::{
     competition::format, match_event
 };
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone, PartialEq)]
 enum Type {
     #[default]
@@ -14,7 +16,7 @@ enum Type {
     Knockout,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct Format {
     pub match_rules: match_event::Rules,
@@ -50,6 +52,16 @@ impl Format {
     fn is_valid(&self) -> bool {
         self.match_rules.is_valid() &&
         self.format_type != Type::Null
+    }
+
+    // Get JSON for a competition screen.
+    pub fn get_comp_screen_json(&self) -> serde_json::Value {
+        json!({
+            "round_robin": self.round_robin,
+            "knockout": self.knockout,
+            "match_rules": self.match_rules,
+            "type": self.format_type
+        })
     }
 
 }

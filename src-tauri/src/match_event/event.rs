@@ -14,7 +14,7 @@ use super::{
     team::PlayersOnIce
 };
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct Event {
     pub time: Clock,
@@ -32,7 +32,7 @@ impl Event {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct Shot {
     pub event: Event,
