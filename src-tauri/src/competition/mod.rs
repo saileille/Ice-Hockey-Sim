@@ -97,13 +97,21 @@ impl Competition {
         Season::build_and_save(self, teams);
     }
 
+    // Create a new season for this competition and all its child competitions.
+    fn create_new_seasons(&self, teams: &Vec<TeamId>) {
+        self.create_new_season(teams);
+
+        // Saves an unnecessary element creation.
+        if self.child_comp_ids.is_empty() { return; }
+
+        let child_teams = Vec::new();
+        for id in self.child_comp_ids.iter() {
+            Competition::fetch_from_db(id).unwrap().create_new_seasons(&child_teams);        }
+    }
+
     // Create new season for this competition and its child competitions.
     pub fn create_and_setup_seasons(&self, teams: &Vec<TeamId>) {
-        self.create_new_season(teams);
-        for id in self.child_comp_ids.iter() {
-            Competition::fetch_from_db(id).unwrap().create_new_season(&Vec::new());
-        }
-
+        self.create_new_seasons(teams);
         self.setup_season(&mut Vec::new());
     }
 

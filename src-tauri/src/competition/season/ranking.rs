@@ -134,15 +134,15 @@ impl Season {
 
     // Sort a knockout round.
     fn sort_knockout_round(&mut self, comp: &Competition) -> bool {
-        let mut advanced_teams = self.knockout.as_ref().unwrap().advanced_teams.clone();
+        let mut sorted_teams = self.knockout.as_ref().unwrap().advanced_teams.clone();
         let mut eliminated_teams = self.knockout.as_ref().unwrap().eliminated_teams.clone();
 
-        comp.sort_some_teams(&mut advanced_teams);
+        comp.sort_some_teams(&mut sorted_teams);
         comp.sort_some_teams(&mut eliminated_teams);
 
-        advanced_teams.append(&mut eliminated_teams);
-        if advanced_teams.len() >= self.teams.len() {
-            self.teams = advanced_teams;
+        sorted_teams.append(&mut eliminated_teams);
+        if sorted_teams.len() >= self.teams.len() {
+            self.teams = sorted_teams;
             return true;
         }
         return false;
@@ -152,10 +152,10 @@ impl Season {
     fn sort_child_competitions(&mut self, comp: &Competition) -> bool {
         let mut ranks = Vec::new();
         for id in comp.child_comp_ids.iter() {
-            let comp = Competition::fetch_from_db(id).unwrap();
+            let child_comp = Competition::fetch_from_db(id).unwrap();
             let mut season = Season::fetch_from_db(id, self.index);
 
-            let sorted = season.rank_teams(&comp);
+            let sorted = season.rank_teams(&child_comp);
             if sorted {
                 ranks.push(season.teams.clone());
             }
@@ -183,21 +183,5 @@ impl Season {
             return true;
         }
         return false;
-    }
-}
-
-impl Season {
-    // Get a final ranking for the season.
-    pub fn display_final_ranking(&mut self) -> String {
-        let comp = Competition::fetch_from_db(&self.comp_id).unwrap();
-        self.rank_teams(&comp);
-
-        let mut s = String::new();
-        for (i, team) in self.teams.iter().enumerate() {
-            if i != 0 { s += "\n"; }
-            s += &format!("{}.\t{}", i + 1, Team::fetch_from_db(&team.team_id).name);
-        }
-
-        return s;
     }
 }

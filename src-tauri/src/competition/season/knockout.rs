@@ -5,7 +5,7 @@ use std::ops::Range;
 use rand::{rng, rngs::ThreadRng, Rng};
 use serde_json::json;
 
-use crate::{competition::{season::{schedule_generator::{assign_dates, generate_matchdays}, team::TeamCompData, Season}, Competition}, match_event::Game, time::db_string_to_date, types::{CompetitionId, TeamId}};
+use crate::{competition::{season::{schedule_generator::{assign_dates, generate_matchdays}, team::TeamCompData, Season}, Competition}, database::TODAY, match_event::Game, time::{date_to_db_string, db_string_to_date}, types::{CompetitionId, TeamId}};
 
 #[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]

@@ -1,9 +1,6 @@
 use std::cmp::Ordering;
 
-use crate::{competition::{season::{team::TeamCompData, Season}, Competition}, database::{COMPETITIONS, SEASONS, TODAY}, team::Team, time::{date_to_db_string, db_string_to_date}, types::{CompetitionId, TeamId}};
-use serde_json::json;
-
-pub mod tests;
+use crate::{competition::{season::Season, Competition}, database::{COMPETITIONS, TODAY}, time::{date_to_db_string, db_string_to_date}, types::{CompetitionId, TeamId}};
 
 // Advance the time with one day.
 #[tauri::command]
@@ -21,7 +18,7 @@ pub fn go_to_next_day() -> String {
 
         // Create new seasons for competitions that are over.
         else if today > db_string_to_date(&season.end_date) {
-            // Can only take the same teams for the next season as well, for now.
+            // Cannot change teams between seasons, for now.
             let teams: Vec<TeamId> = season.teams.iter().map(|a | a.team_id).collect();
             comp.create_and_setup_seasons(&teams);
         }

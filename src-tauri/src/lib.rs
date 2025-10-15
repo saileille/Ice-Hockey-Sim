@@ -13,13 +13,25 @@ mod terminal_tests;
 
 use tauri::Manager;
 
+use crate::database::TODAY;
+use crate::time::db_string_to_date;
+use crate::commands::go_to_next_day;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     database::initialise();
 
-    // terminal testing...
+    // Test stuffs...
     #[cfg(dev)] {
-        // terminal_tests::test_comp_generation();
+        /* let simulate_to = "2026-05-01";    // Simulate to this date.
+        loop {
+            let today = TODAY.lock().unwrap().clone();
+            if today > db_string_to_date(simulate_to) {
+                break;
+            }
+
+            go_to_next_day();
+        } */
     }
 
     tauri::Builder::default()
@@ -32,13 +44,11 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            commands::tests::test_game,
-            commands::tests::test_comp,
             commands::go_to_next_day,
             commands::get_date_string,
             commands::get_all_full_competitions,
             commands::get_child_competitions,
-            commands::get_comp_screen_info
+            commands::get_comp_screen_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

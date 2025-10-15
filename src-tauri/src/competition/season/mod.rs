@@ -190,6 +190,7 @@ impl Season {
             self.knockout.as_mut().unwrap().update_teamdata(games);
         }
 
+        self.check_if_over(comp);
         self.rank_teams(comp);
 
         // We are not saving the season here, because we are doing it after updating the played_games vector.
@@ -241,8 +242,6 @@ impl Season {
 
         self.update_teamdata(comp, &games);
         self.played_games.append(&mut games);
-
-        self.check_if_over(comp);
         self.save();
     }
 
@@ -288,42 +287,5 @@ impl Season {
         for connection in comp.connections.iter() {
             connection.send_teams(&self.teams);
         }
-    }
-}
-
-// Tests.
-impl Season {
-    // Display a match schedule of all matches of this competition's season, and child seasons.
-    pub fn display_match_schedule(&self, comp: &Competition) -> String {
-        let mut games = Vec::new();
-        games.append(&mut self.get_all_games().clone());
-
-        for id in comp.child_comp_ids.iter() {
-            let season = Season::fetch_from_db(id, self.index);
-            games.append(&mut season.get_all_games().clone())
-        }
-
-        games.sort_by(|a, b|
-            db_string_to_date(&a.date).cmp(&db_string_to_date(&b.date))
-            .then(a.get_name().cmp(&b.get_name())));
-
-        let mut s = String::new();
-        let mut current_date = Date::MIN;
-        for game in games {
-            let game_date = db_string_to_date(&game.date);
-            if current_date < db_string_to_date(&game.date) {
-                current_date = game_date;
-
-                if !s.is_empty() {
-                    s += "\n\n";
-                }
-
-                s += &format!("{}", date_to_db_string(&current_date));
-            }
-
-            s += &format!("\n{}", game.get_name_and_score_if_started());
-        }
-
-        return s;
     }
 }
