@@ -121,7 +121,7 @@ impl Season {
             comp.sort_some_teams(&mut self.teams);
             return true;
         }
-        else if self.knockout.is_some() {
+        else if self.knockout_round.is_some() {
             return self.sort_knockout_round(comp);
         }
 
@@ -134,8 +134,8 @@ impl Season {
 
     // Sort a knockout round.
     fn sort_knockout_round(&mut self, comp: &Competition) -> bool {
-        let mut sorted_teams = self.knockout.as_ref().unwrap().advanced_teams.clone();
-        let mut eliminated_teams = self.knockout.as_ref().unwrap().eliminated_teams.clone();
+        let mut sorted_teams = self.knockout_round.as_ref().unwrap().advanced_teams.clone();
+        let mut eliminated_teams = self.knockout_round.as_ref().unwrap().eliminated_teams.clone();
 
         comp.sort_some_teams(&mut sorted_teams);
         comp.sort_some_teams(&mut eliminated_teams);

@@ -1,12 +1,16 @@
 pub mod position;
+mod ai;
+
+use rand::{rngs::ThreadRng, Rng};
+use rand::seq::IteratorRandom;
 
 use crate::{
-    types::{CountryId, PlayerId},
-    database::PLAYERS
+    database::{COUNTRIES, PLAYERS, POSITIONS}, types::{CountryId, PlayerId, TeamId}
 };
 use super::{Person, Gender};
 use self::position::{Position, PositionId};
 
+#[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct Player {
     pub id: PlayerId,  // id: 0 is reserved
@@ -15,7 +19,8 @@ pub struct Player {
     pub position_id: PositionId,
 }
 
-impl Player {   // Basics.
+// Basics.
+impl Player {
     // Create a new ID.
     fn create_id(&mut self, id: usize) {
         self.id = match id.try_into() {
@@ -39,6 +44,16 @@ impl Player {   // Basics.
         player.create_id(PLAYERS.lock().unwrap().len() + 1);
         player.save();
         return player;
+    }
+
+    // Just like build and save, but no arguments.
+    pub fn build_and_save_random(rng: &mut ThreadRng) -> Self {
+        let country_id = rng.random_range(1..=COUNTRIES.lock().unwrap().len()) as CountryId;
+        //let ability = rng.random_range(0..=u8::MAX);
+        let ability = 100;
+        let (position_id, _) = POSITIONS.iter().choose(rng).unwrap();
+
+        return Self::build_and_save(country_id, ability, position_id.clone());
     }
 
     // Get a player from the database.
@@ -69,5 +84,29 @@ impl Player {   // Basics.
     // Get a clone of the player's position.
     fn get_position(&self) -> Position {
         Position::fetch_from_db(&self.position_id)
+    }
+
+    // Get all free agents from the database with given positions, which the given team has not approached yet.
+    pub fn get_free_agents_for_team(positions: Vec<&PositionId>, team_id: TeamId) -> Vec<Self> {
+        PLAYERS.lock().unwrap().iter().filter_map(|(_, a)| {
+            match a.person.contract.is_none() && positions.contains(&&a.position_id) {
+                true => {
+                    let mut team_has_offer = false;
+                    for offer in a.person.contract_offers.iter() {
+                        if offer.team_id == team_id {
+                            team_has_offer = true;
+                            break;
+                        }
+                    }
+
+                    match team_has_offer {
+                        true => None,
+                        _ => Some(a.clone())
+                    }
+                },
+
+                _ => None
+            }
+        }).collect()
     }
 }

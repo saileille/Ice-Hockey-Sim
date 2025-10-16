@@ -98,7 +98,7 @@ pub fn sort_home(sort_type: &MatchGenType, schedule_data: &mut Vec<TeamScheduleD
     sort_with_options(schedule_data, prev_schedule_map, sort_type, rng, &sort_functions);
 }
 
-// Prioritise teams that need a home game.
+// Prioritise teams that need an away game.
 pub fn sort_away(sort_type: &MatchGenType, schedule_data: &mut Vec<TeamScheduleData>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>, rng: &mut ThreadRng) {
     let sort_functions = [compare_away_home, compare_match_count];
     sort_with_options(schedule_data, prev_schedule_map, sort_type, rng, &sort_functions);

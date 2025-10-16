@@ -1,14 +1,14 @@
 // Seasons represent a single iteration of a particular competition.
 pub mod team;
 pub mod round_robin;
-pub mod knockout;
+pub mod knockout_round;
 pub mod ranking;
 mod schedule_generator;
 
 use serde_json::json;
 use time::Date;
 
-use crate::{competition::{season::{self, team::TeamCompData}, Competition}, database::SEASONS, match_event::Game, time::{date_to_db_string, db_string_to_date}, types::{convert, CompetitionId, TeamId}};
+use crate::{competition::{season::{knockout_round::KnockoutRound as KnockoutRoundSeason, round_robin::RoundRobin as RoundRobinSeason, team::TeamCompData}, Competition}, database::SEASONS, match_event::Game, time::{date_to_db_string, db_string_to_date}, types::{convert, CompetitionId, TeamId}};
 
 #[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
@@ -19,11 +19,11 @@ pub struct Season {
     pub teams: Vec<TeamCompData>,
     start_date: String,
     pub end_date: String,
-    pub round_robin: Option<season::round_robin::RoundRobin>,
-    pub knockout: Option<season::knockout::KnockoutRound>,
+    pub round_robin: Option<RoundRobinSeason>,
+    pub knockout_round: Option<KnockoutRoundSeason>,
 
     pub upcoming_games: Vec<Game>,  // Upcoming games are stored with earliest LAST.
-    played_games: Vec<Game>,    // Played games are stored with earliest FIRST.
+    pub played_games: Vec<Game>,    // Played games are stored with earliest FIRST.
 
     // Helper for easily checking if the season is over.
     pub is_over: bool,
@@ -31,7 +31,7 @@ pub struct Season {
 
 impl Season {
     // Build an element.
-    fn build(comp: &Competition, teams: &Vec<TeamId>) -> Self {
+    fn build(comp: &Competition, teams: &[TeamId]) -> Self {
         let mut season = Self::default();
         season.comp_id = comp.id;
         season.teams = teams.iter().map(|id | TeamCompData::build(*id, 0)).collect();
@@ -54,10 +54,10 @@ impl Season {
         if format.is_none() { return season; }
 
         if format.unwrap().round_robin.as_ref().is_some() {
-            season.round_robin = Some(season::round_robin::RoundRobin::build());
+            season.round_robin = Some(RoundRobinSeason::build());
         }
-        else if format.unwrap().knockout.as_ref().is_some() {
-            season.knockout = Some(season::knockout::KnockoutRound::build());
+        else if format.unwrap().knockout_round.as_ref().is_some() {
+            season.knockout_round = Some(KnockoutRoundSeason::build());
         }
         else {
             panic!("{}\nformat: {:#?}", comp.name, comp.format);
@@ -68,7 +68,7 @@ impl Season {
 
     // Build a season and save it to the database.
     // Also build seasons for all possible child competitions.
-    pub fn build_and_save(comp: &Competition, teams: &Vec<TeamId>) -> Self {
+    pub fn build_and_save(comp: &Competition, teams: &[TeamId]) -> Self {
         let mut season = Self::build(comp, teams);
 
         season.save_new();
@@ -101,7 +101,7 @@ impl Season {
 
     // Get the full name of the season, with all parent competition names included.
     fn get_full_name(&self) -> String {
-        let comp_name = self.get_competition().get_full_name(None);
+        let comp_name = self.get_competition().get_full_name("");
         format!("{} {}", comp_name, self.name)
     }
 
@@ -114,11 +114,11 @@ impl Season {
         json!({
             "name": self.name,
             "teams": teams,
-            "knockout": if self.knockout.is_none() {
+            "knockout_round": if self.knockout_round.is_none() {
                 serde_json::Value::Null
             }
             else {
-                self.knockout.as_ref().unwrap().get_comp_screen_json()
+                self.knockout_round.as_ref().unwrap().get_comp_screen_json()
             },
             "upcoming_games": upcoming_games,
             "played_games": played_games
@@ -136,10 +136,14 @@ impl Season {
         // The order of the teams becomes correct by reversing.
         self.teams.reverse();
 
+        // Kind of extra, but this allows the match generator to access the TeamCompData elements.
+        // Which in turn allows passing teams' seeds to games.
+        self.save();
+
         if self.round_robin.is_some() {
             self.setup_round_robin(comp);
         }
-        else if self.knockout.is_some() {
+        else if self.knockout_round.is_some() {
             self.setup_knockout(comp);
         }
 
@@ -169,11 +173,11 @@ impl Season {
         let start = &self.start_date;
         let end = &self.end_date;
 
-        self.upcoming_games = self.knockout.as_mut().unwrap().setup(teams, start, end, comp);
+        self.upcoming_games = self.knockout_round.as_mut().unwrap().setup(teams, start, end, comp);
     }
 
     // Update the teamdata to this season and all parent competition seasons.
-    pub fn update_teamdata(&mut self, comp: &Competition, games: &Vec<Game>) {
+    pub fn update_teamdata(&mut self, comp: &Competition, games: &[Game]) {
         for team in self.teams.iter_mut() {
             for game in games.iter() {
                 if team.team_id == game.home.team_id {
@@ -186,8 +190,8 @@ impl Season {
         }
 
         // In case this is a knockout round, we need to update the pairs as well.
-        if self.knockout.is_some() {
-            self.knockout.as_mut().unwrap().update_teamdata(games);
+        if self.knockout_round.is_some() {
+            self.knockout_round.as_mut().unwrap().update_teamdata(games);
         }
 
         self.check_if_over(comp);
@@ -255,8 +259,8 @@ impl Season {
             if !self.upcoming_games.is_empty() { return false; }
         }
 
-        else if self.knockout.is_some() {
-            if !self.knockout.as_mut().unwrap().check_if_over(comp, &mut self.upcoming_games) {
+        else if self.knockout_round.is_some() {
+            if !self.knockout_round.as_mut().unwrap().check_if_over(comp, &mut self.upcoming_games) {
                 return false;
             }
         }

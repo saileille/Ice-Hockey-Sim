@@ -1,38 +1,9 @@
+pub mod continue_game;
+
 use std::cmp::Ordering;
 
-use crate::{competition::{season::Season, Competition}, database::{COMPETITIONS, TODAY}, time::{date_to_db_string, db_string_to_date}, types::{CompetitionId, TeamId}};
+use crate::{competition::Competition, database::COMPETITIONS, types::CompetitionId};
 
-// Advance the time with one day.
-#[tauri::command]
-pub fn go_to_next_day() -> String {
-    let today = TODAY.lock().unwrap().clone();
-
-    let mut comps = COMPETITIONS.lock().unwrap().clone();
-    for comp in comps.values_mut() {
-        let mut season = Season::fetch_from_db(&comp.id, comp.get_seasons_amount() - 1);
-
-        // Simulate all games that happen today.
-        if comp.format.is_some() {
-            season.simulate_day(&comp, &today);
-        }
-
-        // Create new seasons for competitions that are over.
-        else if today > db_string_to_date(&season.end_date) {
-            // Cannot change teams between seasons, for now.
-            let teams: Vec<TeamId> = season.teams.iter().map(|a | a.team_id).collect();
-            comp.create_and_setup_seasons(&teams);
-        }
-    }
-
-    *TODAY.lock().unwrap() = today.next_day().unwrap();
-    return date_to_db_string(&TODAY.lock().unwrap());
-}
-
-// Get the current date as a string.
-#[tauri::command]
-pub fn get_date_string() -> String {
-    date_to_db_string(&TODAY.lock().unwrap())
-}
 
 // Get name and ID of all competitions that are not part of another competition.
 #[tauri::command]
@@ -70,14 +41,9 @@ pub fn get_child_competitions(id: CompetitionId) -> Vec<(String, String)> {
     // Parent competition is the default option.
     child_comps.push(("0".to_string(), parent_comp.name));
 
-    child_comps.sort_by(|a, b| {
-        // Making sure that the non-selection is always on top.
-        let ordering;
-        if a.0 == "0" { ordering = Ordering::Less }
-        else if b.0 == "0" { ordering = Ordering::Greater }
-        else { ordering = a.1.cmp(&b.1) }
-        ordering
-    });
+    // Sort according to the ID, meaning the earlier stage should always be first.
+    // Could be sorted with start dates too, but that would require extracting comps from the db.
+    child_comps.sort_by(|a, b| a.0.cmp(&b.0));
 
     return child_comps;
 }
@@ -85,5 +51,13 @@ pub fn get_child_competitions(id: CompetitionId) -> Vec<(String, String)> {
 // Get all the info of a competition in a JSON string.
 #[tauri::command]
 pub fn get_comp_screen_info(id: CompetitionId) -> String {
-    Competition::fetch_from_db(&id).unwrap().get_comp_screen_json().to_string()
+    let comp = Competition::fetch_from_db(&id).unwrap();
+
+    if comp.is_tournament_tree {
+        return comp.get_tournament_comp_screen_json().to_string();
+    }
+    else {
+        return comp.get_comp_screen_json().to_string();
+    }
+
 }

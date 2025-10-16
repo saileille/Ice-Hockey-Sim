@@ -55,7 +55,8 @@ impl LineUp {   // Testing functions.
     fn auto_add_player(&mut self, player: Player) {
         match player.position_id {
             PositionId::Goalkeeper => self.auto_add_gk(player),
-            PositionId::Defender => self.auto_add_d(player),
+            PositionId::LeftDefender => self.auto_add_ld(player),
+            PositionId::RightDefender => self.auto_add_rd(player),
             PositionId::LeftWinger => self.auto_add_lw(player),
             PositionId::Centre => self.auto_add_c(player),
             PositionId::RightWinger => self.auto_add_rw(player),
@@ -73,14 +74,20 @@ impl LineUp {   // Testing functions.
         }
     }
 
-    // Add a defender to the lineup.
-    fn auto_add_d(&mut self, player: Player) {
+    // Add a left defender to the lineup.
+    fn auto_add_ld(&mut self, player: Player) {
         for pair in self.defence_pairs.iter_mut() {
             if pair.ld_id == 0 {
                 pair.ld_id = player.id;
                 return;
             }
-            else if pair.rd_id == 0 {
+        }
+    }
+
+    // Add a left defender to the lineup.
+    fn auto_add_rd(&mut self, player: Player) {
+        for pair in self.defence_pairs.iter_mut() {
+            if pair.rd_id == 0 {
                 pair.rd_id = player.id;
                 return;
             }

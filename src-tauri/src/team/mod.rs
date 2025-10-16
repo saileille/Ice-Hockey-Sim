@@ -1,34 +1,37 @@
 pub mod lineup;
+mod ai;
 
 use std::collections::HashSet;
 use rand::{
     distr::Uniform,
     Rng
 };
+use time::Date;
 use crate::{
-    types::{
-        CountryId,
-        TeamId,
-        PlayerId
-    },
-    database::TEAMS,
-    country::Country,
-    person::player::{
-        Player,
-        position::PositionId
+    country::Country, database::{TEAMS, TODAY}, person::{manager::Manager, player::{
+        position::PositionId, Player
+    }, Contract}, team::ai::PlayerNeed, time::date_to_db_string, types::{
+        CompetitionId, ManagerId, PlayerId, TeamId
     }
 };
 use self::lineup::LineUp;
 
 #[derive(Default, Clone)]
 pub struct Team {
-    pub id: TeamId,  // id: 0 is reserved
+    pub id: TeamId,
     pub name: String,
     pub roster: Vec<PlayerId>,
+    manager: Option<ManagerId>,
     pub lineup: LineUp,
+    pub primary_comp_id: CompetitionId,
+
+    // Player-acquisition related.
+    pub approached_players: Vec<PlayerId>,
+    pub player_needs: Vec<PlayerNeed>,
 }
 
-impl Team { // Basics.
+// Basics.
+impl Team {
     // Create a new ID.
     fn create_id(&mut self, id: usize) {
         self.id = match id.try_into() {
@@ -78,15 +81,14 @@ impl Team { // Basics.
         !self.roster.contains(&0)
     }
 
-    // Get every player in the roster as a clone.
+    // Get every player in the roster.
     fn get_players(&self) -> Vec<Player> {
-        let mut players = Vec::new();
+        self.roster.iter().map(|id| Player::fetch_from_db(id).unwrap()).collect()
+    }
 
-        for id in self.roster.iter() {
-            players.push(Player::fetch_from_db(id).unwrap());
-        }
-
-        return players;
+    // Get the players to whom the team has offered contracts.
+    fn get_approached_players(&self) -> Vec<Player> {
+        self.approached_players.iter().map(|id| Player::fetch_from_db(id).unwrap()).collect()
     }
 }
 
@@ -121,9 +123,15 @@ impl Team {
             self.roster.push(player.id);
         }
 
-        // Defenders...
-        for _ in 0..8 {
-            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::Defender);
+        // Left Defenders...
+        for _ in 0..4 {
+            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::LeftDefender);
+            self.roster.push(player.id);
+        }
+
+        // Right Defenders...
+        for _ in 0..4 {
+            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::RightDefender);
             self.roster.push(player.id);
         }
 
@@ -147,7 +155,7 @@ impl Team {
     }
 
     // Delete the team's players.
-    pub fn delete_players(&mut self) {
+    fn delete_players(&mut self) {
         for id in self.roster.iter() {
             Player::fetch_from_db(id).unwrap().delete_from_db();
         }
@@ -155,9 +163,19 @@ impl Team {
         self.roster.clear();
     }
 
-    // Setup a team before a season.
+    // Create a manager out of thin air.
+    fn create_manager(&mut self) {
+        let country_id = Country::fetch_from_db_with_name("Finland").id;
+        let mut manager = Manager::build_and_save(country_id);
+        self.manager = Some(manager.id);
+        manager.person.contract = Some(Contract::build(&date_to_db_string(&TODAY.lock().unwrap()), &date_to_db_string(&Date::MAX), self.id));
+        manager.save();
+    }
+
+    // Set up the team when initialising a game.
     pub fn setup(&mut self, min_ability: u8, max_ability: u8) {
-        self.generate_roster(min_ability, max_ability);
+        self.create_manager();
+        // self.generate_roster(min_ability, max_ability);
         self.save();
     }
 }

@@ -1,28 +1,26 @@
 // Time-related operations.
-use std::time::Duration;
+use std::fmt::Debug;
+
 use time::{
-    format_description::{BorrowedFormatItem, parse},
-    macros::format_description,
-    Date
+    format_description::BorrowedFormatItem, macros::format_description, Date
 };
 use crate::database::TODAY;
 
 // Use this format for formatting and parsing dates.
 static DB_DATE_FORMAT: &[BorrowedFormatItem<'_>] = format_description!("[year]-[month]-[day]");
-static SECONDS_IN_DAY: u64 = 86400;
 
 // A struct that represents an annual time period with fixed start and end dates. Both start and end are given as [month, day].
 #[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct AnnualWindow {
-    start: [u8; 2],
-    end: [u8; 2],
+    start: AnnualDate,
+    pub end: AnnualDate,
 }
 
 impl AnnualWindow {
     // Build the object.
-    pub fn build(start_month: u8, start_day: u8, end_month: u8, end_day: u8) -> Self {
-        AnnualWindow { start: [start_month, start_day], end: [end_month, end_day] }
+    pub fn build(start: AnnualDate, end: AnnualDate) -> Self {
+        AnnualWindow { start: start, end: end }
     }
 }
 
@@ -36,36 +34,36 @@ impl AnnualWindow {
     fn is_first_day(&self) -> bool {
         let today = TODAY.lock().unwrap();
 
-        self.start[1] == today.day() &&
-        self.start[0] == today.month() as u8
+        self.start.day == today.day() &&
+        self.start.month == today.month() as u8
     }
 
     // Check if the current date is the last day of the window.
     fn is_last_day(&self) -> bool {
         let today = TODAY.lock().unwrap();
 
-        self.end[1] == today.day() &&
-        self.end[0] == today.month() as u8
+        self.end.day == today.day() &&
+        self.end.month == today.month() as u8
     }
 
     // Get the previous earliest match date as a date object.
     fn get_previous_start_date(&self) -> Date {
-        Self::get_previous_annual_date(&self.start)
+        self.start.get_previous_annual_date()
     }
 
     // Get the previous latest match date as a date object.
     fn get_previous_end_date(&self) -> Date {
-        Self::get_previous_annual_date(&self.end)
+        self.end.get_previous_annual_date()
     }
 
     // Get the next earliest match date as a date object.
     pub fn get_next_start_date(&self) -> Date {
-        Self::get_next_annual_date(&self.start)
+        self.start.get_next_annual_date()
     }
 
     // Get the next latest match date as a date object.
     pub fn get_next_end_date(&self) -> Date {
-        Self::get_next_annual_date(&self.end)
+        self.end.get_next_annual_date()
     }
 
     // Get the start and end dates for this season if ongoing, or the next if over.
@@ -81,79 +79,87 @@ impl AnnualWindow {
 
     // Get start and end date from a given start year.
     pub fn get_dates_from_start_year(&self, year: i32) -> (Date, Date) {
-        let start_date = match Date::parse(&format!("{}-{:0>2}-{:0>2}", year, self.start[0], self.start[1]), &DB_DATE_FORMAT) {
-            Ok(d) => d,
-            Err(e) => panic!("{e} - year: {year}")
-        };
+        let start_date = self.start.get_date(year);
+        let mut end_date = self.end.get_date(year);
 
-        let end_date = match Date::parse(&format!("{}-{:0>2}-{:0>2}", year, self.end[0], self.end[1]), &DB_DATE_FORMAT) {
-            Ok(d) => {
-                if d < start_date {
-                    d.replace_year(year + 1).unwrap()
-                }
-                else {
-                    d
-                }
-            },
-            Err(e) => panic!("{e} - year: {year}")
-        };
+        if end_date < start_date {
+            end_date = end_date.replace_year(end_date.year() + 1).unwrap();
+        }
 
         return (start_date, end_date)
     }
 
     // Get start and end date from a given end year.
     fn get_dates_from_end_year(&self, year: i32) -> (Date, Date) {
-        let end_date = match Date::parse(&format!("{}-{:0>2}-{:0>2}", year, self.end[0], self.end[1]), &DB_DATE_FORMAT) {
-            Ok(d) => d,
-            Err(e) => panic!("{e} - year: {year}")
-        };
+        let mut start_date = self.start.get_date(year);
+        let end_date = self.end.get_date(year);
 
-        let start_date = match Date::parse(&format!("{}-{:0>2}-{:0>2}", year, self.start[0], self.start[1]), &DB_DATE_FORMAT) {
-            Ok(d) => {
-                if d > end_date {
-                    d.replace_year(year - 1).unwrap()
-                }
-                else {
-                    d
-                }
-            },
-            Err(e) => panic!("{e} - year: {year}")
-        };
+        if start_date > end_date {
+            start_date = start_date.replace_year(start_date.year() - 1).unwrap();
+        }
 
         return (start_date, end_date)
     }
 }
 
-// Statics.
-impl AnnualWindow {
-    // Get a Date object for the next time specific day and month will occur.
-    fn get_next_annual_date(date: &[u8; 2]) -> Date {
-        let today = TODAY.lock().unwrap();
+// Functions for getting dates out of annual date.
+#[derive(Debug, serde::Serialize)]
+#[derive(Default, Clone)]
+pub struct AnnualDate {
+    month: u8,
+    day: u8,
+}
 
-        match Date::parse(&format!("{}-{:0>2}-{:0>2}", today.year(), date[0], date[1]), &DB_DATE_FORMAT) {
-            Ok(d) => {
-                if d < *today {
-                    return d.replace_year(d.year() + 1).unwrap();
-                }
-                d
-            },
-            Err(e) => panic!("{e} - date: {date:?}")
+impl AnnualDate {
+    pub fn build<M: TryInto<u8>>(month: M, day: u8) -> Self
+        where <M as TryInto<u8>>::Error: Debug {
+        Self {
+            month: month.try_into().unwrap(),
+            day: day,
         }
     }
 
-    // Get a Date object for the previous time specific day and month occurred.
-    fn get_previous_annual_date(date: &[u8; 2]) -> Date {
-        let today = TODAY.lock().unwrap();
-
-        match Date::parse(&format!("{}-{:0>2}-{:0>2}", today.year(), date[0], date[1]), &DB_DATE_FORMAT) {
-            Ok(d) => {
-                if d > *today {
-                    return d.replace_year(d.year() - 1).unwrap();
-                }
-                d
-            },
-            Err(e) => panic!("{e} - date: {date:?}")
+    // Get a Date object.
+    fn get_date(&self, year: i32) -> Date {
+        match Date::parse(&format!("{}-{:0>2}-{:0>2}", year, self.month, self.day), &DB_DATE_FORMAT) {
+            Ok(d) => d,
+            Err(e) => panic!("{e} - year: {year}")
         }
+    }
+
+    // Get a Date object for the next time specific day and month will occur.
+    fn get_next_annual_date(&self) -> Date {
+        let today = TODAY.lock().unwrap();
+        let date = self.get_date(today.year());
+
+        if date < *today { return date.replace_year(date.year() + 1).unwrap()}
+        return date;
+    }
+
+    // Get a Date object for the previous time specific day and month occurred.
+    fn get_previous_annual_date(&self) -> Date {
+        let today = TODAY.lock().unwrap();
+        let date = self.get_date(today.year());
+
+        if date > *today {
+            return date.replace_year(date.year() - 1).unwrap();
+        }
+
+        return date;
+    }
+
+    // Get a date this many years into the future or the past.
+    // 0 returns the next year it happens.
+    pub fn get_next_date_with_year_offset(&self, years: i32) -> Date {
+        let date = self.get_next_annual_date();
+        return self.get_date(date.year() + years);
+    }
+
+    // Get a date this many years into the future or the past.
+    // 0 returns the next year it happens.
+    pub fn get_previous_date_with_year_offset(&self, years: i32) -> Date {
+        let date = self.get_previous_annual_date();
+        return self.get_date(date.year() + years);
     }
 }
 
@@ -167,11 +173,6 @@ pub fn get_dates(start: &Date, end: &Date) -> Vec<Date> {
     }
 
     return dates;
-}
-
-// Get std::time::Duration from desired days.
-pub fn get_duration_from_days(days: u64) -> Duration {
-    Duration::new(days * SECONDS_IN_DAY, 0)
 }
 
 // Convert a Date object to database string.

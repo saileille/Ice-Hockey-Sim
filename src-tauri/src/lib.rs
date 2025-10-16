@@ -9,13 +9,9 @@ mod io;
 mod person;
 mod team;
 mod time;
-mod terminal_tests;
+mod tests;
 
 use tauri::Manager;
-
-use crate::database::TODAY;
-use crate::time::db_string_to_date;
-use crate::commands::go_to_next_day;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,15 +19,7 @@ pub fn run() {
 
     // Test stuffs...
     #[cfg(dev)] {
-        /* let simulate_to = "2026-05-01";    // Simulate to this date.
-        loop {
-            let today = TODAY.lock().unwrap().clone();
-            if today > db_string_to_date(simulate_to) {
-                break;
-            }
-
-            go_to_next_day();
-        } */
+        // tests::simulate_to_day("2026-05-01");
     }
 
     tauri::Builder::default()
@@ -44,8 +32,8 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            commands::go_to_next_day,
-            commands::get_date_string,
+            commands::continue_game::go_to_next_day,
+            commands::continue_game::get_date_string,
             commands::get_all_full_competitions,
             commands::get_child_competitions,
             commands::get_comp_screen_info,

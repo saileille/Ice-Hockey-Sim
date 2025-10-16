@@ -1,10 +1,13 @@
 pub mod player;
+pub mod manager;
+
+use time::Duration;
 
 use crate::{
-    types::CountryId,
-    country::Country
+    country::Country, database::TODAY, team::Team, time::db_string_to_date, types::{convert, CountryId, TeamId}
 };
 
+#[derive(Debug)]
 #[derive(Default, Clone, PartialEq)]
 enum Gender {
     #[default] Null,
@@ -12,12 +15,15 @@ enum Gender {
     Female,
 }
 
+#[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct Person {
     forename: String,
     surname: String,
     gender: Gender,
     country_id: CountryId,
+    pub contract: Option<Contract>,
+    pub contract_offers: Vec<Contract>,
 }
 
 // Basics.
@@ -44,15 +50,97 @@ impl Person {
     fn get_country(&self) -> Country {
         Country::fetch_from_db(&self.country_id)
     }
-}
 
-// Functional.
-impl Person {
     pub fn get_full_name(&self) -> String {
         format!("{} {}", self.forename, self.surname)
     }
 
     fn get_initial_and_surname(&self) -> String {
         format!("{}. {}", self.forename.chars().nth(0).unwrap(), self.surname)
+    }
+}
+
+// Functional.
+impl Person {
+    // Delete the person's contract if it has ended.
+    // Return whether the contract ended or not.
+    pub fn check_if_contract_expired(&mut self) -> bool {
+        if self.contract.is_none() { return false; }
+        return self.contract.as_ref().unwrap().check_if_expired();
+    }
+
+    // Determine if the person is going to sign a contract now.
+    // Very simple still.
+    pub fn decide_to_sign(&self) -> bool {
+        if self.contract_offers.is_empty() { return false; }
+        let days_since_earliest_offer = self.contract_offers[0].get_days_expired();
+
+        // Random chance for the person to sign, grows more likely the more time passes.
+        // Guaranteed to sign after 10 days.
+        return rand::random_range(1..10) < days_since_earliest_offer;
+    }
+}
+
+// Contract a person has with a club.
+#[derive(Debug)]
+#[derive(Clone)]
+pub struct Contract {
+    start_date: String,
+    end_date: String,
+    pub team_id: TeamId
+}
+
+impl Contract {
+    // Create a contract.
+    pub fn build(start_date: &str, end_date: &str, team_id: TeamId) -> Self {
+        Self {
+            start_date: start_date.to_string(),
+            end_date: end_date.to_string(),
+            team_id: team_id,
+        }
+    }
+
+    // How many days there are left of the contract.
+    fn get_days_left(&self) -> i64 {
+        self.get_duration_left().whole_days()
+    }
+
+    // How many days have expired from the contract.
+    fn get_days_expired(&self) -> i64 {
+        return self.get_duration_expired().whole_days()
+    }
+
+    // How many seasons there are left of the contract.
+    // Note that 1 means less than a year left of the contract!
+    fn get_seasons_left(&self) -> i8 {
+        let today = TODAY.lock().unwrap().clone();
+        let end_date = db_string_to_date(&self.end_date);
+        let years = convert::i32_to_i8(1 + end_date.year() - today.year());
+
+        match end_date.month() as i8 - today.month() as i8 {
+            1..=i8::MAX => years,
+            0 => match end_date.day() as i8 - today.day() as i8 {
+                1..=i8::MAX => years,
+                _ => years - 1
+            },
+            _ => years - 1
+        }
+    }
+
+    // Get how much is left of the contract.
+    fn get_duration_left(&self) -> Duration {
+        let today = TODAY.lock().unwrap().clone();
+        return db_string_to_date(&self.end_date) - today;
+    }
+
+    // Get how much has expired of the contract.
+    fn get_duration_expired(&self) -> Duration {
+        let today = TODAY.lock().unwrap().clone();
+        return today - db_string_to_date(&self.start_date);
+    }
+
+    // Check if the contract has expired.
+    pub fn check_if_expired(&self) -> bool {
+        return self.get_days_left() <= 0
     }
 }

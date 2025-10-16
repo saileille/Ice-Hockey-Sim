@@ -1,11 +1,9 @@
 // Knockout season parametres.
 
-use std::ops::Range;
-
 use rand::{rng, rngs::ThreadRng, Rng};
 use serde_json::json;
 
-use crate::{competition::{season::{schedule_generator::{assign_dates, generate_matchdays}, team::TeamCompData, Season}, Competition}, database::TODAY, match_event::Game, time::{date_to_db_string, db_string_to_date}, types::{CompetitionId, TeamId}};
+use crate::{competition::{season::{schedule_generator::assign_dates, team::TeamCompData}, Competition}, match_event::Game, time::db_string_to_date, types::TeamId};
 
 #[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
@@ -31,14 +29,14 @@ impl KnockoutRound {
 
     // Set up a knockout round.
     // Return the games.
-    pub fn setup(&mut self, teams: &Vec<TeamCompData>, start: &str, end: &str, comp: &Competition) -> Vec<Game> {
+    pub fn setup(&mut self, teams: &[TeamCompData], start: &str, end: &str, comp: &Competition) -> Vec<Game> {
         self.draw_teams(teams);
         let matchdays = self.generate_matchdays(comp);
-        return assign_dates(&matchdays, &db_string_to_date(start), &db_string_to_date(end), comp.id, false);
+        return assign_dates(matchdays, &db_string_to_date(start), &db_string_to_date(end), comp, false);
     }
 
     // Draw the pairs for the round.
-    fn draw_teams(&mut self, teams: &Vec<TeamCompData>) {
+    fn draw_teams(&mut self, teams: &[TeamCompData]) {
         let mut pots = self.create_pots_and_pairs(teams);
 
         let mut rng = rng();
@@ -77,8 +75,8 @@ impl KnockoutRound {
     }
 
     // Create pots from which to draw teams. Top seeds are first, bottom seeds are last.
-    fn create_pots_and_pairs(&mut self, teams: &Vec<TeamCompData>) -> Vec<(u8, Vec<TeamId>)> {
-        for _ in (Range {start: 0, end: teams.len() / 2}) {
+    fn create_pots_and_pairs(&mut self, teams: &[TeamCompData]) -> Vec<(u8, Vec<TeamId>)> {
+        for _ in 0..teams.len() / 2 {
             self.pairs.push(KnockoutPair::default());
         }
 
@@ -99,11 +97,11 @@ impl KnockoutRound {
 
     // Draw a team from the pot, and remove it from the pot.
     fn draw_team(pot: &mut Vec<TeamId>, rng: &mut ThreadRng) -> TeamId {
-        pot.swap_remove(rng.random_range(Range {start: 0, end: pot.len()}))
+        pot.swap_remove(rng.random_range(0..pot.len()))
     }
 
     // Update the teamdata for the knockout pairs.
-    pub fn update_teamdata(&mut self, games: &Vec<Game>) {
+    pub fn update_teamdata(&mut self, games: &[Game]) {
         for pair in self.pairs.iter_mut() {
             if !pair.is_over {
                 pair.update_teamdata(games);
@@ -117,7 +115,7 @@ impl KnockoutRound {
         for pair in self.pairs.iter_mut() {
             if pair.is_over { continue; }
 
-            let is_pair_over = pair.get_winner_loser(comp.format.as_ref().unwrap().knockout.as_ref().unwrap().wins_required);
+            let is_pair_over = pair.get_winner_loser(comp.format.as_ref().unwrap().knockout_round.as_ref().unwrap().wins_required);
             if is_pair_over.is_none() {
                 is_over = false;
                 continue;
@@ -192,7 +190,7 @@ impl KnockoutPair {
     }
 
     // Update the teamdata for the pair.
-    fn update_teamdata(&mut self, games: &Vec<Game>) {
+    fn update_teamdata(&mut self, games: &[Game]) {
         for game in games.iter() {
             if self.home.team_id == game.home.team_id {
                 self.home.update(&game.home, &game.away, game.has_overtime());

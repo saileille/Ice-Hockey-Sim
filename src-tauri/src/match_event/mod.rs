@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use serde_json::json;
 
 use crate::{
-    competition::Competition, event as logic_event, team::Team, types::{
+    competition::{season::team::TeamCompData, Competition}, event as logic_event, types::{
         convert, CompetitionId, TeamId
     }
 };
@@ -29,7 +29,7 @@ pub struct Game {
 
 // Basics.
 impl Game {
-    pub fn build(home: TeamId, away: TeamId, comp_id: CompetitionId, date: &str) -> Self {
+    pub fn build(home: &TeamCompData, away: &TeamCompData, comp_id: CompetitionId, date: &str) -> Self {
         let mut game = Game::default();
         game.home = TeamGameData::build(home);
         game.away = TeamGameData::build(away);
@@ -58,11 +58,17 @@ impl Game {
     // Get nice data for a competition screen.
     pub fn get_comp_screen_json(&self) -> serde_json::Value {
         json!({
-            "home": self.home.get_team().name,
-            "away": self.away.get_team().name,
+            "home": {
+                "name": self.home.get_team().name,
+                "seed": self.home.team_seed,
+                "goals": self.home.get_goal_amount()
+            },
+            "away": {
+                "name": self.away.get_team().name,
+                "seed": self.away.team_seed,
+                "goals": self.away.get_goal_amount()
+            },
             "date": self.date,
-            "home_goals": self.home.get_goal_amount(),
-            "away_goals": self.away.get_goal_amount(),
             "had_overtime": self.has_overtime(),
             "is_over": self.clock != Clock::default()
         })

@@ -7,11 +7,11 @@ export const initialiseAll = () => {
     document.body.innerHTML = `
         <div id="date"></div>
         <button id="continue">Continue</button>
-        <select id="comps"></select>
+
     `;
 
     displayDate();
-    populateCompSelect(0);
+    createCompSelect(0);
 
     createEventListener("#comps", "change", goToParentCompetition);
     createEventListener("#continue", "click", toNextDay);
@@ -23,16 +23,17 @@ const displayDate = async () => {
     dateDiv.textContent = dateString;
 };
 
-// Give items to the competition selection dropdown.
-export const populateCompSelect = async (id: number) => {
+// Create competition selection dropdown and give items to it.
+export const createCompSelect = async (id: number) => {
     let query: string;
-    // Normal situation.
-    if (id === 0) { query = "#comps"; }
+    if (id === 0) { query = "comps"; }
+    else { query = "child-comps"; }
 
-    // In case we need child competitions.
-    else { query = "#child-comps"; }
+    document.body.insertAdjacentHTML("beforeend", `
+        <select id="${query}"></select>
+    `);
 
-    const select: HTMLSelectElement = document.querySelector(query) as HTMLSelectElement;
+    const select: HTMLSelectElement = document.querySelector(`#${query}`) as HTMLSelectElement;
 
     let compData: Array<Array<string>>;
     if (id === 0) {

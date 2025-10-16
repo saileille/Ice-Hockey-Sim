@@ -1,6 +1,6 @@
 // Draw the competition screen of the competition given in the ID.
 import { invoke } from "@tauri-apps/api/core";
-import { initialiseAll, populateCompSelect, goToChildCompetition } from "../initialiseGeneric";
+import { initialiseAll, createCompSelect, goToChildCompetition } from "../initialiseGeneric";
 import { createEventListener, createElement } from "../main";
 
 // Draw any competition screen.
@@ -10,39 +10,59 @@ export const drawScreen = async (id: number) => {
 
     initialiseAll();
 
-    if (json.format === null) {
+    // If the competition is something like playoffs.
+    // The JSON looks a bit different in this case.
+    if (json.is_tournament_tree) {
+        drawScreenTournament(json, id);
+    }
+
+    else if (json.format === null) {
         drawScreenParent(json, id);
     }
     else if (json.format.type === "RoundRobin") {
         drawScreenRoundRobin(json, id);
     }
 
-    // Knockouts...
+    // Individual knockout rounds.
     else {
-        drawScreenKnockout(json, id);
+        drawScreenKnockoutRound(json, id);
     }
 };
 
-// Draw a competiton screen for parent competitions.
-const drawScreenParent = (json: any, id: number) => {
+// Draw a screen for tournament-type competitions.
+const drawScreenTournament = (json: any, id: number) => {
+    createCompSelect(id);
+    createEventListener("#child-comps", "change", goToChildCompetition);
+
     document.body.insertAdjacentHTML("beforeend", `
-        <select id="child-comps"></select>
+        <div id="tree"></div>
     `);
 
-    populateCompSelect(id);
+    const tree: HTMLDivElement = document.querySelector("#tree") as HTMLDivElement;
+    for (const [index, round] of json.season.rounds.entries()) {
+        const roundElement: HTMLDivElement = createElement("div", { "id": `round${index}` });
+        createKnockoutPairElements(round.pairs, roundElement);
+        tree.appendChild(roundElement);
+    }
+
+    drawSchedule(json, true);
+};
+
+// Draw a screen for parent competitions.
+const drawScreenParent = (json: any, id: number) => {
+    createCompSelect(id);
     drawRanking(json);
     createEventListener("#child-comps", "change", goToChildCompetition);
 }
 
-// Draw a competition screen for round robin competitions.
-const drawScreenRoundRobin = (json: any, _id: number) => {
+// Draw a screen for round robin competitions.
+const drawScreenRoundRobin = (json: any, id: number) => {
     drawRoundRobinStandings(json);
     drawSchedule(json, false);
 };
 
-// Draw a knockout screen.
-// Very much WIP.
-const drawScreenKnockout = (json: any, _id: number) => {
+// Draw a screen for a knockout round.
+const drawScreenKnockoutRound = (json: any, id: number) => {
     drawKnockoutPairs(json);
     drawSchedule(json, true);
 };
@@ -89,7 +109,7 @@ const drawRoundRobinStandings = (json: any) => {
 
 // Draw a competition schedule.
 // Only previous and next matches for now.
-const drawSchedule = (json: any, displayRank: boolean) => {
+const drawSchedule = (json: any, displaySeed: boolean) => {
     document.body.insertAdjacentHTML("beforeend", `
         <div id="previous-date"></div>
         <div id="previous"></div>
@@ -110,16 +130,19 @@ const drawSchedule = (json: any, displayRank: boolean) => {
             otString = " OT";
         }
 
-        previousGames.appendChild(createElement("div", {
-            "textContent": `${match.home} ${match.home_goals} - ${match.away_goals}${otString} ${match.away}`
-        }));
+        let matchString = `${match.home.name} ${match.home.goals} - ${match.away.goals}${otString} ${match.away.name}`;
+        if (displaySeed) {
+            matchString = `(${match.home.seed}.) ${matchString} (${match.away.seed}.)`;
+        }
+
+        previousGames.appendChild(createElement("div", { "textContent": matchString }));
     }
 
     if (previousMatchDay === "") {
         previousDate.textContent = "No previous games.";
     }
     else {
-        previousDate.textContent = `Games on ${previousMatchDay}`;
+        previousDate.textContent = `Previous games from ${previousMatchDay}`;
     }
 
     let nextMatchDay: string = "";
@@ -130,16 +153,19 @@ const drawSchedule = (json: any, displayRank: boolean) => {
         if (nextMatchDay === "") { nextMatchDay = match.date; }
         else if (nextMatchDay !== match.date) { break; }
 
-        nextGames.appendChild(createElement("div", {
-            "textContent": `${match.home} - ${match.away}`
-        }));
+        let matchString = `${match.home.name} - ${match.away.name}`;
+        if (displaySeed) {
+            matchString = `(${match.home.seed}.) ${matchString} (${match.away.seed}.)`;
+        }
+
+        nextGames.appendChild(createElement("div", { "textContent": matchString }));
     }
 
     if (nextMatchDay === "") {
         nextDate.textContent = "No upcoming games.";
     }
     else {
-        nextDate.textContent = `Games on ${nextMatchDay}`;
+        nextDate.textContent = `Next games on ${nextMatchDay}`;
     }
 };
 
@@ -166,11 +192,16 @@ const drawKnockoutPairs = (json: any) => {
     document.body.insertAdjacentHTML("beforeend", `
         <div id="pairs"></div>
     `);
-    let pairs: HTMLDivElement = document.querySelector("#pairs") as HTMLDivElement;
-    for (const pair of json.season.knockout.pairs) {
-        pairs.appendChild(createElement("div", {
+
+    const pairs: HTMLDivElement = document.querySelector("#pairs") as HTMLDivElement;
+    createKnockoutPairElements(json.season.knockout_round.pairs, pairs);
+};
+
+// Create elements of knockout pairs and append them to the given parent element.
+const createKnockoutPairElements = (json_pairs: any, parentElement: HTMLDivElement) => {
+    for (const pair of json_pairs) {
+        parentElement.appendChild(createElement("div", {
             "textContent": `(${pair.home.seed}.) ${pair.home.name} ${pair.home.wins} - ${pair.away.wins} ${pair.away.name} (${pair.away.seed}.)`
         }));
-
     }
 };

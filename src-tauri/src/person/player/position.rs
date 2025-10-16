@@ -6,7 +6,8 @@ pub enum PositionId {
     #[default]
     Null,
     Goalkeeper,
-    Defender,
+    LeftDefender,
+    RightDefender,
     LeftWinger,
     Centre,
     RightWinger,
@@ -15,13 +16,15 @@ pub enum PositionId {
 #[derive(Default, Clone)]
 pub struct Position {
     pub id: PositionId,
+    pub abbreviation: String,
     pub offensive_value: u8,
 }
 
 impl Position {
-    pub fn build(id: PositionId, offensive_value: u8) -> Self {
+    pub fn build(id: PositionId, abbreviation: &str, offensive_value: u8) -> Self {
         let mut position = Position::default();
         position.id = id;
+        position.abbreviation = abbreviation.to_string();
         position.offensive_value = offensive_value;
         return position;
     }
