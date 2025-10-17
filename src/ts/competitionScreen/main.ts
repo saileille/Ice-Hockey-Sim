@@ -1,6 +1,6 @@
 // Draw the competition screen of the competition given in the ID.
 import { invoke } from "@tauri-apps/api/core";
-import { initialiseAll, createCompSelect, goToChildCompetition } from "../initialiseGeneric";
+import { initialiseAll, createCompSelect, goToChildCompetition } from "../initialise_generic";
 import { createEventListener, createElement } from "../main";
 
 // Draw any competition screen.
