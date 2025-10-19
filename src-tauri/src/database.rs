@@ -98,8 +98,7 @@ pub fn initialise() {
         Player::build_and_save_random(&mut rng);
     }
 
-    // FOR TESTING ONLY.
-    // Give teams some players.
+    // Set up the teams.
     let mut teams = TEAMS.lock().unwrap().clone();
     for team in teams.values_mut() {
         team.setup(0, 0);

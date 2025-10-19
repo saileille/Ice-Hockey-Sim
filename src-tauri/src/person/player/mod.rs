@@ -136,14 +136,19 @@ impl Player {
         }).collect()
     }
 
-    // Get relevant infomration of the player for team screen.
+    // Get relevant information of the player for team screen.
     pub fn get_team_screen_json(&self) -> serde_json::Value {
+        let seasons_left = match self.person.contract.as_ref() {
+            Some(contract) => contract.get_seasons_left(),
+            _ => 0
+        };
+
         json!({
             "name": self.person.get_full_name(),
             "country": self.person.get_country().name,
             "position": self.get_position().abbreviation,
             "ability": self.ability,
-            "seasons_left": self.person.contract.as_ref().unwrap().get_seasons_left(),
+            "seasons_left": seasons_left,
         })
     }
 }

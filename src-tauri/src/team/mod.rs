@@ -95,12 +95,16 @@ impl Team {
     // Get info for a team screen in JSON.
     pub fn get_team_screen_json(&self) -> serde_json::Value {
         let mut players = self.get_players();
+        let mut approached_players = self.get_approached_players();
+        players.append(&mut approached_players);
+
         players.sort_by(|a, b| (a.position_id.clone() as u8).cmp(&(b.position_id.clone() as u8)).then(b.ability.cmp(&a.ability)));
 
         let json_players: Vec<serde_json::Value> = players.iter().map(|a| a.get_team_screen_json()).collect();
         json!({
+            "id": self.id,
             "name": self.name,
-            "players": json_players,
+            "players": json_players
         })
     }
 }
