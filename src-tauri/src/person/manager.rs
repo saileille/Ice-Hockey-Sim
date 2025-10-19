@@ -19,19 +19,25 @@ impl Manager {
     }
 
     // Build a manager.
-    fn build(country_id: CountryId) -> Self {
+    fn build(person: Person) -> Self {
         let mut manager = Self::default();
-        manager.person = Person::build(country_id, Gender::Male);
+        manager.person = person;
 
         return manager;
     }
 
     // Create a manager and store it in the database. Return a clone of the Manager.
-    pub fn build_and_save(country_id: CountryId) -> Self {
-        let mut player = Self::build(country_id);
+    fn build_and_save(person: Person) -> Self {
+        let mut player = Self::build(person);
         player.create_id(MANAGERS.lock().unwrap().len() + 1);
         player.save();
         return player;
+    }
+
+    // Build a random manager.
+    pub fn build_and_save_random() -> Self {
+        let person = Person::build_random();
+        return Self::build_and_save(person);
     }
 
     // Get a manager from the database.

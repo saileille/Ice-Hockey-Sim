@@ -1,6 +1,6 @@
 // Team screen stuffs.
 import { invoke } from "@tauri-apps/api/core";
-import { initialiseBase } from "../initialise_base";
+import { initialiseContentScreen, initialiseTopBar } from "./basics";
 import { createElement, createEventListener, Listener } from "../helpers";
 
 // Draw the screen of a given team.
@@ -8,19 +8,21 @@ export const drawScreen: Listener = async (e: Event) => {
     const target: HTMLSpanElement = e.target as HTMLSpanElement;
     const id = Number(target.id.replace("team", ""));
 
-    const json_s: string = await invoke("get_team_screen_info", { id: id });
-    const json = JSON.parse(json_s);
+    const jsonString: string = await invoke("get_team_screen_info", { id: id });
+    const json = JSON.parse(jsonString);
 
-    initialiseBase();
-    document.body.insertAdjacentHTML("beforeend", `
+    initialiseTopBar();
+    const screen = initialiseContentScreen();
+
+    screen.insertAdjacentHTML("beforeend", `
         <div>${json.name}</div>
     `);
-    drawRoster(json.players);
+    drawRoster(screen, json.players);
 };
 
 // Draw the roster of a team.
-const drawRoster = (players: any) => {
-    document.body.insertAdjacentHTML("beforeend", `
+const drawRoster = (screen: HTMLDivElement, players: any) => {
+    screen.insertAdjacentHTML("beforeend", `
         <select id="player-filters"></select>
         <table id="players"><tr>
             <th>Name</th>

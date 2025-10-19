@@ -15,7 +15,9 @@
     "windows": [
       {
         "label": "main",
-        "title": "ice-hockey-sim"
+        "title": "ice-hockey-sim",
+        "width": 1024,
+        "height": 768
       }
     ],
     "security": {

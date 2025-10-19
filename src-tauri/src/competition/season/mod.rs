@@ -8,7 +8,7 @@ mod schedule_generator;
 use serde_json::json;
 use time::Date;
 
-use crate::{competition::{season::{knockout_round::KnockoutRound as KnockoutRoundSeason, round_robin::RoundRobin as RoundRobinSeason, team::TeamCompData}, Competition}, database::SEASONS, match_event::Game, time::{date_to_db_string, db_string_to_date}, types::{convert, CompetitionId, TeamId}};
+use crate::{competition::{season::{knockout_round::KnockoutRound as KnockoutRoundSeason, round_robin::RoundRobin as RoundRobinSeason, team::TeamCompData}, Competition}, database::SEASONS, match_event::Game, team::Team, time::{date_to_db_string, db_string_to_date}, types::{convert, CompetitionId, TeamId}};
 
 #[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
@@ -123,6 +123,11 @@ impl Season {
             "upcoming_games": upcoming_games,
             "played_games": played_games
         })
+    }
+
+    // Get all teams participating in the season.
+    pub fn get_teams(&self) -> Vec<Team> {
+        self.teams.iter().map(|a | Team::fetch_from_db(&a.team_id)).collect()
     }
 
     // Check if the season has enough teams to begin.

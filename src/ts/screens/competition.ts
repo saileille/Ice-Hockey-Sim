@@ -1,41 +1,42 @@
 // Draw the competition screen of the competition given in the ID.
 import { invoke } from "@tauri-apps/api/core";
-import { initialiseBase, createCompSelect, goToChildCompetition } from "../initialise_base";
+import { initialiseTopBar, createCompSelect, goToChildCompetition, initialiseContentScreen } from "./basics";
 import { createEventListener, createElement } from "../helpers";
 import { createTeamField, drawScreen as drawTeamScreen } from "./team";
 
 // Draw any competition screen.
 export const drawScreen = async (id: number) => {
-    const json_s: string = await invoke("get_comp_screen_info", { id: id });
-    const json = JSON.parse(json_s);
+    const jsonString: string = await invoke("get_comp_screen_info", { id: id });
+    const json = JSON.parse(jsonString);
 
-    initialiseBase();
+    initialiseTopBar();
+    const screen = initialiseContentScreen();
 
     // If the competition is something like playoffs.
     // The JSON looks a bit different in this case.
     if (json.is_tournament_tree) {
-        drawScreenTournament(json, id);
+        drawScreenTournament(screen, json, id);
     }
 
     else if (json.format === null) {
-        drawScreenParent(json, id);
+        drawScreenParent(screen, json, id);
     }
     else if (json.format.type === "RoundRobin") {
-        drawScreenRoundRobin(json, id);
+        drawScreenRoundRobin(screen, json);
     }
 
     // Individual knockout rounds.
     else {
-        drawScreenKnockoutRound(json, id);
+        drawScreenKnockoutRound(screen, json);
     }
 };
 
 // Draw a screen for tournament-type competitions.
-const drawScreenTournament = (json: any, id: number) => {
-    createCompSelect(id);
+const drawScreenTournament = (screen: HTMLDivElement, json: any, id: number) => {
+    createCompSelect(screen, id);
     createEventListener("#child-comps", "change", goToChildCompetition);
 
-    document.body.insertAdjacentHTML("beforeend", `
+    screen.insertAdjacentHTML("beforeend", `
         <div id="tree"></div>
     `);
 
@@ -46,31 +47,37 @@ const drawScreenTournament = (json: any, id: number) => {
         tree.appendChild(roundElement);
     }
 
-    drawSchedule(json, true);
+    drawSchedule(screen, json, true);
 };
 
 // Draw a screen for parent competitions.
-const drawScreenParent = (json: any, id: number) => {
-    createCompSelect(id);
-    drawRanking(json);
+const drawScreenParent = (screen: HTMLDivElement, json: any, id: number) => {
+    createCompSelect(screen, id);
+    drawRanking(screen, json);
     createEventListener("#child-comps", "change", goToChildCompetition);
 }
 
 // Draw a screen for round robin competitions.
-const drawScreenRoundRobin = (json: any, id: number) => {
-    drawRoundRobinStandings(json);
-    drawSchedule(json, false);
+const drawScreenRoundRobin = (screen: HTMLDivElement, json: any) => {
+    createCompSelect(screen, json.parent_comp_id);
+    createEventListener("#child-comps", "change", goToChildCompetition);
+
+    drawRoundRobinStandings(screen, json);
+    drawSchedule(screen, json, false);
 };
 
 // Draw a screen for a knockout round.
-const drawScreenKnockoutRound = (json: any, id: number) => {
-    drawKnockoutPairs(json);
-    drawSchedule(json, true);
+const drawScreenKnockoutRound = (screen: HTMLDivElement, json: any) => {
+    createCompSelect(screen, json.parent_comp_id);
+    createEventListener("#child-comps", "change", goToChildCompetition);
+
+    drawKnockoutPairs(screen, json);
+    drawSchedule(screen, json, true);
 };
 
 // Draw the standings for round robin.
-const drawRoundRobinStandings = (json: any) => {
-    document.body.insertAdjacentHTML("beforeend", `
+const drawRoundRobinStandings = (screen: HTMLDivElement, json: any) => {
+    screen.insertAdjacentHTML("beforeend", `
         <table id="standings"><tr>
             <th>Rank</th>
             <th>Name</th>
@@ -115,8 +122,8 @@ const drawRoundRobinStandings = (json: any) => {
 
 // Draw a competition schedule.
 // Only previous and next matches for now.
-const drawSchedule = (json: any, displaySeed: boolean) => {
-    document.body.insertAdjacentHTML("beforeend", `
+const drawSchedule = (screen: HTMLDivElement, json: any, displaySeed: boolean) => {
+    screen.insertAdjacentHTML("beforeend", `
         <div id="previous-date"></div>
         <div id="previous"></div>
         <div id="next-date"></div>
@@ -180,8 +187,8 @@ const drawSchedule = (json: any, displaySeed: boolean) => {
 };
 
 // Draw rankings for a competition.
-const drawRanking = (json: any) => {
-    document.body.insertAdjacentHTML("beforeend", `
+const drawRanking = (screen: HTMLDivElement, json: any) => {
+    screen.insertAdjacentHTML("beforeend", `
         <table id="ranking"><tr>
             <th>Rank</th>
             <th>Team</th>
@@ -204,8 +211,8 @@ const drawRanking = (json: any) => {
 };
 
 // Draw pairs of the knockout round.
-const drawKnockoutPairs = (json: any) => {
-    document.body.insertAdjacentHTML("beforeend", `
+const drawKnockoutPairs = (screen: HTMLDivElement, json: any) => {
+    screen.insertAdjacentHTML("beforeend", `
         <div id="pairs"></div>
     `);
 

@@ -158,6 +158,16 @@ impl Competition {
             self.format.as_ref().unwrap().round_robin.clone()
         }
     }
+
+    // Get the current season of the competition.
+    fn get_current_season(&self) -> Season {
+        Season::fetch_from_db(&self.id, self.get_seasons_amount() - 1)
+    }
+
+    // Get the teams in the competition's current season.
+    pub fn get_teams(&self) -> Vec<Team> {
+        self.get_current_season().get_teams()
+    }
 }
 
 // Functional.
@@ -207,6 +217,7 @@ impl Competition {
             },
             "season": season.get_comp_screen_json(self),
             "child_comp_ids": self.child_comp_ids,
+            "parent_comp_id": self.parent_comp_id,
             "is_tournament_tree": self.is_tournament_tree
         })
     }

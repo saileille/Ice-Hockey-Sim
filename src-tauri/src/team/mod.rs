@@ -11,7 +11,7 @@ use time::Date;
 use crate::{
     country::Country, database::{TEAMS, TODAY}, person::{manager::Manager, player::{
         position::PositionId, Player
-    }, Contract}, team::ai::PlayerNeed, time::date_to_db_string, types::{
+    }, Contract, Person}, team::ai::PlayerNeed, time::date_to_db_string, types::{
         CompetitionId, ManagerId, PlayerId, TeamId
     }
 };
@@ -22,7 +22,7 @@ pub struct Team {
     pub id: TeamId,
     pub name: String,
     pub roster: Vec<PlayerId>,
-    manager: Option<ManagerId>,
+    pub manager_id: ManagerId,
     pub lineup: LineUp,
     pub primary_comp_id: CompetitionId,
 
@@ -82,6 +82,11 @@ impl Team {
         !self.roster.contains(&0)
     }
 
+    // Get the team's manager.
+    pub fn get_manager(&self) -> Option<Manager> {
+        Manager::fetch_from_db(&self.manager_id)
+    }
+
     // Get every player in the roster.
     fn get_players(&self) -> Vec<Player> {
         self.roster.iter().map(|id| Player::fetch_from_db(id).unwrap()).collect()
@@ -131,41 +136,39 @@ impl Team {
             .expect(&format!("error: low: {min_ability}, high: {max_ability}"));
 
         let mut rng = rand::rng();
-        let country_id = Country::fetch_from_db_with_name("Finland").id;
-
         // Goalkeepers...
         for _ in 0..2 {
-            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::Goalkeeper);
+            let player = Player::build_and_save(Person::build_random(), rng.sample(range), PositionId::Goalkeeper);
             self.roster.push(player.id);
         }
 
         // Left Defenders...
         for _ in 0..4 {
-            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::LeftDefender);
+            let player = Player::build_and_save(Person::build_random(), rng.sample(range), PositionId::LeftDefender);
             self.roster.push(player.id);
         }
 
         // Right Defenders...
         for _ in 0..4 {
-            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::RightDefender);
+            let player = Player::build_and_save(Person::build_random(), rng.sample(range), PositionId::RightDefender);
             self.roster.push(player.id);
         }
 
         // Left Wingers...
         for _ in 0..4 {
-            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::LeftWinger);
+            let player = Player::build_and_save(Person::build_random(), rng.sample(range), PositionId::LeftWinger);
             self.roster.push(player.id);
         }
 
         // Centres...
         for _ in 0..4 {
-            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::Centre);
+            let player = Player::build_and_save(Person::build_random(), rng.sample(range), PositionId::Centre);
             self.roster.push(player.id);
         }
 
         // Right Wingers...
         for _ in 0..4 {
-            let player = Player::build_and_save(country_id, rng.sample(range), PositionId::RightWinger);
+            let player = Player::build_and_save(Person::build_random(), rng.sample(range), PositionId::RightWinger);
             self.roster.push(player.id);
         }
     }
@@ -181,9 +184,8 @@ impl Team {
 
     // Create a manager out of thin air.
     fn create_manager(&mut self) {
-        let country_id = Country::fetch_from_db_with_name("Finland").id;
-        let mut manager = Manager::build_and_save(country_id);
-        self.manager = Some(manager.id);
+        let mut manager = Manager::build_and_save_random();
+        self.manager_id = manager.id;
         manager.person.contract = Some(Contract::build(&date_to_db_string(&TODAY.lock().unwrap()), &date_to_db_string(&Date::MAX), self.id));
         manager.save();
     }

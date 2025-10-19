@@ -1,10 +1,11 @@
 pub mod player;
 pub mod manager;
 
+use rand;
 use time::Duration;
 
 use crate::{
-    country::Country, database::TODAY, team::Team, time::db_string_to_date, types::{convert, CountryId, TeamId}
+    country::Country, database::{COUNTRIES, TODAY}, team::Team, time::db_string_to_date, types::{convert, CountryId, TeamId}
 };
 
 #[derive(Debug)]
@@ -36,6 +37,38 @@ impl Person {
         person.gender = gender;
 
         return person;
+    }
+
+    // Make a random person (male).
+    pub fn build_random() -> Self {
+        // First determining the person's nationality with weighted random.
+        let countries = COUNTRIES.lock().unwrap().clone();
+        let mut country_weights = Vec::new();
+        let mut total_weight = 0;
+        for country in countries.values() {
+            let weight = match country.name == "Finland" {
+                // Making Finns more likely to appear in what tries to emulate some kind of a Finnish league.
+                true => country.forenames.total_weight * 20,
+                _ => country.forenames.total_weight,
+            };
+
+            total_weight += weight;
+            country_weights.push((country.id, weight));
+        }
+
+        let random = rand::random_range(0..total_weight);
+        let mut counter = 0;
+        let mut country_id = 0;
+        for (id, weight) in country_weights {
+            counter += weight;
+
+            if random < counter {
+                country_id = id;
+                break;
+            }
+        }
+
+        return Self::build(country_id, Gender::Male);
     }
 
     // Check if the person in question does not have default traits.

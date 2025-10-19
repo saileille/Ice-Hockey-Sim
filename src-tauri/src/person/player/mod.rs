@@ -30,9 +30,9 @@ impl Player {
         };
     }
 
-    fn build(country_id: CountryId, ability: u8, position_id: PositionId) -> Self {
+    fn build(person: Person, ability: u8, position_id: PositionId) -> Self {
         let mut player = Self::default();
-        player.person = Person::build(country_id, Gender::Male);
+        player.person = person;
         player.ability = ability;
         player.position_id = position_id;
 
@@ -40,8 +40,8 @@ impl Player {
     }
 
     // Create a player and store it in the database. Return a clone of the Player.
-    pub fn build_and_save(country_id: CountryId, ability: u8, position_id: PositionId) -> Self {
-        let mut player = Self::build(country_id, ability, position_id);
+    pub fn build_and_save(person: Person, ability: u8, position_id: PositionId) -> Self {
+        let mut player = Self::build(person, ability, position_id);
         player.create_id(PLAYERS.lock().unwrap().len() + 1);
         player.save();
         return player;
@@ -49,37 +49,12 @@ impl Player {
 
     // Just like build and save, but no arguments.
     pub fn build_and_save_random(rng: &mut ThreadRng) -> Self {
-        // Determine the player's nationality.
-        let countries = COUNTRIES.lock().unwrap().clone();
-        let mut country_weights = Vec::new();
-        let mut total_weight = 0;
-        for country in countries.values() {
-            let weight = match country.name == "Finland" {
-                // Making Finns more likely to appear in what tries to emulate some kind of a Finnish league.
-                true => country.forenames.total_weight * 20,
-                _ => country.forenames.total_weight,
-            };
-
-            total_weight += weight;
-            country_weights.push((country.id, weight));
-        }
-
-        let random = rng.random_range(0..total_weight);
-        let mut counter = 0;
-        let mut country_id = 0;
-        for (id, weight) in country_weights {
-            counter += weight;
-
-            if random < counter {
-                country_id = id;
-                break;
-            }
-        }
+        let person = Person::build_random();
 
         let ability = rng.random_range(0..=u8::MAX);
         let (position_id, _) = POSITIONS.iter().choose(rng).unwrap();
 
-        return Self::build_and_save(country_id, ability, position_id.clone());
+        return Self::build_and_save(person, ability, position_id.clone());
     }
 
     // Get a player from the database.
