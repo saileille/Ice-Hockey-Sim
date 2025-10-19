@@ -39,7 +39,7 @@ impl TeamCompData {
     }
 
     // Get relevant information for a competition screen.
-    pub fn get_json(&self, comp: &Competition, index: usize) -> serde_json::Value {
+    pub fn get_comp_screen_json(&self, comp: &Competition, index: usize) -> serde_json::Value {
         json!({
             "id": self.team_id,
             "name": self.get_team().name,
@@ -56,6 +56,16 @@ impl TeamCompData {
             "goals_conceded": self.goals_conceded,
             "goal_difference": self.get_goal_difference(),
             "points": self.get_points(&comp.get_round_robin_format()),
+            "seed": self.seed
+        })
+    }
+
+    // Get information for the competition screen tournament tree.
+    pub fn get_comp_screen_json_pair(&self) -> serde_json::Value {
+        json!({
+            "id": self.team_id,
+            "name": self.get_team().name,
+            "wins": self.get_wins(),
             "seed": self.seed
         })
     }
@@ -87,10 +97,10 @@ impl TeamCompData {
         self.regular_losses * rr.points_for_loss
     }
 
-    pub fn get_goal_difference(&self) -> i8 {
+    pub fn get_goal_difference(&self) -> i16 {
         let gf = convert::u16_to_i16(self.goals_scored);
         let ga = convert::u16_to_i16(self.goals_conceded);
-        return convert::i16_to_i8(gf - ga);
+        return gf - ga;
     }
 
     // Update the team data after a match.

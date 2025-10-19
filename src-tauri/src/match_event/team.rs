@@ -1,3 +1,4 @@
+use serde_json::json;
 use weighted_rand::{
     builder::{NewBuilder, WalkerTableBuilder}
 };
@@ -37,6 +38,15 @@ impl TeamGameData { // Basics.
     // Get a clone of the team.
     pub fn get_team(&self) -> Team {
         Team::fetch_from_db(&self.team_id)
+    }
+
+    pub fn get_comp_screen_json(&self) -> serde_json::Value {
+        json!({
+            "id": self.team_id,
+            "name": self.get_team().name,
+            "seed": self.team_seed,
+            "goals": self.get_goal_amount()
+        })
     }
 }
 

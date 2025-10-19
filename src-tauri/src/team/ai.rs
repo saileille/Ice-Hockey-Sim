@@ -185,7 +185,7 @@ impl Team {
     fn offer_contract_to_player(&mut self, player: &mut Player, today: &Date) {
         let years = rand::random_range(1..=4);  // 1-4 year contract offers, just like MHM.
 
-        let comp = Competition::fetch_from_db(&self.primary_comp_id).unwrap();
+        let comp = Competition::fetch_from_db(&self.primary_comp_id);
         let end_date = comp.season_window.end.get_previous_date_with_year_offset(years);
 
         let contract = Contract::build(&date_to_db_string(today), &date_to_db_string(&end_date), self.id);
@@ -193,8 +193,6 @@ impl Team {
         self.approached_players.push(player.id);
         self.evaluate_player_needs();
         player.save();
-
-        println!("{} offered a {}-year contract to {} ({}, {})!", self.name, years, player.person.get_full_name(), Position::fetch_from_db(&player.position_id).abbreviation, player.ability);
     }
 
     // Get a player shortlist of possible hirelings.

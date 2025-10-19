@@ -3,6 +3,7 @@ mod ai;
 
 use rand::{rngs::ThreadRng, Rng};
 use rand::seq::IteratorRandom;
+use serde_json::json;
 
 use crate::{
     database::{COUNTRIES, PLAYERS, POSITIONS}, types::{CountryId, PlayerId, TeamId}
@@ -13,7 +14,7 @@ use self::position::{Position, PositionId};
 #[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct Player {
-    pub id: PlayerId,  // id: 0 is reserved
+    pub id: PlayerId,
     pub person: Person,
     pub ability: u8,
     pub position_id: PositionId,
@@ -48,9 +49,34 @@ impl Player {
 
     // Just like build and save, but no arguments.
     pub fn build_and_save_random(rng: &mut ThreadRng) -> Self {
-        let country_id = rng.random_range(1..=COUNTRIES.lock().unwrap().len()) as CountryId;
-        //let ability = rng.random_range(0..=u8::MAX);
-        let ability = 100;
+        // Determine the player's nationality.
+        let countries = COUNTRIES.lock().unwrap().clone();
+        let mut country_weights = Vec::new();
+        let mut total_weight = 0;
+        for country in countries.values() {
+            let weight = match country.name == "Finland" {
+                // Making Finns more likely to appear in what tries to emulate some kind of a Finnish league.
+                true => country.forenames.total_weight * 20,
+                _ => country.forenames.total_weight,
+            };
+
+            total_weight += weight;
+            country_weights.push((country.id, weight));
+        }
+
+        let random = rng.random_range(0..total_weight);
+        let mut counter = 0;
+        let mut country_id = 0;
+        for (id, weight) in country_weights {
+            counter += weight;
+
+            if random < counter {
+                country_id = id;
+                break;
+            }
+        }
+
+        let ability = rng.random_range(0..=u8::MAX);
         let (position_id, _) = POSITIONS.iter().choose(rng).unwrap();
 
         return Self::build_and_save(country_id, ability, position_id.clone());
@@ -108,5 +134,16 @@ impl Player {
                 _ => None
             }
         }).collect()
+    }
+
+    // Get relevant infomration of the player for team screen.
+    pub fn get_team_screen_json(&self) -> serde_json::Value {
+        json!({
+            "name": self.person.get_full_name(),
+            "country": self.person.get_country().name,
+            "position": self.get_position().abbreviation,
+            "ability": self.ability,
+            "seasons_left": self.person.contract.as_ref().unwrap().get_seasons_left(),
+        })
     }
 }

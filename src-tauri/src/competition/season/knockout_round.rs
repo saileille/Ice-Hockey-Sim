@@ -154,16 +154,8 @@ impl KnockoutPair {
     // Get nice JSON for comp screen.
     fn get_comp_screen_json(&self) -> serde_json::Value {
         json!({
-            "home": {
-                "name": self.home.get_team().name,
-                "wins": self.home.get_wins(),
-                "seed": self.home.seed
-            },
-            "away": {
-                "name": self.away.get_team().name,
-                "wins": self.away.get_wins(),
-                "seed": self.away.seed
-            }
+            "home": self.home.get_comp_screen_json_pair(),
+            "away": self.away.get_comp_screen_json_pair()
         })
     }
 

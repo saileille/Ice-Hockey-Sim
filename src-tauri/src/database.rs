@@ -92,9 +92,9 @@ pub fn initialise() {
         Country::build_and_save(name);
     }
 
-    // Generate some players.
+    // Generate 50 players per team.
     let mut rng = rng();
-    for _ in 0..1000 {
+    for _ in 0..TEAMS.lock().unwrap().len() * 50 {
         Player::build_and_save_random(&mut rng);
     }
 
@@ -112,20 +112,20 @@ fn add_competition_data() {
     Competition::build_and_save(
         "Liiga",
         vec![
-            Team::build_and_save("Blues"),      // 1
-            Team::build_and_save("HIFK"),       // 2
-            Team::build_and_save("HPK"),        // 3
-            Team::build_and_save("Ilves"),      // 4
-            Team::build_and_save("Jokerit"),    // 5
-            Team::build_and_save("JYP"),        // 6
-            Team::build_and_save("KalPa"),      // 7
-            Team::build_and_save("Kärpät"),     // 8
-            Team::build_and_save("Lukko"),      // 9
-            Team::build_and_save("Pelicans"),   // 10
-            Team::build_and_save("SaiPa"),      // 11
-            Team::build_and_save("Tappara"),    // 12
-            Team::build_and_save("TPS"),        // 13
-            Team::build_and_save("Ässät"),      // 14
+            Team::build_and_save("Gestapojat"), // 1
+            Team::build_and_save("Veto"),       // 2
+            Team::build_and_save("Uupuneet"),   // 3
+            Team::build_and_save("SantaClaus"), // 4
+            Team::build_and_save("HardCore"),   // 5
+            Team::build_and_save("Vauhti"),     // 6
+            Team::build_and_save("Vimma"),      // 7
+            Team::build_and_save("Kelarotat"),  // 8
+            Team::build_and_save("Saappaat"),   // 9
+            Team::build_and_save("Katiska"),    // 10
+            Team::build_and_save("Turmio"),     // 11
+            Team::build_and_save("Mahti"),      // 12
+            Team::build_and_save("Merirosvot"), // 13
+            Team::build_and_save("Sirkus"),     // 14
         ],
         AnnualWindow::build(
             AnnualDate::build(9, 1),

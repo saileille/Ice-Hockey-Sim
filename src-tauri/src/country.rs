@@ -13,8 +13,8 @@ use crate::{
 #[derive(Default, Clone)]
 pub struct Country {
     pub id: CountryId,
-    name: String,
-    forenames: NamePool,
+    pub name: String,
+    pub forenames: NamePool,
     surnames: NamePool,
 }
 
@@ -92,10 +92,10 @@ impl Country {
 
 // Namepool with names and weights.
 #[derive(Default, Clone)]
-struct NamePool {
+pub struct NamePool {
     names: Vec<String>,
     weights: Vec<u16>,
-    total_weight: usize,
+    pub total_weight: usize,
 }
 
 impl NamePool { // Basics.

@@ -37,6 +37,7 @@ pub fn run() {
             commands::get_all_full_competitions,
             commands::get_child_competitions,
             commands::get_comp_screen_info,
+            commands::get_team_screen_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

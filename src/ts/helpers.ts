@@ -12,7 +12,14 @@ type TagName = Parameters<CreateElement>[0];
 // A generic helper function to alleviate the tedious verbosity.
 // Do not touch anything, It Just Works™.
 export const createEventListener = (query: Query, event: EventType, listener: Listener) => {
-    document.querySelector(query)?.addEventListener(event, listener)
+    const element = document.querySelector(query);
+    if (element === null) {
+        console.error(`${query} not found`);
+        return;
+    }
+
+    element.addEventListener(event, listener);
+    // console.log(`Created listener for ${query}`);
 };
 
 // Create an HTML element, give it values that you want and return it.

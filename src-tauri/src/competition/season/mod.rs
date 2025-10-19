@@ -96,7 +96,7 @@ impl Season {
 
     // Get the competition of the season.
     fn get_competition(&self) -> Competition {
-        Competition::fetch_from_db(&self.comp_id).unwrap()
+        Competition::fetch_from_db(&self.comp_id)
     }
 
     // Get the full name of the season, with all parent competition names included.
@@ -107,7 +107,7 @@ impl Season {
 
     // Get some nice JSON for a competition screen.
     pub fn get_comp_screen_json(&self, comp: &Competition) -> serde_json::Value {
-        let teams: Vec<serde_json::Value> = self.teams.iter().enumerate().map(|(i, a)| a.get_json(comp, i)).collect();
+        let teams: Vec<serde_json::Value> = self.teams.iter().enumerate().map(|(i, a)| a.get_comp_screen_json(comp, i)).collect();
         let upcoming_games: Vec<serde_json::Value> = self.upcoming_games.iter().map(|a| a.get_comp_screen_json()).collect();
         let played_games: Vec<serde_json::Value> = self.played_games.iter().map(|a| a.get_comp_screen_json()).collect();
 
@@ -157,7 +157,7 @@ impl Season {
                     // Does not support group competitions yet.
                     teams = self.teams.clone();
                 }
-                Competition::fetch_from_db(id).unwrap().setup_season(&mut teams);
+                Competition::fetch_from_db(id).setup_season(&mut teams);
             }
         }
     }
@@ -202,7 +202,7 @@ impl Season {
 
         // Update all parent competitions as well.
         if comp.parent_comp_id != 0 {
-            let parent_comp = Competition::fetch_from_db(&comp.parent_comp_id).unwrap();
+            let parent_comp = Competition::fetch_from_db(&comp.parent_comp_id);
 
             let mut season = Season::fetch_from_db(&parent_comp.id, parent_comp.get_seasons_amount() - 1);
             season.update_teamdata(&parent_comp, games);
@@ -268,7 +268,7 @@ impl Season {
         // Check for a parent competition.
         else {
             for id in comp.child_comp_ids.iter() {
-                let child_comp = Competition::fetch_from_db(id).unwrap();
+                let child_comp = Competition::fetch_from_db(id);
                 let mut season = Season::fetch_from_db(&child_comp.id, child_comp.get_seasons_amount() - 1);
                 if !season.check_if_over(&child_comp) {
                     return false;

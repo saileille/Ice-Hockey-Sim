@@ -25,7 +25,7 @@ impl Season {
 
     // Get the round robin standings.
     pub fn display_standings(&mut self) -> String {
-        let comp = Competition::fetch_from_db(&self.comp_id).unwrap();
+        let comp = Competition::fetch_from_db(&self.comp_id);
         self.rank_teams(&comp);
         let rr = comp.get_round_robin_format();
 

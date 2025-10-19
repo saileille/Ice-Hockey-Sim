@@ -25,6 +25,5 @@ impl Player {
         }
 
         self.person.contract_offers.clear();
-        println!("{} ({}, {}) accepted a contract offer from {}!", self.person.get_full_name(), Position::fetch_from_db(&self.position_id).abbreviation, self.ability, team.name);
     }
 }

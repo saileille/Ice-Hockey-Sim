@@ -74,8 +74,8 @@ impl Competition {
         return comp;
     }
 
-    pub fn fetch_from_db(id: &CompetitionId) -> Option<Self> {
-        COMPETITIONS.lock().unwrap().get(id).cloned()
+    pub fn fetch_from_db(id: &CompetitionId) -> Self {
+        COMPETITIONS.lock().unwrap().get(id).cloned().unwrap()
     }
 
     // Save a competition to the database for the first time.
@@ -112,7 +112,7 @@ impl Competition {
 
         let child_teams = Vec::new();
         for id in self.child_comp_ids.iter() {
-            Competition::fetch_from_db(id).unwrap().create_new_seasons(&child_teams);        }
+            Competition::fetch_from_db(id).create_new_seasons(&child_teams);        }
     }
 
     // Create new season for this competition and its child competitions.
@@ -124,7 +124,7 @@ impl Competition {
     // Give child competitions this competition's ID.
     pub fn give_id_to_children_comps(&self) {
         for id in self.child_comp_ids.iter() {
-            let mut child_comp = Competition::fetch_from_db(id).unwrap();
+            let mut child_comp = Competition::fetch_from_db(id);
             child_comp.parent_comp_id = self.id;
             child_comp.save();
         }
@@ -139,7 +139,7 @@ impl Competition {
         };
 
         if self.parent_comp_id != 0 {
-            name = Competition::fetch_from_db(&self.parent_comp_id).unwrap().get_full_name(&name);
+            name = Competition::fetch_from_db(&self.parent_comp_id).get_full_name(&name);
         }
 
         return name;
@@ -213,7 +213,7 @@ impl Competition {
 
     // Get relevant information for a tournament tree competition screen.
     pub fn get_tournament_comp_screen_json(&self) -> serde_json::Value {
-        let mut child_comps: Vec<Competition> = self.child_comp_ids.iter().map(|id| Competition::fetch_from_db(id).unwrap()).collect();
+        let mut child_comps: Vec<Competition> = self.child_comp_ids.iter().map(|id| Competition::fetch_from_db(id)).collect();
         let season_index = self.get_seasons_amount() - 1;
         let mut child_seasons: Vec<Season> = child_comps.iter().map(|a| Season::fetch_from_db(&a.id, season_index)).collect();
 
@@ -296,6 +296,6 @@ impl CompConnection {
             teamdata.push(team);
         }
 
-        Competition::fetch_from_db(&self.comp_to_connect).unwrap().setup_season(&mut teamdata);
+        Competition::fetch_from_db(&self.comp_to_connect).setup_season(&mut teamdata);
     }
 }

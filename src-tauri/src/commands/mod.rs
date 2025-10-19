@@ -2,7 +2,7 @@ pub mod continue_game;
 
 use std::cmp::Ordering;
 
-use crate::{competition::Competition, database::COMPETITIONS, types::CompetitionId};
+use crate::{competition::Competition, database::COMPETITIONS, team::Team, types::{CompetitionId, TeamId}};
 
 
 // Get name and ID of all competitions that are not part of another competition.
@@ -35,8 +35,8 @@ pub fn get_all_full_competitions() -> Vec<(String, String)> {
 // Get name and ID of all competitions that are children of the given competition.
 #[tauri::command]
 pub fn get_child_competitions(id: CompetitionId) -> Vec<(String, String)> {
-    let parent_comp = Competition::fetch_from_db(&id).unwrap();
-    let mut child_comps: Vec<(String, String)> = parent_comp.child_comp_ids.iter().map(|a| (a.to_string(), Competition::fetch_from_db(a).unwrap().name)).collect();
+    let parent_comp = Competition::fetch_from_db(&id);
+    let mut child_comps: Vec<(String, String)> = parent_comp.child_comp_ids.iter().map(|a| (a.to_string(), Competition::fetch_from_db(a).name)).collect();
 
     // Parent competition is the default option.
     child_comps.push(("0".to_string(), parent_comp.name));
@@ -48,10 +48,10 @@ pub fn get_child_competitions(id: CompetitionId) -> Vec<(String, String)> {
     return child_comps;
 }
 
-// Get all the info of a competition in a JSON string.
+// Get all the info for a competition screen in a JSON string.
 #[tauri::command]
 pub fn get_comp_screen_info(id: CompetitionId) -> String {
-    let comp = Competition::fetch_from_db(&id).unwrap();
+    let comp = Competition::fetch_from_db(&id);
 
     if comp.is_tournament_tree {
         return comp.get_tournament_comp_screen_json().to_string();
@@ -59,5 +59,10 @@ pub fn get_comp_screen_info(id: CompetitionId) -> String {
     else {
         return comp.get_comp_screen_json().to_string();
     }
+}
 
+// Get all info for a team screen in a JSON string.
+#[tauri::command]
+pub fn get_team_screen_info(id: TeamId) -> String {
+    Team::fetch_from_db(&id).get_team_screen_json().to_string()
 }

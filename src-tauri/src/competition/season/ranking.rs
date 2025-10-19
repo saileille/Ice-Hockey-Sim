@@ -152,7 +152,7 @@ impl Season {
     fn sort_child_competitions(&mut self, comp: &Competition) -> bool {
         let mut ranks = Vec::new();
         for id in comp.child_comp_ids.iter() {
-            let child_comp = Competition::fetch_from_db(id).unwrap();
+            let child_comp = Competition::fetch_from_db(id);
             let mut season = Season::fetch_from_db(id, self.index);
 
             let sorted = season.rank_teams(&child_comp);

@@ -1,11 +1,12 @@
 pub mod lineup;
 mod ai;
 
-use std::collections::HashSet;
+use std::{collections::HashSet, mem::discriminant};
 use rand::{
     distr::Uniform,
     Rng
 };
+use serde_json::json;
 use time::Date;
 use crate::{
     country::Country, database::{TEAMS, TODAY}, person::{manager::Manager, player::{
@@ -90,6 +91,18 @@ impl Team {
     fn get_approached_players(&self) -> Vec<Player> {
         self.approached_players.iter().map(|id| Player::fetch_from_db(id).unwrap()).collect()
     }
+
+    // Get info for a team screen in JSON.
+    pub fn get_team_screen_json(&self) -> serde_json::Value {
+        let mut players = self.get_players();
+        players.sort_by(|a, b| (a.position_id.clone() as u8).cmp(&(b.position_id.clone() as u8)).then(b.ability.cmp(&a.ability)));
+
+        let json_players: Vec<serde_json::Value> = players.iter().map(|a| a.get_team_screen_json()).collect();
+        json!({
+            "name": self.name,
+            "players": json_players,
+        })
+    }
 }
 
 impl Team {
@@ -114,7 +127,6 @@ impl Team {
             .expect(&format!("error: low: {min_ability}, high: {max_ability}"));
 
         let mut rng = rand::rng();
-
         let country_id = Country::fetch_from_db_with_name("Finland").id;
 
         // Goalkeepers...

@@ -1,13 +1,12 @@
 // Show the current date.
 import { invoke } from "@tauri-apps/api/core";
-import { Listener, createEventListener, createElement } from "./main.ts";
-import { drawScreen as drawCompScreen } from "./competitionScreen/main.ts";
+import { Listener, createEventListener, createElement } from "./helpers.ts";
+import { drawScreen as drawCompScreen } from "./screens/competition.ts";
 
-export const initialiseAll = () => {
+export const initialiseBase = () => {
     document.body.innerHTML = `
         <div id="date"></div>
         <button id="continue">Continue</button>
-
     `;
 
     displayDate();
@@ -76,4 +75,4 @@ export const goToChildCompetition: Listener = (_e: Event) => {
     goToCompetition("#child-comps");
 };
 
-initialiseAll();
+initialiseBase();

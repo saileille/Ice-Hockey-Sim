@@ -1,14 +1,15 @@
 // Draw the competition screen of the competition given in the ID.
 import { invoke } from "@tauri-apps/api/core";
-import { initialiseAll, createCompSelect, goToChildCompetition } from "../initialise_generic";
-import { createEventListener, createElement } from "../main";
+import { initialiseBase, createCompSelect, goToChildCompetition } from "../initialise_base";
+import { createEventListener, createElement } from "../helpers";
+import { createTeamField, drawScreen as drawTeamScreen } from "./team";
 
 // Draw any competition screen.
 export const drawScreen = async (id: number) => {
     const json_s: string = await invoke("get_comp_screen_info", { id: id });
     const json = JSON.parse(json_s);
 
-    initialiseAll();
+    initialiseBase();
 
     // If the competition is something like playoffs.
     // The JSON looks a bit different in this case.
@@ -91,7 +92,11 @@ const drawRoundRobinStandings = (json: any) => {
         const row: HTMLTableRowElement = document.createElement("tr");
 
         row.appendChild(createElement("td", { "textContent": team.rank }));
-        row.appendChild(createElement("td", { "textContent": team.name }));
+
+        const teamCell = document.createElement("td");
+        createTeamField(team, teamCell);
+        row.appendChild(teamCell);
+
         row.appendChild(createElement("td", { "textContent": team.games.toString() }));
         row.appendChild(createElement("td", { "textContent": team.wins.toString() }));
         row.appendChild(createElement("td", { "textContent": team.ot_wins.toString() }));
@@ -104,6 +109,7 @@ const drawRoundRobinStandings = (json: any) => {
         row.appendChild(createElement("td", { "textContent": team.points.toString() }));
 
         standings.appendChild(row);
+        createEventListener(`#team${team.id}`, "click", drawTeamScreen);
     }
 };
 
@@ -130,12 +136,14 @@ const drawSchedule = (json: any, displaySeed: boolean) => {
             otString = " OT";
         }
 
-        let matchString = `${match.home.name} ${match.home.goals} - ${match.away.goals}${otString} ${match.away.name}`;
+        let matchString = `<span id="team${match.home.id}">${match.home.name}</span> ${match.home.goals} - ${match.away.goals}${otString} <span id="team${match.away.id}">${match.away.name}</span>`;
         if (displaySeed) {
             matchString = `(${match.home.seed}.) ${matchString} (${match.away.seed}.)`;
         }
 
-        previousGames.appendChild(createElement("div", { "textContent": matchString }));
+        previousGames.appendChild(createElement("div", { "innerHTML": matchString }));
+        createEventListener(`#team${match.home.id}`, "click", drawTeamScreen);
+        createEventListener(`#team${match.away.id}`, "click", drawTeamScreen);
     }
 
     if (previousMatchDay === "") {
@@ -153,12 +161,14 @@ const drawSchedule = (json: any, displaySeed: boolean) => {
         if (nextMatchDay === "") { nextMatchDay = match.date; }
         else if (nextMatchDay !== match.date) { break; }
 
-        let matchString = `${match.home.name} - ${match.away.name}`;
+        let matchString = `<span id="team${match.home.id}">${match.home.name}</span> - <span id="team${match.away.id}">${match.away.name}</span>`;
         if (displaySeed) {
             matchString = `(${match.home.seed}.) ${matchString} (${match.away.seed}.)`;
         }
 
-        nextGames.appendChild(createElement("div", { "textContent": matchString }));
+        nextGames.appendChild(createElement("div", { "innerHTML": matchString }));
+        createEventListener(`#team${match.home.id}`, "click", drawTeamScreen);
+        createEventListener(`#team${match.away.id}`, "click", drawTeamScreen);
     }
 
     if (nextMatchDay === "") {
@@ -181,9 +191,15 @@ const drawRanking = (json: any) => {
     const ranking: HTMLTableElement = document.querySelector("#ranking") as HTMLTableElement;
     for (const team of json.season.teams) {
         const row = document.createElement("tr");
+
         row.appendChild(createElement("td", { "textContent": team.rank }));
-        row.appendChild(createElement("td", { "textContent": team.name }));
+
+        const teamCell = document.createElement("td");
+        createTeamField(team, teamCell);
+        row.append(teamCell);
+
         ranking.appendChild(row);
+        createEventListener(`#team${team.id}`, "click", drawTeamScreen);
     }
 };
 
@@ -201,7 +217,10 @@ const drawKnockoutPairs = (json: any) => {
 const createKnockoutPairElements = (json_pairs: any, parentElement: HTMLDivElement) => {
     for (const pair of json_pairs) {
         parentElement.appendChild(createElement("div", {
-            "textContent": `(${pair.home.seed}.) ${pair.home.name} ${pair.home.wins} - ${pair.away.wins} ${pair.away.name} (${pair.away.seed}.)`
+            "textContent": `(${pair.home.seed}.) <span id="${pair.home.id}">${pair.home.name}</span> ${pair.home.wins} - ${pair.away.wins} <span id="${pair.away.id}">${pair.away.name}</span> (${pair.away.seed}.)`
         }));
+
+        createEventListener(`#team${pair.home.id}`, "click", drawTeamScreen);
+        createEventListener(`#team${pair.away.id}`, "click", drawTeamScreen);
     }
 };

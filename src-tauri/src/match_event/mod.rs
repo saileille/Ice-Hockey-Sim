@@ -47,27 +47,19 @@ impl Game {
 
     // Get the game rules.
     fn get_rules(&self) -> Rules {
-        Competition::fetch_from_db(&self.comp_id).unwrap().format.as_ref().unwrap().match_rules.clone()
+        Competition::fetch_from_db(&self.comp_id).format.as_ref().unwrap().match_rules.clone()
     }
 
     // Get the competition of the game.
     fn get_comp(&self) -> Competition {
-        Competition::fetch_from_db(&self.comp_id).unwrap()
+        Competition::fetch_from_db(&self.comp_id)
     }
 
     // Get nice data for a competition screen.
     pub fn get_comp_screen_json(&self) -> serde_json::Value {
         json!({
-            "home": {
-                "name": self.home.get_team().name,
-                "seed": self.home.team_seed,
-                "goals": self.home.get_goal_amount()
-            },
-            "away": {
-                "name": self.away.get_team().name,
-                "seed": self.away.team_seed,
-                "goals": self.away.get_goal_amount()
-            },
+            "home": self.home.get_comp_screen_json(),
+            "away": self.away.get_comp_screen_json(),
             "date": self.date,
             "had_overtime": self.has_overtime(),
             "is_over": self.clock != Clock::default()
