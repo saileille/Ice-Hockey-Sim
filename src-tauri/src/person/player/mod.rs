@@ -119,11 +119,31 @@ impl Player {
         };
 
         json!({
+            "id": self.id,
             "name": self.person.get_full_name(),
             "country": self.person.get_country().name,
             "position": self.get_position().abbreviation,
             "ability": self.ability,
             "seasons_left": seasons_left,
+        })
+    }
+
+    // Get relevant information of the player for the player screen.
+    pub fn get_player_screen_json(&self) -> serde_json::Value {
+        let contract = match self.person.contract.as_ref() {
+            Some(contract) => Some(contract.get_person_screen_json()),
+            _ => None
+        };
+
+        let contract_offers: Vec<serde_json::Value> = self.person.contract_offers.iter().map(|a| a.get_person_screen_json()).collect();
+
+        json!({
+            "name": self.person.get_full_name(),
+            "country": self.person.get_country().name,
+            "position": self.get_position().abbreviation,
+            "ability": self.ability,
+            "contract": contract,
+            "offers": contract_offers
         })
     }
 }

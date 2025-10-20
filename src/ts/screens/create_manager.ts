@@ -1,8 +1,9 @@
 // The manager creation screen.
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen, createCompSelect } from "./basics";
-import { createElement, createEventListener, Listener } from "../helpers";
+import { createElement, createEventListener, linkListener } from "../helpers";
 import { drawScreen as drawHomeScreen } from "./home";
+import { Listener } from "../types";
 
 // Draw the thing.
 const drawScreen = async () => {
@@ -52,5 +53,8 @@ const createManager: Listener = async (_e: Event) => {
     await invoke("create_human_manager", { id: Number(teamSelect.value) });
     drawHomeScreen();
 };
+
+// This line of code needs to be in whatever TypeScript gets called first.
+document.addEventListener("click", linkListener)
 
 drawScreen();

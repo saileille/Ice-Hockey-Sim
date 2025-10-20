@@ -112,6 +112,14 @@ impl Team {
             "players": json_players
         })
     }
+
+    // Get relevant info for a player screen.
+    pub fn get_player_screen_json(&self) -> serde_json::Value {
+        json!({
+            "id": self.id,
+            "name": self.name
+        })
+    }
 }
 
 impl Team {

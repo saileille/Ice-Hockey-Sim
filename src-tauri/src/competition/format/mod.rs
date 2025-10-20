@@ -58,7 +58,7 @@ impl Format {
     pub fn get_comp_screen_json(&self) -> serde_json::Value {
         json!({
             "round_robin": self.round_robin,
-            "knockout": self.knockout_round,
+            "knockout_round": self.knockout_round,
             "match_rules": self.match_rules,
             "type": self.format_type
         })

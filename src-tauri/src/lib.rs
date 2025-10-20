@@ -39,6 +39,7 @@ pub fn run() {
             commands::get_team_select_info,
             commands::get_comp_screen_info,
             commands::get_team_screen_info,
+            commands::get_player_screen_info,
             commands::create_human_manager,
         ])
         .run(tauri::generate_context!())

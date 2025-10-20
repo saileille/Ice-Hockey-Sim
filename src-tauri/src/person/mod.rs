@@ -2,6 +2,7 @@ pub mod player;
 pub mod manager;
 
 use rand;
+use serde_json::json;
 use time::Duration;
 
 use crate::{
@@ -133,6 +134,11 @@ impl Contract {
         }
     }
 
+    // Get the team of the contract.
+    fn get_team(&self) -> Team {
+        Team::fetch_from_db(&self.team_id)
+    }
+
     // How many days there are left of the contract.
     fn get_days_left(&self) -> i64 {
         self.get_duration_left().whole_days()
@@ -175,5 +181,15 @@ impl Contract {
     // Check if the contract has expired.
     pub fn check_if_expired(&self) -> bool {
         return self.get_days_left() <= 0
+    }
+
+    // Get relevant information for a person screen.
+    fn get_person_screen_json(&self) -> serde_json::Value {
+        json!({
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "seasons_left": self.get_seasons_left(),
+            "team": self.get_team().get_player_screen_json()
+        })
     }
 }

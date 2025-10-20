@@ -1,7 +1,8 @@
 // Show the current date.
 import { invoke } from "@tauri-apps/api/core";
-import { Listener, createEventListener, createElement } from "../helpers.ts";
+import { createEventListener, createElement } from "../helpers.ts";
 import { drawScreen as drawCompScreen } from "./competition.ts";
+import { Listener } from "../types.ts";
 
 export const initialiseTopBar = () => {
     // Check if the basics have already been initialised.

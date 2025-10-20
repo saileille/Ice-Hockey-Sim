@@ -1,36 +1,52 @@
 // Team screen stuffs.
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen, initialiseTopBar } from "./basics";
-import { createElement, createEventListener, Listener } from "../helpers";
+import { createElement, createEventListener, createLink } from "../helpers";
+import { Listener } from "../types";
+import { drawScreen as drawPlayerScreen } from "./player";
+
+type RosterSetting = "roster" | "approached" | "both";
+
+type Player = {
+    id: number,
+    name: string,
+    country: string,
+    position: string,
+    ability: number,
+    seasons_left: number
+};
+
+type Team = {
+    id: number,
+    name: string,
+    players: Array<Player>
+};
 
 // Draw the screen of a given team.
-export const drawScreen: Listener = async (e: Event) => {
-    const target: HTMLSpanElement = e.target as HTMLSpanElement;
-    const id = Number(target.id.replace("team", ""));
-
-    const jsonString: string = await invoke("get_team_screen_info", { id: id });
-    const json = JSON.parse(jsonString);
+export const drawScreen = async (id: number) => {
+    const json: string = await invoke("get_team_screen_info", { id: id });
+    const team: Team = JSON.parse(json);
 
     initialiseTopBar();
     const screen = initialiseContentScreen();
 
     screen.insertAdjacentHTML("beforeend", `
-        <div>${json.name}</div>
+        <div>${team.name}</div>
     `);
-    drawRoster(screen, json.players);
+    drawRoster(screen, team.players);
 };
 
 // Draw the roster of a team.
-const drawRoster = (screen: HTMLDivElement, players: any) => {
+const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
     screen.insertAdjacentHTML("beforeend", `
         <select id="player-filters"></select>
-        <table id="players"><tr>
+        <table id="players"><tbody><tr>
             <th>Name</th>
             <th>Country</th>
             <th>Position</th>
             <th>Ability</th>
             <th>Seasons Left</th>
-        </tr></table>
+        </tr></tbody></table>
     `);
 
     const select = document.querySelector("#player-filters") as HTMLSelectElement;
@@ -38,17 +54,18 @@ const drawRoster = (screen: HTMLDivElement, players: any) => {
     select.appendChild(createElement("option", { "value": "approached", "textContent": "Approached" }));
     select.appendChild(createElement("option", { "value": "both", "textContent": "Roster + Approached" }));
 
-    const roster = document.querySelector("#players") as HTMLTableElement;
+    const roster = (document.querySelector("#players") as HTMLTableElement).children[0] as HTMLTableSectionElement;
 
     for (const player of players) {
         const row = document.createElement("tr");
-        row.appendChild(createElement("td", { "textContent": player.name }));
+        createLink("player", player.id, player.name, [document.createElement("td"), row]);
         row.appendChild(createElement("td", { "textContent": player.country }));
         row.appendChild(createElement("td", { "textContent": player.position }));
         row.appendChild(createElement("td", { "textContent": player.ability }));
         row.appendChild(createElement("td", { "textContent": player.seasons_left }));
 
-        roster.children[0].appendChild(row);
+        roster.appendChild(row);
+        // createEventListener(`.player${player.id}`, "click", drawPlayerScreen);
     }
 
     changePlayerFilter(roster, "roster");
@@ -57,15 +74,15 @@ const drawRoster = (screen: HTMLDivElement, players: any) => {
 
 // When the user changes the player filter of a team screen.
 const onChangePlayerFilter: Listener = (e: Event) => {
-    const roster = document.querySelector("#players") as HTMLTableElement;
+    const roster = (document.querySelector("#players") as HTMLTableElement).children[0] as HTMLTableSectionElement;
     const select = e.target as HTMLSelectElement;
-    const setting = select.value;
+    const setting = select.value as RosterSetting;
 
     changePlayerFilter(roster, setting);
 };
 
-const changePlayerFilter = (roster: HTMLTableElement, setting: string) => {
-    for (const row of roster.children[0].children) {
+const changePlayerFilter = (roster: HTMLTableSectionElement, setting: RosterSetting) => {
+    for (const row of roster.children) {
         const r = row as HTMLTableRowElement;
         const seasonsLeftCell = r.children[4];
 
@@ -82,22 +99,11 @@ const changePlayerFilter = (roster: HTMLTableElement, setting: string) => {
             if (seasonsLeft === "0") { r.style.display = "none"; }
             else { r.style.display = "table-row"; }
         }
-        else if (setting === "approached") {
+
+        // Setting must be "approached".
+        else {
             if (seasonsLeft === "0") { r.style.display = "table-row"; }
             else { r.style.display = "none"; }
         }
-        else { console.error(`Unknown filter setting ${setting}`); }
     }
-};
-
-// Draw a team field for any purpose.
-export const createTeamField = (team_json: any, parentElement: HTMLElement) => {
-    const team = createElement("span", {
-        "textContent": team_json.name,
-        "id": `team${team_json.id}`
-    });
-
-    // The event listener needs to be created later.
-    // createEventListener(`#team${team_json.id}`, "click", goToTeamScreen)
-    parentElement.appendChild(team);
 };

@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 
 use time::Date;
 
-use crate::{competition::{self, Competition}, database::{COMPETITIONS, TODAY}, person::{manager::Manager, Contract}, team::Team, time::date_to_db_string, types::{CompetitionId, TeamId}};
+use crate::{competition::Competition, database::{COMPETITIONS, TODAY}, person::{manager::Manager, player::Player, Contract}, team::Team, time::date_to_db_string, types::{CompetitionId, PlayerId, TeamId}};
 
 
 // Get name and ID of all competitions that are not part of another competition.
@@ -88,6 +88,12 @@ pub fn get_comp_screen_info(id: CompetitionId) -> String {
 #[tauri::command]
 pub fn get_team_screen_info(id: TeamId) -> String {
     Team::fetch_from_db(&id).get_team_screen_json().to_string()
+}
+
+// Get info for a player screen in a JSON string.
+#[tauri::command]
+pub fn get_player_screen_info(id: PlayerId) -> String {
+    Player::fetch_from_db(&id).unwrap().get_player_screen_json().to_string()
 }
 
 // Create a human manager in the game.
