@@ -28,9 +28,9 @@ export const createElement = (elementType: TagName, attributes: any) => {
 
 
 // Draw a link field for any purpose.
-export const createLink = (type: LinkType, id: number, name: string, parentElements: Array<HTMLElement>) => {
-    const span = createElement("span", { "textContent": name });
-    span.classList.add(`${type}${id}`);
+export const createLink = (type: LinkType, id: number, text: string, parentElements: Array<HTMLElement>) => {
+    const span = createElement("span", { "textContent": text });
+    span.className = `${type}${id} link`;
 
     // The event listener needs to be created later.
 
@@ -53,27 +53,35 @@ export const linkListener: Listener = (e: Event) => {
     const element = target as HTMLSpanElement;
 
     for (const linkType of LINK_TYPES) {
-        const regex = new RegExp(`${linkType}([0-9]+)`);
+        const id = extractIdFromElement(linkType, element);
+        if (id === undefined) {
+            continue;
+        }
 
-        for (const elementClass of element.classList) {
-            const match = elementClass.match(regex);
-            if (match === null) { continue; }
-
-            const id = Number(match[1]);
-
-            switch (linkType) {
-                case "team": {
-                    drawTeamScreen(id);
-                    return;
-                }
-                case "player": {
-                    drawPlayerScreen(id);
-                    return;
-                }
-                default: {
-                    console.error(`Unknown link type ${linkType} with ID ${match[1]}`);
-                }
+        switch (linkType) {
+            case "team": {
+                drawTeamScreen(id);
+                return;
+            }
+            case "player": {
+                drawPlayerScreen(id);
+                return;
+            }
+            default: {
+                console.error(`Unknown link type ${linkType} with ID ${id}`);
             }
         }
+    }
+};
+
+// Extract the ID of a data item from DOM element ID.
+export const extractIdFromElement = (linkType: LinkType, element: Element): number | undefined => {
+    const regex = new RegExp(`${linkType}([0-9]+)`);
+
+    for (const className of element.classList) {
+        const match = className.match(regex);
+        if (match === null) { continue; }
+
+        return Number(match[1]);
     }
 };

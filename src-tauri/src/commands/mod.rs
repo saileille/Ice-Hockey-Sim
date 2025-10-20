@@ -73,27 +73,27 @@ pub fn get_team_select_info(id: CompetitionId) -> Vec<(String, String)> {
 
 // Get all the info for a competition screen in a JSON string.
 #[tauri::command]
-pub fn get_comp_screen_info(id: CompetitionId) -> String {
+pub fn get_comp_screen_info(id: CompetitionId) -> serde_json::Value {
     let comp = Competition::fetch_from_db(&id);
 
     if comp.is_tournament_tree {
-        return comp.get_tournament_comp_screen_json().to_string();
+        return comp.get_tournament_comp_screen_json();
     }
     else {
-        return comp.get_comp_screen_json().to_string();
+        return comp.get_comp_screen_json();
     }
 }
 
 // Get all info for a team screen in a JSON string.
 #[tauri::command]
-pub fn get_team_screen_info(id: TeamId) -> String {
-    Team::fetch_from_db(&id).get_team_screen_json().to_string()
+pub fn get_team_screen_info(id: TeamId) -> serde_json::Value {
+    Team::fetch_from_db(&id).get_team_screen_json()
 }
 
 // Get info for a player screen in a JSON string.
 #[tauri::command]
-pub fn get_player_screen_info(id: PlayerId) -> String {
-    Player::fetch_from_db(&id).unwrap().get_player_screen_json().to_string()
+pub fn get_player_screen_info(id: PlayerId) -> serde_json::Value {
+    Player::fetch_from_db(&id).unwrap().get_player_screen_json()
 }
 
 // Create a human manager in the game.
@@ -102,8 +102,12 @@ pub fn create_human_manager(id: TeamId) {
     let mut human = Manager::build_and_save_random();
     human.is_human = true;
 
+    human.person.forename = "Human".to_string();
+    human.person.surname = "Manager".to_string();
+
     // This would mean the manager is unemployed.
     if id == 0 {
+        human.save();
         println!("Started as unemployed.");
         return;
     }
@@ -121,6 +125,38 @@ pub fn create_human_manager(id: TeamId) {
 
     team.manager_id = human.id;
     human.save();
+    team.save();
 
     println!("Took control of {}.", team.name);
+}
+
+// Get information about the human.
+#[tauri::command]
+pub fn get_human_info() -> serde_json::Value {
+    let human = Manager::get_human().unwrap();
+    return human.get_package();
+}
+
+// Get all free agents.
+#[tauri::command]
+pub fn get_free_agents() -> serde_json::Value {
+    Player::get_all_free_agents_json()
+}
+
+// Get player with player search data on it.
+#[tauri::command]
+pub fn get_player_search_info(id: PlayerId) -> serde_json::Value {
+    Player::fetch_from_db(&id).unwrap().get_player_search_screen_json()
+}
+
+// Offer a contract to a player.
+#[tauri::command]
+pub fn offer_contract(player_id: PlayerId, team_id: TeamId, years: i32) {
+    let today = TODAY.lock().unwrap().clone();
+    let mut team = Team::fetch_from_db(&team_id);
+    let mut player = Player::fetch_from_db(&player_id).unwrap();
+    let contract = Contract::build_from_years(&team, &today, years);
+
+    team.offer_contract_to_player(&mut player, contract);
+    team.save();
 }

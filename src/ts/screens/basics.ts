@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { createEventListener, createElement } from "../helpers.ts";
 import { drawScreen as drawCompScreen } from "./competition.ts";
 import { Listener } from "../types.ts";
+import { onClickHomeScreen } from "./home.ts";
 
 export const initialiseTopBar = () => {
     // Check if the basics have already been initialised.
@@ -16,6 +17,7 @@ export const initialiseTopBar = () => {
         <div id="top-bar">
             <div id="date"></div>
             <button id="continue">Continue</button>
+            <button id="home-screen">Home Screen</button>
         </div>
     `;
 
@@ -24,6 +26,7 @@ export const initialiseTopBar = () => {
 
     createEventListener("#comps", "change", goToParentCompetition);
     createEventListener("#continue", "click", toNextDay);
+    createEventListener("#home-screen", "click", onClickHomeScreen);
     initialiseContentScreen();
 };
 

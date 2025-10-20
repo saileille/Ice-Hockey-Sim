@@ -6,7 +6,7 @@ use rand::seq::IteratorRandom;
 use serde_json::json;
 
 use crate::{
-    database::{COUNTRIES, PLAYERS, POSITIONS}, types::{CountryId, PlayerId, TeamId}
+    database::{PLAYERS, POSITIONS}, types::{PlayerId, TeamId}
 };
 use super::{Person, Gender};
 use self::position::{Position, PositionId};
@@ -52,9 +52,9 @@ impl Player {
         let person = Person::build_random();
 
         let ability = rng.random_range(0..=u8::MAX);
-        let (position_id, _) = POSITIONS.iter().choose(rng).unwrap();
+        let position_id = PositionId::get_random(rng);
 
-        return Self::build_and_save(person, ability, position_id.clone());
+        return Self::build_and_save(person, ability, position_id);
     }
 
     // Get a player from the database.
@@ -111,6 +111,25 @@ impl Player {
         }).collect()
     }
 
+    // Get all free agents in the game.
+    pub fn get_all_free_agents_json() -> serde_json::Value {
+        let mut players: Vec<Self> = PLAYERS.lock().unwrap().iter().filter_map(|(_, a)| {
+            match a.person.contract.is_none() {
+                true => Some(a.clone()),
+                _ => None
+            }
+        }).collect();
+
+        players.sort_by(|a, b|
+            b.ability.cmp(&a.ability)
+            .then((a.position_id.clone() as u8).cmp(&(b.position_id.clone() as u8)))
+            .then(a.person.surname.cmp(&b.person.surname))
+            .then(a.person.forename.cmp(&b.person.forename))
+        );
+
+        players.iter().map(|a| a.get_player_search_screen_json()).collect()
+    }
+
     // Get relevant information of the player for team screen.
     pub fn get_team_screen_json(&self) -> serde_json::Value {
         let seasons_left = match self.person.contract.as_ref() {
@@ -143,6 +162,18 @@ impl Player {
             "position": self.get_position().abbreviation,
             "ability": self.ability,
             "contract": contract,
+            "offers": contract_offers
+        })
+    }
+
+    pub fn get_player_search_screen_json(&self) -> serde_json::Value {
+        let contract_offers: Vec<serde_json::Value> = self.person.contract_offers.iter().map(|a| a.get_person_screen_json()).collect();
+        json!({
+            "id": self.id,
+            "name": self.person.get_full_name(),
+            "country": self.person.get_country().name,
+            "position": self.get_position().abbreviation,
+            "ability": self.ability,
             "offers": contract_offers
         })
     }

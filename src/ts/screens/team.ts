@@ -3,7 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen, initialiseTopBar } from "./basics";
 import { createElement, createEventListener, createLink } from "../helpers";
 import { Listener } from "../types";
-import { drawScreen as drawPlayerScreen } from "./player";
 
 type RosterSetting = "roster" | "approached" | "both";
 
@@ -16,23 +15,33 @@ type Player = {
     seasons_left: number
 };
 
+type Manager = {
+    name: string
+};
+
 type Team = {
     id: number,
     name: string,
+    manager: Manager | null,
     players: Array<Player>
 };
 
 // Draw the screen of a given team.
 export const drawScreen = async (id: number) => {
-    const json: string = await invoke("get_team_screen_info", { id: id });
-    const team: Team = JSON.parse(json);
+    const team: Team = await invoke("get_team_screen_info", { id: id });
 
     initialiseTopBar();
     const screen = initialiseContentScreen();
 
     screen.insertAdjacentHTML("beforeend", `
-        <div>${team.name}</div>
+        <h1>${team.name}</h1>
+        <div id="manager"></div>
     `);
+
+    if (team.manager !== null) {
+        (document.querySelector("#manager") as HTMLDivElement).textContent = `Manager: ${team.manager.name}`;
+    }
+
     drawRoster(screen, team.players);
 };
 

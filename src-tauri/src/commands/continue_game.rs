@@ -19,7 +19,7 @@ pub fn go_to_next_day() -> String {
     handle_comps(&today);
 
     *TODAY.lock().unwrap() = today.next_day().unwrap();
-    return date_to_db_string(&TODAY.lock().unwrap());
+    return get_date_string();
 }
 
 // Get the current date as a string.
@@ -39,8 +39,8 @@ fn handle_comps(today: &Date) {
             season.simulate_day(&comp, &today);
         }
 
-        // Create new seasons for competitions that are over.
-        else if *today > db_string_to_date(&season.end_date) {
+        // Create new seasons for parent competitions whose seasons are over.
+        if comp.parent_comp_id == 0 && *today > db_string_to_date(&season.end_date) {
             // Cannot change teams between seasons, for now.
             let teams: Vec<TeamId> = season.teams.iter().map(|a | a.team_id).collect();
             comp.create_and_setup_seasons(&teams);
@@ -55,24 +55,32 @@ fn handle_managers_and_teams(today: &Date) {
 
     for manager in managers.values_mut() {
         // TODO: have the manager look for a job or something.
-        if manager.person.contract.is_none() { continue; }
+        if manager.person.contract.is_none() {
+            continue;
+        }
 
         let mut team = Team::fetch_from_db(&manager.person.contract.as_ref().unwrap().team_id);
         teams_visited.insert(team.id);
 
-        // Do not do anything for the human.
-        if manager.is_human { continue; }
-
-        let mut has_changes = false;
-        if team.player_needs.is_empty() {
-            team.evaluate_player_needs();
-            has_changes = true;
+        // Do not do anything on behalf of the human.
+        if manager.is_human {
+            team.return_actions_to_full();
+            team.save();
+            continue;
         }
 
-        let contract_offered = team.offer_contract(today);
-        if contract_offered { has_changes = true; }
+        // Evaluate player needs if there are none.
+        if team.player_needs.is_empty() {
+            team.evaluate_player_needs();
+        }
 
-        if has_changes { team.save(); }
+        while team.actions_remaining > 0 {
+            let contract_offered = team.offer_contract(today);
+            if !contract_offered { break; }
+        }
+
+        team.return_actions_to_full();
+        team.save();
     }
 
     // TODO: teams without managers should do tasks specific to them.

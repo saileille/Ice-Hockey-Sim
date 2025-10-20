@@ -3,10 +3,10 @@ pub mod manager;
 
 use rand;
 use serde_json::json;
-use time::Duration;
+use time::{Date, Duration};
 
 use crate::{
-    country::Country, database::{COUNTRIES, TODAY}, team::Team, time::db_string_to_date, types::{convert, CountryId, TeamId}
+    competition::Competition, country::Country, database::{COUNTRIES, TODAY}, team::Team, time::{date_to_db_string, db_string_to_date}, types::{convert, CountryId, TeamId}
 };
 
 #[derive(Debug)]
@@ -20,8 +20,8 @@ enum Gender {
 #[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct Person {
-    forename: String,
-    surname: String,
+    pub forename: String,
+    pub surname: String,
     gender: Gender,
     country_id: CountryId,
     pub contract: Option<Contract>,
@@ -132,6 +132,14 @@ impl Contract {
             end_date: end_date.to_string(),
             team_id: team_id,
         }
+    }
+
+    // Create a contract based on the team and how many years it should last.
+    pub fn build_from_years(team: &Team, today: &Date, years: i32) -> Self {
+        let comp = Competition::fetch_from_db(&team.primary_comp_id);
+        let end_date = comp.season_window.end.get_previous_date_with_year_offset(years);
+
+        return Self::build(&date_to_db_string(today), &date_to_db_string(&end_date), team.id);
     }
 
     // Get the team of the contract.

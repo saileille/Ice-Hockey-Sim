@@ -29,6 +29,9 @@ pub struct Team {
     // Player-acquisition related.
     pub approached_players: Vec<PlayerId>,
     pub player_needs: Vec<PlayerNeed>,
+
+    // Actions.
+    pub actions_remaining: u8
 }
 
 // Basics.
@@ -109,6 +112,10 @@ impl Team {
         json!({
             "id": self.id,
             "name": self.name,
+            "manager": match self.get_manager() {
+                Some(manager) => Some(manager.get_team_screen_json()),
+                _ => None
+            },
             "players": json_players
         })
     }
@@ -118,6 +125,15 @@ impl Team {
         json!({
             "id": self.id,
             "name": self.name
+        })
+    }
+
+    // Get relevant info of the team for a human manager.
+    pub fn get_manager_package_info(&self) -> serde_json::Value {
+        json!({
+            "id": self.id,
+            "actions_remaining": self.actions_remaining,
+            "approached_players": self.approached_players
         })
     }
 }
@@ -132,6 +148,12 @@ impl Team {
 
         self.lineup.auto_add(players);
         self.save();
+    }
+
+    // Give the team its full actions back.
+    // Action value could depend on quantity and quality of team staff?
+    pub fn return_actions_to_full(&mut self) {
+        self.actions_remaining = 1;
     }
 }
 
@@ -202,6 +224,7 @@ impl Team {
     pub fn setup(&mut self, min_ability: u8, max_ability: u8) {
         self.create_manager();
         // self.generate_roster(min_ability, max_ability);
+        self.return_actions_to_full();
         self.save();
     }
 }

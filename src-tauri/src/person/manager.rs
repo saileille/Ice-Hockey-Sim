@@ -1,5 +1,7 @@
 // This is what a player is!
 
+use serde_json::json;
+
 use crate::{database::MANAGERS, person::{Gender, Person}, types::{CountryId, ManagerId}};
 
 #[derive(Default, Clone)]
@@ -53,5 +55,32 @@ impl Manager {
     // Delete the manager from the database.
     pub fn delete_from_db(&self) {
         MANAGERS.lock().unwrap().remove(&self.id);
+    }
+
+    // Get the human manager.
+    pub fn get_human() -> Option<Self> {
+        for manager in MANAGERS.lock().unwrap().values() {
+            if manager.is_human { return Some(manager.clone()); }
+        }
+
+        return None;
+    }
+
+    // Get relevant information to the team screen.
+    pub fn get_team_screen_json(&self) -> serde_json::Value {
+        json!({
+            "name": self.person.get_full_name()
+        })
+    }
+
+    // Get a package of information that is used in game interaction.
+    // For human players only.
+    pub fn get_package(&self) -> serde_json::Value {
+        json!({
+            "team": match self.person.contract.as_ref() {
+                Some(contract) => Some(contract.get_team().get_manager_package_info()),
+                _ => None
+            }
+        })
     }
 }

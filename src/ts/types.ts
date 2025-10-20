@@ -9,3 +9,15 @@ export type TagName = Parameters<CreateElement>[0];
 // Types allowed in creating links.
 export const LINK_TYPES = ["team", "player"];
 export type LinkType = (typeof LINK_TYPES)[number];
+
+
+export type HumanTeamInfo = {
+    id: number,
+    actions_remaining: number,
+    approached_players: Array<number>
+};
+
+// Important info of a human manager.
+export type HumanInfo = {
+    team: HumanTeamInfo | null
+};

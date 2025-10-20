@@ -135,7 +135,9 @@ impl Team {
     pub fn offer_contract(&mut self, today: &Date) -> bool {
         let mut player = self.select_player_from_shortlist();
         if player.is_none() { return false; }
-        self.offer_contract_to_player(player.as_mut().unwrap(), today);
+
+        let contract = self.create_contract_offer(player.as_ref().unwrap(), today);
+        self.offer_contract_to_player(player.as_mut().unwrap(), contract);
         return true;
     }
 
@@ -182,17 +184,20 @@ impl Team {
     }
 
     // Offer contract to a given player.
-    fn offer_contract_to_player(&mut self, player: &mut Player, today: &Date) {
-        let years = rand::random_range(1..=4);  // 1-4 year contract offers, just like MHM.
-
-        let comp = Competition::fetch_from_db(&self.primary_comp_id);
-        let end_date = comp.season_window.end.get_previous_date_with_year_offset(years);
-
-        let contract = Contract::build(&date_to_db_string(today), &date_to_db_string(&end_date), self.id);
+    pub fn offer_contract_to_player(&mut self, player: &mut Player, contract: Contract) {
         player.person.contract_offers.push(contract);
         self.approached_players.push(player.id);
         self.evaluate_player_needs();
         player.save();
+
+        self.actions_remaining -= 1;
+    }
+
+    // AI makes a contract offer to a player.
+    // The player itself should affect the contract offer at some point.
+    fn create_contract_offer(&self, player: &Player, today: &Date) -> Contract {
+        let years = rand::random_range(1..=4);  // 1-4 year contract offers, just like MHM.
+        return Contract::build_from_years(self, today, years);
     }
 
     // Get a player shortlist of possible hirelings.

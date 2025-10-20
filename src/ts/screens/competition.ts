@@ -2,7 +2,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseTopBar, createCompSelect, goToChildCompetition, initialiseContentScreen } from "./basics";
 import { createEventListener, createElement, createLink } from "../helpers";
-import { drawScreen as drawTeamScreen } from "./team";
 
 type Format = {
     round_robin: RoundRobinFormat | null,
@@ -103,14 +102,12 @@ type Competition = {
 
 // Draw any competition screen.
 export const drawScreen = async (id: number) => {
-    const json: string = await invoke("get_comp_screen_info", { id: id });
-    const comp: Competition = JSON.parse(json);
+    const comp: Competition = await invoke("get_comp_screen_info", { id: id });
 
     initialiseTopBar();
     const screen = initialiseContentScreen();
 
     // If the competition is something like playoffs.
-    // The JSON looks a bit different in this case.
     if (comp.season.rounds !== undefined) {
         drawScreenTournament(screen, comp, comp.season.rounds, id);
     }

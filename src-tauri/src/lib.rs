@@ -41,6 +41,10 @@ pub fn run() {
             commands::get_team_screen_info,
             commands::get_player_screen_info,
             commands::create_human_manager,
+            commands::get_human_info,
+            commands::get_free_agents,
+            commands::get_player_search_info,
+            commands::offer_contract,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
