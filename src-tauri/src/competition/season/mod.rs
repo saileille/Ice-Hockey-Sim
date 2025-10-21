@@ -10,7 +10,7 @@ use time::Date;
 
 use crate::{competition::{season::{knockout_round::KnockoutRound as KnockoutRoundSeason, round_robin::RoundRobin as RoundRobinSeason, team::TeamCompData}, Competition}, database::SEASONS, match_event::Game, team::Team, time::{date_to_db_string, db_string_to_date}, types::{convert, CompetitionId, TeamId}};
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct Season {
     index: usize,   // For easier saving of the season.

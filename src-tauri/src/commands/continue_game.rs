@@ -99,11 +99,13 @@ fn handle_players(today: &Date) {
         let mut has_changes = false;
 
         // Check if the player's contract has expired.
-        if player.person.check_if_contract_expired() {
+        let expired = player.person.check_if_contract_expired();
+        if expired {
             let mut team = Team::fetch_from_db(&player.person.contract.as_ref().unwrap().team_id);
             player.person.contract = None;
 
             team.roster.retain(|id| *id != player.id);
+            team.evaluate_player_needs();
             team.save();
 
             has_changes = true;

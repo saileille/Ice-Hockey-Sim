@@ -220,13 +220,18 @@ const drawRoundRobinStandings = (screen: HTMLDivElement, teams: Array<Team>) => 
 // Only previous and next matches for now.
 const drawSchedule = (screen: HTMLDivElement, season: Season, displaySeed: boolean) => {
     screen.insertAdjacentHTML("beforeend", `
-        <table id="previous"><tbody><tr>
-            <th id="previous-date"></th>
-        </tr></tbody></table>
-
-        <table id="next"><tbody><tr>
-            <th id="next-date"></th>
-            </tr></tbody></table>
+        <table><tr>
+            <td style="vertical-align: top;">
+                <table id="previous"><tbody><tr>
+                    <th id="previous-date"></th>
+                </tr></tbody></table>
+            </td>
+            <td style="vertical-align: top;">
+                <table id="next"><tbody><tr>
+                    <th id="next-date"></th>
+                </tr></tbody></table>
+            </td>
+        </tr></table>
     `);
 
     drawGameDay("previous", season.played_games, displaySeed);

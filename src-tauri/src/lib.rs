@@ -10,6 +10,7 @@ mod person;
 mod team;
 mod time;
 mod tests;
+mod misc;
 
 use tauri::Manager;
 
