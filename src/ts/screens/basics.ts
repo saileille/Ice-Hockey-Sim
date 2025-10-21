@@ -4,6 +4,7 @@ import { createEventListener, createElement } from "../helpers.ts";
 import { drawScreen as drawCompScreen } from "./competition.ts";
 import { Listener } from "../types.ts";
 import { onClickHomeScreen } from "./home.ts";
+import { drawScreen as drawHomeScreen } from "./home.ts";
 
 export const initialiseTopBar = () => {
     // Check if the basics have already been initialised.
@@ -81,8 +82,8 @@ const toNextDay: Listener = async (_e: Event) => {
     const dateDiv: HTMLDivElement = document.querySelector("#date") as HTMLDivElement;
     const dateString: string = await invoke("go_to_next_day");
 
-    // Should update a whole lot more.
     dateDiv.textContent = dateString;
+    drawHomeScreen();
 };
 
 const goToCompetition = (query: string) => {

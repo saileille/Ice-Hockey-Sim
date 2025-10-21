@@ -111,28 +111,11 @@ fn handle_players(today: &Date) {
             has_changes = true;
         }
 
-        // Check if any contract offers for the player have expired.
-        let mut expired_indexes = Vec::new();
-        for (i, offer) in player.person.contract_offers.iter().enumerate() {
-            if offer.check_if_expired() {
-                let mut team = Team::fetch_from_db(&offer.team_id);
-                team.approached_players.retain(|id| *id != player.id);
-                team.evaluate_player_needs();
-                team.save();
-                expired_indexes.push(i);
-            }
-        }
-
-        if !expired_indexes.is_empty() {
-            has_changes = true;
-            for index in expired_indexes.iter().rev() {
-                player.person.contract_offers.remove(*index);
-            }
-        }
+        player.check_expired_offers(&mut has_changes);
 
         let signs_contract = player.person.decide_to_sign();
         if signs_contract {
-            player.sign_contract(today);
+            player.choose_contract(today);
             has_changes = true;
         }
 

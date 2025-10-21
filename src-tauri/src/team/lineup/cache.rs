@@ -6,8 +6,8 @@ use crate::{match_event::event::PlayersOnIce, misc::random_with_weights, person:
 #[derive(Default, Clone)]
 pub struct LineUpCache {
     goalkeepers: [Option<Player>; 2],
-    pub defence_pairs: [DefencePairCache; 4],
-    pub forward_lines: [ForwardLineCache; 4],
+    defence_pairs: [DefencePairCache; 4],
+    forward_lines: [ForwardLineCache; 4],
     pub players_on_ice: PlayersOnIceCache,
 }
 
@@ -47,6 +47,52 @@ impl LineUpCache {
         self.players_on_ice.lw = self.forward_lines[index].lw.clone();
         self.players_on_ice.c = self.forward_lines[index].c.clone();
         self.players_on_ice.rw = self.forward_lines[index].rw.clone();
+    }
+
+    // Get the average ability of the lineup.
+    // This is for player contract AI.
+    pub fn get_average_ability(&self) -> f64 {
+        let mut total_ability = 0;
+        let mut counter: u8 = 0;
+
+        for gk in self.goalkeepers.iter() {
+            if gk.is_some() {
+                total_ability += gk.as_ref().unwrap().ability as u16;
+                counter += 1;
+            }
+        }
+
+        for pair in self.defence_pairs.iter() {
+            if pair.ld.is_some() {
+                total_ability += pair.ld.as_ref().unwrap().ability as u16;
+                counter += 1;
+            }
+            if pair.rd.is_some() {
+                total_ability += pair.rd.as_ref().unwrap().ability as u16;
+                counter += 1;
+            }
+        }
+
+        for line in self.forward_lines.iter() {
+            if line.lw.is_some() {
+                total_ability += line.lw.as_ref().unwrap().ability as u16;
+                counter += 1;
+            }
+            if line.c.is_some() {
+                total_ability += line.c.as_ref().unwrap().ability as u16;
+                counter += 1;
+            }
+            if line.rw.is_some() {
+                total_ability += line.rw.as_ref().unwrap().ability as u16;
+                counter += 1;
+            }
+        }
+
+        match counter {
+            0 => 0.0,
+            n => (total_ability as f64) / (n as f64)
+        }
+
     }
 }
 

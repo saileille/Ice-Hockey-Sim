@@ -111,20 +111,20 @@ fn add_competition_data() {
     Competition::build_and_save(
         "Liiga",
         vec![
-            Team::build_and_save("Gestapojat"), // 1
-            Team::build_and_save("Veto"),       // 2
+            Team::build_and_save("Ruiske"),     // 1
+            Team::build_and_save("Atomi"),      // 2
             Team::build_and_save("Uupuneet"),   // 3
             Team::build_and_save("SantaClaus"), // 4
             Team::build_and_save("HardCore"),   // 5
-            Team::build_and_save("Vauhti"),     // 6
-            Team::build_and_save("Vimma"),      // 7
-            Team::build_and_save("Kelarotat"),  // 8
+            Team::build_and_save("Ikirouta"),   // 6
+            Team::build_and_save("Kelarotat"),  // 7
+            Team::build_and_save("Vety"),       // 8
             Team::build_and_save("Saappaat"),   // 9
-            Team::build_and_save("Katiska"),    // 10
+            Team::build_and_save("Siat"),       // 10
             Team::build_and_save("Turmio"),     // 11
-            Team::build_and_save("Mahti"),      // 12
-            Team::build_and_save("Merirosvot"), // 13
-            Team::build_and_save("Sirkus"),     // 14
+            Team::build_and_save("Sirkus"),     // 12
+            Team::build_and_save("Polkka"),     // 13
+            Team::build_and_save("Teurastus"),  // 14
         ],
         AnnualWindow::build(
             AnnualDate::build(9, 1),

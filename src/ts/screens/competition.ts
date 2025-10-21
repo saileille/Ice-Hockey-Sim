@@ -177,23 +177,26 @@ const drawScreenKnockoutRound = (screen: HTMLDivElement, comp: Competition) => {
 // Draw the standings for round robin.
 const drawRoundRobinStandings = (screen: HTMLDivElement, teams: Array<Team>) => {
     screen.insertAdjacentHTML("beforeend", `
-        <table id="standings"><tbody><tr>
-            <th>Rank</th>
-            <th>Name</th>
-            <th>Games</th>
-            <th>Wins</th>
-            <th>OT Wins</th>
-            <th>Draws</th>
-            <th>OT Losses</th>
-            <th>Losses</th>
-            <th>Goals For</th>
-            <th>Goals Against</th>
-            <th>Goal Difference</th>
-            <th>Points</th>
-        </tr></tbody></table>
+        <table id="standings">
+            <thead><tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>Games</th>
+                <th>Wins</th>
+                <th>OT Wins</th>
+                <th>Draws</th>
+                <th>OT Losses</th>
+                <th>Losses</th>
+                <th>Goals For</th>
+                <th>Goals Against</th>
+                <th>Goal Difference</th>
+                <th>Points</th>
+            </tr></thead>
+            <tbody></tbody>
+        </table>
     `);
 
-    const standings = (document.querySelector("#standings") as HTMLTableElement).children[0] as HTMLTableSectionElement;
+    const standings = (document.querySelector("#standings") as HTMLTableElement).children[1] as HTMLTableSectionElement;
     for (const team of teams) {
         const row: HTMLTableRowElement = document.createElement("tr");
 

@@ -8,7 +8,6 @@ import { drawScreen as drawPlayerSearchScreen } from "./player_search";
 export const drawScreen = () => {
     initialiseTopBar();
 
-    // Do stuff with this later.
     const screen = initialiseContentScreen();
     screen.innerHTML = `
         <button id="player-search">Free Agents</button>
@@ -20,4 +19,4 @@ export const drawScreen = () => {
 // Listener of home screen button.
 export const onClickHomeScreen: Listener = (_e: Event) => {
     drawScreen();
-}
+};

@@ -4,14 +4,14 @@ use std::collections::HashMap;
 
 use time::Date;
 
-use crate::{competition::Competition, person::{player::{position::{Position, PositionId}, Player}, Contract}, team::Team, time::date_to_db_string, types::{convert, PlayerId}};
+use crate::{person::{player::{position::PositionId, Player}, Contract}, team::Team, types::{convert, PlayerId}};
 
 #[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct PlayerNeed {
-    position: PositionId,
+    pub position: PositionId,
 
-    // Abilities of the players.
+    // Abilities of the players, from highest to lowest.
     abilities: Vec<f64>,
 
     // Calculated and set in get_urgency
@@ -40,20 +40,34 @@ impl PlayerNeed {
     }
 
     // Get the worst ability of a player in lineup.
-    fn get_worst(&self) -> f64 {
+    pub fn get_worst(&self) -> f64 {
         match self.get_surplus() < 0 {
             true => 0.0,
-            _ => *self.abilities.first().unwrap()
+            _ => *self.abilities.last().unwrap()
         }
     }
 
-
     // Get the best ability of a player in lineup.
     fn get_best(&self) -> f64 {
-        match self.abilities.last() {
+        match self.abilities.first() {
             Some(a) => *a,
             _ => 0.0
         }
+    }
+
+    // See how attractive playing in the team would be to a player, role-wise.
+    // 1.0 is the best it can be. Player checks against not getting a playable position,
+    // so the minimum value is always above 0.0.
+    pub fn get_role_of_player(&self, player: &Player) -> f64 {
+        let mut index = 0.0;
+        for ability in self.abilities.iter() {
+            if player.ability as f64 > *ability {
+                break;
+            }
+            index += 1.0;
+        }
+
+        return 1.0 - (index / (self.get_lineup_places()) as f64);
     }
 
     // Calculate how much a team wants this type of player.
@@ -110,8 +124,7 @@ impl PlayerNeed {
 
 impl Team {
     // Team evaluates what kind of players it might need, and how desperately.
-    // This is a costly operation, so only do it after a signing, removal of a player target, or contract expiration.
-    // Needs re-evaluation once player development becomes a thing.
+    // Needs rework once player development becomes a thing.
     pub fn evaluate_player_needs(&mut self) {
         let mut roster_build = self.get_players();
         roster_build.append(&mut self.get_approached_players());

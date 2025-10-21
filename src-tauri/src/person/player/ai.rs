@@ -2,12 +2,11 @@
 
 use time::Date;
 
-use crate::{person::player::{position::Position, Player}, team::Team, time::date_to_db_string};
+use crate::{person::{player::Player, Contract}, team::{lineup::cache::LineUpCache, Team}, time::date_to_db_string};
 
 impl Player {
-    // Choose a contract to sign from the available options.
-    pub fn sign_contract(&mut self, today: &Date) {
-        let mut contract = self.person.contract_offers.swap_remove(rand::random_range(0..self.person.contract_offers.len()));
+    // Sign a given contract.
+    pub fn sign_contract(&mut self, mut contract: Contract, today: &Date) {
         contract.start_date = date_to_db_string(today);
 
         self.person.contract = Some(contract);
@@ -18,12 +17,84 @@ impl Player {
         team.save();
 
         for offer in self.person.contract_offers.iter() {
-            let mut team = Team::fetch_from_db(&offer.team_id);
-            team.approached_players.retain(|id| *id != self.id);
-            team.evaluate_player_needs();
-            team.save();
+            self.reject_contract(offer);
         }
 
         self.person.contract_offers.clear();
+    }
+
+    // Choose a contract to sign, if any...
+    pub fn choose_contract(&mut self, today: &Date) {
+        let mut offers: Vec<(f64, &Contract)> = self.person.contract_offers.iter().map(|a| (self.evaluate_offer(a), a)).collect();
+        offers.sort_by(|a, b| b.0.total_cmp(&a.0));
+
+        // If even the best offer is unacceptable, all should be rejected.
+        if offers[0].0 <= 0.0 {
+            for offer in self.person.contract_offers.iter() {
+                self.reject_contract(offer);
+            }
+            self.person.contract_offers.clear();
+            return;
+        }
+
+        let team_id = offers[0].1.team_id;
+        let index = self.person.contract_offers.iter().position(|a| a.team_id == team_id).unwrap();
+
+        let contract = self.person.contract_offers.swap_remove(index);
+        self.sign_contract(contract, today);
+    }
+
+    // Evaluate a contract offer.
+    fn evaluate_offer(&self, contract: &Contract) -> f64 {
+        let mut team = Team::fetch_from_db(&contract.team_id);
+        let mut need = None;
+        for team_need in team.player_needs.iter() {
+            if team_need.position == self.position_id {
+                need = Some(team_need);
+                break;
+            }
+        }
+
+        if self.ability as f64 <= need.unwrap().get_worst() {
+            return -1000.0;
+        }
+
+        // 1.0 at best, above 0.0 at worst.
+        let role_modifier = need.unwrap().get_role_of_player(self);
+
+        team.auto_build_lineup();
+        let lineup = LineUpCache::build(&team.lineup);
+
+        // Adding 10 so an empty roster is not that bad of a detriment.
+        let avg_ability = 10.0 + lineup.get_average_ability();
+
+        return avg_ability / role_modifier;
+    }
+
+    // Reject a contract.
+    fn reject_contract(&self, offer: &Contract) {
+        let mut team = Team::fetch_from_db(&offer.team_id);
+        team.approached_players.retain(|id| *id != self.id);
+        team.evaluate_player_needs();
+        team.save();
+    }
+
+    // Check if any contract offers for the player have expired.
+    // Return if there are changes to the player.
+    pub fn check_expired_offers(&mut self, has_changes: &mut bool) {
+        let mut expired_indexes = Vec::new();
+        for (i, offer) in self.person.contract_offers.iter().enumerate() {
+            if offer.check_if_expired() {
+                self.reject_contract(offer);
+                expired_indexes.push(i);
+            }
+        }
+
+        if !expired_indexes.is_empty() {
+            *has_changes = true;
+            for index in expired_indexes.iter().rev() {
+                self.person.contract_offers.remove(*index);
+            }
+        }
     }
 }
