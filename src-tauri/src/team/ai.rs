@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use rand::{rng, seq::IndexedRandom, Rng};
 use time::Date;
 
 use crate::{person::{player::{position::PositionId, Player}, Contract}, team::Team, types::{convert, PlayerId}};
@@ -16,7 +17,7 @@ pub struct PlayerNeed {
 
     // Calculated and set in get_urgency
     // f64::MAX: Must have this type of player at all costs.
-    // f64::MIN: Will not acquire a player of this type (unless maybe if one is *really* good).
+    // Negative: Will not acquire a player of this type (unless maybe if one is *really* good).
     urgency: f64,
 }
 
@@ -118,7 +119,7 @@ impl PlayerNeed {
             _ => self.get_worst()
         };
 
-        (player.ability as f64 - worst) * self.urgency
+        (player.ability as f64 - worst) * self.urgency * (1.0 / (player.person.contract_offers.len() + 1) as f64)
     }
 }
 
@@ -164,7 +165,6 @@ impl Team {
 
         // How much a team wants a specific player.
         let mut player_attraction: Vec<(PlayerId, f64)> = Vec::new();
-        let mut total_weight: f64 = 0.0;
         for player in free_agents.iter() {
             for need in self.player_needs.iter() {
                 if need.position == player.position_id {
@@ -174,26 +174,25 @@ impl Team {
                     if evaluation <= 0.0 { continue; }
 
                     player_attraction.push((player.id, evaluation));
-
-                    total_weight += evaluation;
                     break;
                 }
             }
         }
 
         if player_attraction.is_empty() { return None; }
+        player_attraction.sort_by(|(_, a), (_, b)| b.total_cmp(&a));
 
-        // Weighted random to determine who the team is trying to sign.
-        let value = rand::random_range(0.0..total_weight);
-        let mut counter = 0.0;
-        for (id, evaluation) in player_attraction.iter() {
-            counter += evaluation;
-            if value < counter {
-                return Some(Player::fetch_from_db(id).unwrap());
+        // Choose randomly from equally good options.
+        let mut choices: Vec<(PlayerId, f64)> = Vec::new();
+        for attraction in player_attraction {
+            if choices.is_empty() || choices[0].1 <= attraction.1 {
+                choices.push(attraction);
             }
         }
 
-        panic!("impossibru. value was {}, total weight was {}", value, total_weight);
+        let choice = choices.choose(&mut rng()).unwrap();
+
+        return Player::fetch_from_db(&choice.0);
     }
 
     // Offer contract to a given player.
