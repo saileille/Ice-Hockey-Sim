@@ -131,14 +131,19 @@ const drawScreenTournament = (screen: HTMLDivElement, comp: Competition, rounds:
     createEventListener("#child-comps", "change", goToChildCompetition);
 
     screen.insertAdjacentHTML("beforeend", `
-        <div id="tree"></div>
+        <table id="tree"><tbody><tr></tr></tbody></table>
     `);
 
-    const tree: HTMLDivElement = document.querySelector("#tree") as HTMLDivElement;
+    const tree = ((document.querySelector("#tree") as HTMLTableElement).children[0] as HTMLTableSectionElement).children[0] as HTMLTableRowElement;
     for (const [index, round] of rounds.entries()) {
-        const roundElement: HTMLDivElement = createElement("div", { "id": `round${index}` });
-        createKnockoutPairElements(round.pairs, roundElement);
-        tree.appendChild(roundElement);
+        const roundCell = document.createElement("td");
+        const roundTable = createElement("table", { "id": `round${index}` });
+        const tbody = document.createElement("tbody");
+        roundTable.appendChild(tbody);
+
+        createKnockoutPairElements(round.pairs, tbody);
+        roundCell.appendChild(roundTable);
+        tree.appendChild(roundCell);
     }
 
     drawSchedule(screen, comp.season, true);
@@ -271,7 +276,7 @@ const drawGame = (query: string, game: Game, displaySeed: boolean) => {
         if (game.had_overtime) {
             otString = " OT";
         }
-        scoreString = `${game.home.goals} ${scoreString}${otString} ${game.away.goals}`;
+        scoreString = `${game.home.goals} ${scoreString} ${game.away.goals}${otString}`;
     }
 
     const row: HTMLTableRowElement = document.createElement("tr");
@@ -281,8 +286,8 @@ const drawGame = (query: string, game: Game, displaySeed: boolean) => {
     createLink("team", game.away.id, game.away.name, [document.createElement("td"), row]);
 
     if (displaySeed) {
-        row.insertBefore(createElement("td", { "textContent": game.home.seed }), row.firstChild);
-        row.appendChild(createElement("td", { "textContent": game.away.seed }));
+        row.insertBefore(createElement("td", { "textContent": `(${game.home.seed}.)` }), row.firstChild);
+        row.appendChild(createElement("td", { "textContent": `(${game.away.seed}.)` }));
     }
 
     return row;
@@ -310,32 +315,27 @@ const drawRanking = (screen: HTMLDivElement, teams: Array<Team>) => {
 // Draw pairs of the knockout round.
 const drawKnockoutPairs = (screen: HTMLDivElement, pairs: Array<KnockoutPair>) => {
     screen.insertAdjacentHTML("beforeend", `
-        <div id="pairs"></div>
+        <table id="pairs"><tbody></tbody></table>
     `);
 
-    const pairsElement: HTMLDivElement = document.querySelector("#pairs") as HTMLDivElement;
-    createKnockoutPairElements(pairs, pairsElement);
+    const tbody = (document.querySelector("#pairs") as HTMLTableElement).children[0] as HTMLTableSectionElement;
+    createKnockoutPairElements(pairs, tbody);
 };
 
 // Create elements of knockout pairs and append them to the given parent element.
-const createKnockoutPairElements = (pairs: Array<KnockoutPair>, parentElement: HTMLDivElement) => {
+const createKnockoutPairElements = (pairs: Array<KnockoutPair>, tbody: HTMLTableSectionElement) => {
     for (const pair of pairs) {
-        const table = document.createElement("table");
-        const tbody = document.createElement("tbody");
-        table.appendChild(tbody);
-
         drawKnockoutPairTeam(pair.home, tbody);
         drawKnockoutPairTeam(pair.away, tbody);
-        parentElement.appendChild(table);
     }
 };
 
-const drawKnockoutPairTeam = (team: KnockoutTeam, parentElement: HTMLTableSectionElement) => {
+const drawKnockoutPairTeam = (team: KnockoutTeam, tbody: HTMLTableSectionElement) => {
     const row = document.createElement("tr");
     row.appendChild(createElement("td", { "textContent": `${team.seed}.` }));
 
     createLink("team", team.id, team.name, [document.createElement("td"), row]);
     row.appendChild(createElement("td", { "textContent": team.wins }));
 
-    parentElement.appendChild(row);
+    tbody.appendChild(row);
 }

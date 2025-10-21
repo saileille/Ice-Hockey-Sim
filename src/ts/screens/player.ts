@@ -41,7 +41,6 @@ export const drawScreen = async (id: number) => {
         <h1>${pageTitle}</h1>
         <table id="contract"><tbody>
         </tbody></table>
-        <button id="offer-contract${id}">Offer Contract</button>
     `);
 
     if (player.contract !== null) {
@@ -50,13 +49,14 @@ export const drawScreen = async (id: number) => {
 
     drawOffers(player.offers);
 
-    const offerContract = document.querySelector(`#offer-contract${id}`) as HTMLButtonElement;
-
-    // Maybe some tooltip as to why the contract cannot be offered would be good...
-    if (humanInfo.team === null || humanInfo.team.approached_players.includes(id) || humanInfo.team.actions_remaining <= 0) {
-        offerContract.disabled = true;
-    }
-    else {
+    // Contract offer can be made if...
+    if (
+        player.contract === null && // ...player does not have a contract,
+        humanInfo.team !== null &&  // ...human is managing a team,
+        !humanInfo.team.approached_players.includes(id) &&  // ...human's team has not approached the player,
+        humanInfo.team.actions_remaining > 0    // ...and human team has actions remaining.
+    ) {
+        screen.appendChild(createElement("button", { "id": `offer-contract${id}`, "textContent": "Offer Contract" }));
         createEventListener(`#offer-contract${id}`, "click", drawNegotiationScreen);
     }
 };
@@ -68,6 +68,7 @@ const drawContract = (contract: Contract) => {
     const firstRow = document.createElement("tr");
     firstRow.appendChild(createElement("th", { "textContent": "Current Contract" }));
     firstRow.appendChild(createElement("th", { "textContent": "Started" }));
+    firstRow.appendChild(createElement("th", { "textContent": "Ends" }));
     firstRow.appendChild(createElement("th", { "textContent": "Seasons Left" }));
     contractTable.appendChild(firstRow);
 

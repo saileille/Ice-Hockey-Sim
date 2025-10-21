@@ -48,20 +48,22 @@ export const drawScreen = async (id: number) => {
 // Draw the roster of a team.
 const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
     screen.insertAdjacentHTML("beforeend", `
-        <select id="player-filters"></select>
-        <table id="players"><tbody><tr>
-            <th>Name</th>
-            <th>Country</th>
-            <th>Position</th>
-            <th>Ability</th>
-            <th>Seasons Left</th>
-        </tr></tbody></table>
+        <select id="player-filters">
+            <option value="both">Roster + Approached</option>
+            <option value="roster">Roster</option>
+            <option value="approached">Approached</option>
+        </select>
+        <table id="players">
+            <thead><tr>
+                <th>Name</th>
+                <th>Country</th>
+                <th>Position</th>
+                <th>Ability</th>
+                <th>Seasons Left</th>
+            </tr></thead>
+            <tbody></tbody>
+        </table>
     `);
-
-    const select = document.querySelector("#player-filters") as HTMLSelectElement;
-    select.appendChild(createElement("option", { "value": "roster", "textContent": "Roster" }));
-    select.appendChild(createElement("option", { "value": "approached", "textContent": "Approached" }));
-    select.appendChild(createElement("option", { "value": "both", "textContent": "Roster + Approached" }));
 
     const roster = (document.querySelector("#players") as HTMLTableElement).children[0] as HTMLTableSectionElement;
 
@@ -74,16 +76,14 @@ const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
         row.appendChild(createElement("td", { "textContent": player.seasons_left }));
 
         roster.appendChild(row);
-        // createEventListener(`.player${player.id}`, "click", drawPlayerScreen);
     }
 
-    changePlayerFilter(roster, "roster");
     createEventListener("#player-filters", "change", onChangePlayerFilter);
 };
 
 // When the user changes the player filter of a team screen.
 const onChangePlayerFilter: Listener = (e: Event) => {
-    const roster = (document.querySelector("#players") as HTMLTableElement).children[0] as HTMLTableSectionElement;
+    const roster = (document.querySelector("#players") as HTMLTableElement).children[1] as HTMLTableSectionElement;
     const select = e.target as HTMLSelectElement;
     const setting = select.value as RosterSetting;
 
@@ -93,16 +93,13 @@ const onChangePlayerFilter: Listener = (e: Event) => {
 const changePlayerFilter = (roster: HTMLTableSectionElement, setting: RosterSetting) => {
     for (const row of roster.children) {
         const r = row as HTMLTableRowElement;
-        const seasonsLeftCell = r.children[4];
-
-        // The header should always be displayed.
-        if (seasonsLeftCell.tagName === "TH") { continue; }
 
         if (setting === "both") {
             r.style.display = "table-row";
             continue;
         }
 
+        const seasonsLeftCell = r.children[4];
         const seasonsLeft = seasonsLeftCell.textContent;
         if (setting === "roster") {
             if (seasonsLeft === "0") { r.style.display = "none"; }
