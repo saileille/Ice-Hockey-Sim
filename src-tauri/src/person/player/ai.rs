@@ -23,15 +23,18 @@ impl Player {
         self.person.contract_offers.clear();
     }
 
-    // Choose a contract to sign, if any...
+    // Choose a contract to sign, if any.
+    // This method assumes there are existing contract offers.
     pub fn choose_contract(&mut self, today: &Date) {
         let mut offers: Vec<(f64, &Contract)> = self.person.contract_offers.iter().map(|a| (self.evaluate_offer(a), a)).collect();
         offers.sort_by(|a, b| b.0.total_cmp(&a.0));
 
         // If even the best offer is unacceptable, all should be rejected.
         if offers[0].0 <= 0.0 {
+            let mut rejected = Vec::new();
             for offer in self.person.contract_offers.iter() {
                 self.reject_contract(offer);
+                rejected.push(offer.get_team());
             }
             self.person.contract_offers.clear();
             return;
@@ -47,20 +50,31 @@ impl Player {
     // Evaluate a contract offer.
     fn evaluate_offer(&self, contract: &Contract) -> f64 {
         let mut team = Team::fetch_from_db(&contract.team_id);
-        let mut need = None;
+        let mut need_option = None;
         for team_need in team.player_needs.iter() {
             if team_need.position == self.position_id {
-                need = Some(team_need);
+                need_option = Some(team_need.clone());
                 break;
             }
         }
 
-        if self.ability as f64 <= need.unwrap().get_worst() {
+        // This should not be possible, but let's check against it just in case.
+        if need_option.is_none() { return -1000.0; }
+
+        // Let's unwrap so code becomes nicer.
+        let mut need = need_option.unwrap();
+
+        // Removing the player's ability from needs so the player does not compare against himself.
+        let player_index = need.abilities.iter().position(|a| *a == self.ability as f64);
+        if player_index.is_some() { need.abilities.remove(player_index.unwrap()); }
+
+        // A player never wants to join a team where their playing time is uncertain.
+        if self.ability as f64 <= need.get_worst() {
             return -1000.0;
         }
 
         // 1.0 at best, above 0.0 at worst.
-        let role_modifier = need.unwrap().get_role_of_player(self);
+        let role_modifier = need.get_role_of_player(self);
 
         team.auto_build_lineup();
         let lineup = LineUpCache::build(&team.lineup);
@@ -75,13 +89,13 @@ impl Player {
     fn reject_contract(&self, offer: &Contract) {
         let mut team = Team::fetch_from_db(&offer.team_id);
         team.approached_players.retain(|id| *id != self.id);
-        team.evaluate_player_needs();
         team.save();
     }
 
     // Check if any contract offers for the player have expired.
     // Return if there are changes to the player.
-    pub fn check_expired_offers(&mut self, has_changes: &mut bool) {
+    pub fn check_expired_offers(&mut self) -> bool {
+        let mut expired = false;
         let mut expired_indexes = Vec::new();
         for (i, offer) in self.person.contract_offers.iter().enumerate() {
             if offer.check_if_expired() {
@@ -91,10 +105,12 @@ impl Player {
         }
 
         if !expired_indexes.is_empty() {
-            *has_changes = true;
+            expired = true;
             for index in expired_indexes.iter().rev() {
                 self.person.contract_offers.remove(*index);
             }
         }
+
+        return expired;
     }
 }

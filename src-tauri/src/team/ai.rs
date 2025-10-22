@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use rand::{rng, seq::IndexedRandom, Rng};
+use rand::{rng, seq::IndexedRandom};
 use time::Date;
 
 use crate::{person::{player::{position::PositionId, Player}, Contract}, team::Team, types::{convert, PlayerId}};
@@ -13,7 +13,7 @@ pub struct PlayerNeed {
     pub position: PositionId,
 
     // Abilities of the players, from highest to lowest.
-    abilities: Vec<f64>,
+    pub abilities: Vec<f64>,
 
     // Calculated and set in get_urgency
     // f64::MAX: Must have this type of player at all costs.
@@ -57,10 +57,11 @@ impl PlayerNeed {
     }
 
     // See how attractive playing in the team would be to a player, role-wise.
-    // 1.0 is the best it can be. Player checks against not getting a playable position,
+    // 1.0 is the best it can be. This method assumes the player is getting a playable position,
     // so the minimum value is always above 0.0.
     pub fn get_role_of_player(&self, player: &Player) -> f64 {
         let mut index = 0.0;
+
         for ability in self.abilities.iter() {
             if player.ability as f64 > *ability {
                 break;
@@ -199,7 +200,6 @@ impl Team {
     pub fn offer_contract_to_player(&mut self, player: &mut Player, contract: Contract) {
         player.person.contract_offers.push(contract);
         self.approached_players.push(player.id);
-        self.evaluate_player_needs();
         player.save();
 
         self.actions_remaining -= 1;

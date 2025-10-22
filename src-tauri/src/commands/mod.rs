@@ -158,5 +158,8 @@ pub fn offer_contract(player_id: PlayerId, team_id: TeamId, years: i32) {
     let contract = Contract::build_from_years(&team, &today, years);
 
     team.offer_contract_to_player(&mut player, contract);
+
+    // This is for players to evaluate this team's attractiveness.
+    team.evaluate_player_needs();
     team.save();
 }

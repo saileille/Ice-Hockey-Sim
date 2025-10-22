@@ -1,7 +1,6 @@
 pub mod lineup;
-mod ai;
+pub mod ai;
 
-use std::{collections::HashSet, mem::discriminant};
 use rand::{
     distr::Uniform,
     Rng
@@ -9,7 +8,7 @@ use rand::{
 use serde_json::json;
 use time::Date;
 use crate::{
-    country::Country, database::{TEAMS, TODAY}, person::{manager::Manager, player::{
+    database::{TEAMS, TODAY}, person::{manager::Manager, player::{
         position::PositionId, Player
     }, Contract, Person}, team::ai::PlayerNeed, time::date_to_db_string, types::{
         CompetitionId, ManagerId, PlayerId, TeamId

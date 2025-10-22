@@ -62,6 +62,10 @@ fn handle_managers_and_teams(today: &Date) {
         let mut team = Team::fetch_from_db(&manager.person.contract.as_ref().unwrap().team_id);
         teams_visited.insert(team.id);
 
+        // Initial evaluation here.
+        // Done for human managers as well so the players can evaluate the contract offers they receive.
+        team.evaluate_player_needs();
+
         // Do not do anything on behalf of the human.
         if manager.is_human {
             team.return_actions_to_full();
@@ -69,14 +73,21 @@ fn handle_managers_and_teams(today: &Date) {
             continue;
         }
 
-        // Evaluate player needs if there are none.
-        if team.player_needs.is_empty() {
-            team.evaluate_player_needs();
-        }
 
+        let mut has_changes = false;
         while team.actions_remaining > 0 {
             let contract_offered = team.offer_contract(today);
-            if !contract_offered { break; }
+            if !contract_offered {
+                break;
+            }
+            else {
+                has_changes = true;
+            }
+        }
+
+        // Another evaluation used for players' decision-making.
+        if has_changes {
+            team.evaluate_player_needs();
         }
 
         team.return_actions_to_full();
@@ -105,13 +116,13 @@ fn handle_players(today: &Date) {
             player.person.contract = None;
 
             team.roster.retain(|id| *id != player.id);
-            team.evaluate_player_needs();
             team.save();
 
             has_changes = true;
         }
 
-        player.check_expired_offers(&mut has_changes);
+        let expired = player.check_expired_offers();
+        if expired { has_changes = true; }
 
         let signs_contract = player.person.decide_to_sign();
         if signs_contract {
