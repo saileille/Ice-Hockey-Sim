@@ -3,13 +3,15 @@ pub mod season;
 pub mod format;
 pub mod knockout_generator;
 
-use std::{cmp::Ordering, ops::Range};
+use std::{cmp::Ordering, iter::zip};
 
-use crate::{competition::season::{ranking::{get_sort_functions, RankCriteria}, team::TeamCompData, Season}, database::{COMPETITIONS, SEASONS}, team::Team, time::AnnualWindow, types::{convert, CompetitionId, TeamId}};
+use serde_json::json;
+
+use crate::{competition::season::{ranking::{get_sort_functions, RankCriteria}, team::TeamCompData, Season}, database::{COMPETITIONS, SEASONS}, team::Team, time::{db_string_to_date, AnnualWindow}, types::{convert, CompetitionId, TeamId}};
 
 use self::format::Format;
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct Competition {
     pub id: CompetitionId,
@@ -22,6 +24,7 @@ pub struct Competition {
 
     pub child_comp_ids: Vec<CompetitionId>,
     pub parent_comp_id: CompetitionId,
+    pub is_tournament_tree: bool,  // Make this true if the competition consists solely of child knockout rounds.
 }
 
 // Basics.
@@ -35,7 +38,7 @@ impl Competition {
     }
 
     // Build a Competition element.
-    fn build(name: &str, teams: &Vec<Team>, season_window: AnnualWindow, connections: Vec<CompConnection>,
+    fn build(name: &str, teams: &[Team], season_window: AnnualWindow, connections: Vec<CompConnection>,
     min_no_of_teams: u8, format: Option<Format>, rank_criteria: Vec<RankCriteria>, child_comp_ids: Vec<CompetitionId>) -> Self {
         let mut comp = Self::default();
         comp.name = name.to_string();
@@ -57,21 +60,26 @@ impl Competition {
     }
 
     // Build a competition element and save it to the database.
-    pub fn build_and_save(name: &str, teams: &Vec<Team>, season_window: AnnualWindow, connections: Vec<CompConnection>,
+    pub fn build_and_save(name: &str, mut teams: Vec<Team>, season_window: AnnualWindow, connections: Vec<CompConnection>,
     min_no_of_teams: u8, format: Option<Format>, rank_criteria: Vec<RankCriteria>, child_comp_ids: Vec<CompetitionId>) -> Self {
         let mut comp = Self::build(name, &teams, season_window, connections, min_no_of_teams, format, rank_criteria, child_comp_ids);
 
         comp.save_new(&teams);
 
+        for team in teams.iter_mut() {
+            team.primary_comp_id = comp.id;
+            team.save();
+        }
+
         return comp;
     }
 
-    pub fn fetch_from_db(id: &CompetitionId) -> Option<Self> {
-        COMPETITIONS.lock().unwrap().get(id).cloned()
+    pub fn fetch_from_db(id: &CompetitionId) -> Self {
+        COMPETITIONS.lock().unwrap().get(id).cloned().unwrap()
     }
 
     // Save a competition to the database for the first time.
-    fn save_new(&mut self, teams: &Vec<Team>) {
+    fn save_new(&mut self, teams: &[Team]) {
         self.create_id(COMPETITIONS.lock().unwrap().len() + 1);
         self.save();
 
@@ -79,8 +87,8 @@ impl Competition {
         SEASONS.lock().unwrap().insert(self.id, Vec::new());
 
         // Create and save the first season.
-        let team_ids = teams.iter().map(|a| a.id).collect();
-        Season::build_and_save(self, &team_ids);
+        let team_ids: Vec<u8> = teams.iter().map(|a| a.id).collect();
+        self.create_new_season(&team_ids);
     }
 
     // Update the Competition to database.
@@ -90,13 +98,51 @@ impl Competition {
             .insert(self.id, self.clone());
     }
 
+    // Create a new season for the competition.
+    fn create_new_season(&self, teams: &[TeamId]) {
+        Season::build_and_save(self, teams);
+    }
+
+    // Create a new season for this competition and all its child competitions.
+    fn create_new_seasons(&self, teams: &[TeamId]) {
+        self.create_new_season(teams);
+
+        // Saves an unnecessary element creation.
+        if self.child_comp_ids.is_empty() { return; }
+
+        let child_teams = Vec::new();
+        for id in self.child_comp_ids.iter() {
+            Competition::fetch_from_db(id).create_new_seasons(&child_teams);        }
+    }
+
+    // Create new season for this competition and its child competitions.
+    pub fn create_and_setup_seasons(&self, teams: &[TeamId]) {
+        self.create_new_seasons(teams);
+        self.setup_season(&mut Vec::new());
+    }
+
     // Give child competitions this competition's ID.
     pub fn give_id_to_children_comps(&self) {
         for id in self.child_comp_ids.iter() {
-            let mut child_comp = Self::fetch_from_db(id).expect(&format!("{}: {} has child comp id of {id}", self.id, self.name));
+            let mut child_comp = Competition::fetch_from_db(id);
             child_comp.parent_comp_id = self.id;
             child_comp.save();
         }
+    }
+
+    // Get the name of this competition with all parent competition names.
+    fn get_full_name(&self, string: &str) -> String {
+        let mut name = if string.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{} {}", self.name, string)
+        };
+
+        if self.parent_comp_id != 0 {
+            name = Competition::fetch_from_db(&self.parent_comp_id).get_full_name(&name);
+        }
+
+        return name;
     }
 
     // Get the amount of seasons this competition has stored.
@@ -105,12 +151,22 @@ impl Competition {
     }
 
     // Get the round robin format, if competition has one.
-    fn get_round_robin_format(&self) -> Option<format::round_robin::RoundRobin> {
+    pub fn get_round_robin_format(&self) -> Option<format::round_robin::RoundRobin> {
         if self.format.is_none() {
             None
         } else {
             self.format.as_ref().unwrap().round_robin.clone()
         }
+    }
+
+    // Get the current season of the competition.
+    fn get_current_season(&self) -> Season {
+        Season::fetch_from_db(&self.id, self.get_seasons_amount() - 1)
+    }
+
+    // Get the teams in the competition's current season.
+    pub fn get_teams(&self) -> Vec<Team> {
+        self.get_current_season().get_teams()
     }
 }
 
@@ -146,10 +202,60 @@ impl Competition {
             order
         });
     }
+
+    // Get relevant information for a competition screen.
+    pub fn get_comp_screen_json(&self) -> serde_json::Value {
+        let season = Season::fetch_from_db(&self.id, self.get_seasons_amount() - 1);
+
+        json!({
+            "name": self.name,
+            "full_name": self.get_full_name(""),
+            "format": if self.format.is_none() {
+                serde_json::Value::Null
+            } else {
+                self.format.as_ref().unwrap().get_comp_screen_json()
+            },
+            "season": season.get_comp_screen_json(self),
+            "child_comp_ids": self.child_comp_ids,
+            "parent_comp_id": self.parent_comp_id,
+            "is_tournament_tree": self.is_tournament_tree
+        })
+    }
+
+    // Get relevant information for a tournament tree competition screen.
+    pub fn get_tournament_comp_screen_json(&self) -> serde_json::Value {
+        let mut child_comps: Vec<Competition> = self.child_comp_ids.iter().map(|id| Competition::fetch_from_db(id)).collect();
+        let season_index = self.get_seasons_amount() - 1;
+        let mut child_seasons: Vec<Season> = child_comps.iter().map(|a| Season::fetch_from_db(&a.id, season_index)).collect();
+
+        let mut upcoming_games = Vec::new();
+        let mut played_games = Vec::new();
+        let mut rounds = Vec::new();
+        for (season, comp) in zip(child_seasons.iter_mut(), child_comps.iter_mut()) {
+            upcoming_games.append(&mut season.upcoming_games);
+            played_games.append(&mut season.played_games);
+
+            let mut round = season.knockout_round.as_ref().unwrap().get_comp_screen_json();
+            round["name"] = json!(comp.name);
+            rounds.push(round);
+        }
+
+        // Upcoming games with next last.
+        upcoming_games.sort_by(|a, b| db_string_to_date(&b.date).cmp(&db_string_to_date(&a.date)));
+        // Played games with most recent last.
+        played_games.sort_by(|a, b| db_string_to_date(&a.date).cmp(&db_string_to_date(&b.date)));
+
+        let mut comp_json = self.get_comp_screen_json();
+        comp_json["season"]["upcoming_games"] = upcoming_games.iter().map(|a| a.get_comp_screen_json()).collect();
+        comp_json["season"]["played_games"] = played_games.iter().map(|a| a.get_comp_screen_json()).collect();
+        comp_json["season"]["rounds"] = json!(rounds);
+
+        return comp_json;
+    }
 }
 
 // What to do with the seed of the team.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Clone)]
 pub enum Seed {
     // Get the seed from the team's final standing in the previous competition.
@@ -160,7 +266,7 @@ pub enum Seed {
 }
 
 // Stores data for which teams to go to which competition.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Clone)]
 pub struct CompConnection {
     teams_from_positions: [u8; 2],
@@ -181,10 +287,10 @@ impl CompConnection {
     }
 
     // Send teams onwards to the next stage.
-    fn send_teams(&self, teams: &Vec<TeamCompData>) {
+    fn send_teams(&self, teams: &[TeamCompData]) {
         let mut teamdata = Vec::new();
 
-        for i in (Range { start: self.teams_from_positions[0] - 1, end: self.teams_from_positions[1] })  {
+        for i in self.teams_from_positions[0] - 1..self.teams_from_positions[1]  {
             let seed = match self.team_seeds {
                 Seed::GetFromPosition => i + 1,
                 Seed::Preserve => teams[i as usize].seed,
@@ -201,7 +307,6 @@ impl CompConnection {
             teamdata.push(team);
         }
 
-        let comp = Competition::fetch_from_db(&self.comp_to_connect).expect(&format!("competition id {} not found", self.comp_to_connect));
-        comp.setup_season(&mut teamdata);
+        Competition::fetch_from_db(&self.comp_to_connect).setup_season(&mut teamdata);
     }
 }

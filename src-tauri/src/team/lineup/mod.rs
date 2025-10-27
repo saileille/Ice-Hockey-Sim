@@ -1,3 +1,5 @@
+pub mod cache;
+
 use crate::{
     types::PlayerId,
     person::player::{
@@ -7,7 +9,7 @@ use crate::{
 };
 
 // A line-up of players used in a match.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct LineUp {
     gk_ids: [PlayerId; 2],
@@ -15,24 +17,20 @@ pub struct LineUp {
     pub forward_lines: [ForwardLine; 4],
 }
 
-impl LineUp {   // Basics.
-    // Get a clone of either of the goalkeeper players.
-    fn get_goalkeeper(&self, index: usize) -> Option<Player> {
-        Player::fetch_from_db(&self.gk_ids[index])
-    }
+impl LineUp {
+    // Make sure the lineup is filled.
+    pub fn is_full(&self) -> bool {
+        if self.gk_ids.contains(&0) { return false; }
 
-    // Get clones of both goalkeepers.
-    pub fn get_goalkeepers(&self) -> Vec<Player> {
-        let mut gks = Vec::new();
-
-        for id in self.gk_ids.iter() {
-            let gk = Player::fetch_from_db(id);
-            if gk.is_some() {
-                gks.push(gk.unwrap());
-            }
+        for pair in self.defence_pairs.iter() {
+            if !pair.is_full() { return false; }
         }
 
-        return gks;
+        for line in self.forward_lines.iter() {
+            if !line.is_full() { return false; }
+        }
+
+        return true;
     }
 }
 
@@ -43,7 +41,7 @@ impl LineUp {
     }
 }
 
-impl LineUp {   // Testing functions.
+impl LineUp {
     // Add players from a roster to the lineup.
     pub fn auto_add(&mut self, players: Vec<Player>) {
         for player in players {
@@ -55,7 +53,8 @@ impl LineUp {   // Testing functions.
     fn auto_add_player(&mut self, player: Player) {
         match player.position_id {
             PositionId::Goalkeeper => self.auto_add_gk(player),
-            PositionId::Defender => self.auto_add_d(player),
+            PositionId::LeftDefender => self.auto_add_ld(player),
+            PositionId::RightDefender => self.auto_add_rd(player),
             PositionId::LeftWinger => self.auto_add_lw(player),
             PositionId::Centre => self.auto_add_c(player),
             PositionId::RightWinger => self.auto_add_rw(player),
@@ -73,14 +72,20 @@ impl LineUp {   // Testing functions.
         }
     }
 
-    // Add a defender to the lineup.
-    fn auto_add_d(&mut self, player: Player) {
+    // Add a left defender to the lineup.
+    fn auto_add_ld(&mut self, player: Player) {
         for pair in self.defence_pairs.iter_mut() {
             if pair.ld_id == 0 {
                 pair.ld_id = player.id;
                 return;
             }
-            else if pair.rd_id == 0 {
+        }
+    }
+
+    // Add a left defender to the lineup.
+    fn auto_add_rd(&mut self, player: Player) {
+        for pair in self.defence_pairs.iter_mut() {
+            if pair.rd_id == 0 {
                 pair.rd_id = player.id;
                 return;
             }
@@ -119,7 +124,7 @@ impl LineUp {   // Testing functions.
 }
 
 // A pair of defenders used in a line-up.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct DefencePair {
     pub ld_id: PlayerId,
@@ -137,8 +142,10 @@ impl DefencePair {  // Basics.
         Player::fetch_from_db(&self.rd_id)
     }
 
-    fn get(&self) -> DefencePairClones {
-        DefencePairClones::build(self)
+    // Make sure the defence pair is full.
+    fn is_full(&self) -> bool {
+        self.ld_id != 0 &&
+        self.rd_id != 0
     }
 }
 
@@ -150,23 +157,8 @@ impl DefencePair {
     }
 }
 
-#[derive()]
-struct DefencePairClones {
-    ld: Option<Player>,
-    rd: Option<Player>,
-}
-
-impl DefencePairClones {
-    fn build(defence_pair: &DefencePair) -> Self {
-        DefencePairClones {
-            ld: defence_pair.get_left_defender(),
-            rd: defence_pair.get_right_defender(),
-        }
-    }
-}
-
 // A line of forwards used in a line-up.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct ForwardLine {
     pub lw_id: PlayerId,
@@ -190,8 +182,11 @@ impl ForwardLine {  // Basics.
         Player::fetch_from_db(&self.rw_id)
     }
 
-    fn get(&self) -> ForwardLineClones {
-        ForwardLineClones::build(self)
+    // Make sure the forward line is full.
+    fn is_full(&self) -> bool {
+        self.lw_id != 0 &&
+        self.c_id != 0 &&
+        self.rw_id != 0
     }
 }
 
@@ -201,22 +196,5 @@ impl ForwardLine {
         self.lw_id = 0;
         self.c_id = 0;
         self.rw_id = 0;
-    }
-}
-
-#[derive()]
-struct ForwardLineClones {
-    lw: Option<Player>,
-    c: Option<Player>,
-    rw: Option<Player>,
-}
-
-impl ForwardLineClones {
-    fn build(forward_line: &ForwardLine) -> Self {
-        ForwardLineClones {
-            lw: forward_line.get_left_winger(),
-            c: forward_line.get_centre(),
-            rw: forward_line.get_right_winger(),
-        }
     }
 }

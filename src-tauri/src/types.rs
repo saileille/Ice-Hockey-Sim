@@ -7,10 +7,19 @@ pub type GameId = u8;
 
 pub type TeamId = u8;
 pub type PlayerId = u16;
+pub type ManagerId = u8;
 
 // Type conversions.
 pub mod convert {
-    // Convert usize to u8.
+    // Convert usize to i8.
+    pub fn usize_to_i8(num: usize) -> i8 {
+        match num.try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        }
+    }
+
+     // Convert usize to u8.
     pub fn usize_to_u8(num: usize) -> u8 {
         match num.try_into() {
             Ok(n) => n,
@@ -34,6 +43,14 @@ pub mod convert {
         panic!("{num} is bigger than {}", f64::MAX);
     }
 
+    // Convert i64 to u8.
+    pub fn i64_to_u8(num: i64) -> u8 {
+        match num.try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        }
+    }
+
     // Convert f64 to u8.
     pub fn f64_to_u8(num: f64) -> u8 {
         if num <= (u8::MAX as f64) {
@@ -52,6 +69,14 @@ pub mod convert {
 
     // Convert u32 to i32.
     pub fn u32_to_i32(num: u32) -> i32 {
+        match num.try_into() {
+            Ok(n) => n,
+            Err(e) => panic!("{e}")
+        }
+    }
+
+    // Convert i32 to i8.
+    pub fn i32_to_i8(num: i32) -> i8 {
         match num.try_into() {
             Ok(n) => n,
             Err(e) => panic!("{e}")

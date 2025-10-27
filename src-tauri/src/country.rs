@@ -1,8 +1,7 @@
 // Countries and such.
-use std::{
-    collections::HashMap,
-    ops::Range
-};
+use std::
+    collections::HashMap
+;
 use rand::random_range;
 
 use crate::{
@@ -14,8 +13,8 @@ use crate::{
 #[derive(Default, Clone)]
 pub struct Country {
     pub id: CountryId,
-    name: String,
-    forenames: NamePool,
+    pub name: String,
+    pub forenames: NamePool,
     surnames: NamePool,
 }
 
@@ -93,10 +92,10 @@ impl Country {
 
 // Namepool with names and weights.
 #[derive(Default, Clone)]
-struct NamePool {
+pub struct NamePool {
     names: Vec<String>,
     weights: Vec<u16>,
-    total_weight: usize,
+    pub total_weight: usize,
 }
 
 impl NamePool { // Basics.
@@ -136,9 +135,7 @@ impl NamePool {
 
     // Get a random index of the weights/names vector.
     fn draw_index(&self) -> usize {
-        let range = Range { start: 0, end: self.total_weight };
-        let random = random_range(range);
-
+        let random = random_range(0..self.total_weight);
         let mut counter = 0;
         for (i, weight) in self.weights.iter().enumerate() {
             counter += *weight as usize;

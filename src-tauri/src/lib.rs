@@ -9,7 +9,8 @@ mod io;
 mod person;
 mod team;
 mod time;
-mod terminal_tests;
+mod tests;
+mod misc;
 
 use tauri::Manager;
 
@@ -17,9 +18,9 @@ use tauri::Manager;
 pub fn run() {
     database::initialise();
 
-    // terminal testing...
+    // Test stuffs...
     #[cfg(dev)] {
-        // terminal_tests::test_comp_generation();
+        // tests::simulate_to_day("2026-05-01");
     }
 
     tauri::Builder::default()
@@ -32,10 +33,19 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            commands::tests::test_game,
-            commands::tests::test_comp,
-            commands::go_to_next_day,
-            commands::get_date_string,
+            commands::continue_game::go_to_next_day,
+            commands::continue_game::get_date_string,
+            commands::get_comp_select_info,
+            commands::get_child_comp_select_info,
+            commands::get_team_select_info,
+            commands::get_comp_screen_info,
+            commands::get_team_screen_info,
+            commands::get_player_screen_info,
+            commands::create_human_manager,
+            commands::get_human_info,
+            commands::get_free_agents,
+            commands::get_player_search_info,
+            commands::offer_contract,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

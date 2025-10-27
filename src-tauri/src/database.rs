@@ -3,19 +3,20 @@ use std::{
     collections::HashMap,
     sync::{LazyLock, Mutex}
 };
+use rand::rng;
 use time::{macros::date, Date};
 use lazy_static::lazy_static;
 
 use crate::{
     competition::{
         format::{self}, knockout_generator, season::{ranking::RankCriteria, Season}, CompConnection, Competition, Seed
-    }, country::Country, event, io, match_event, person::player::{
+    }, country::Country, event, io, match_event, person::{manager::Manager, player::{
         position::{Position, PositionId}, Player
-    }, team::Team, time::AnnualWindow, types::{CompetitionId, CountryId, PlayerId, TeamId}
+    }}, team::Team, time::{AnnualDate, AnnualWindow}, types::{CompetitionId, CountryId, ManagerId, PlayerId, TeamId}
 };
 
 // The current date in the game.
-pub static TODAY: LazyLock<Mutex<Date>> = LazyLock::new(|| Mutex::new(date!(2025-08-01)));
+pub static TODAY: LazyLock<Mutex<Date>> = LazyLock::new(|| Mutex::new(date!(2025-07-01)));
 
 pub static COUNTRIES: LazyLock<Mutex<HashMap<CountryId, Country>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 pub static COMPETITIONS: LazyLock<Mutex<HashMap<CompetitionId, Competition>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -25,25 +26,29 @@ pub static SEASONS: LazyLock<Mutex<HashMap<CompetitionId, Vec<Season>>>> = LazyL
 
 pub static TEAMS: LazyLock<Mutex<HashMap<TeamId, Team>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 pub static PLAYERS: LazyLock<Mutex<HashMap<PlayerId, Player>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+pub static MANAGERS: LazyLock<Mutex<HashMap<ManagerId, Manager>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 lazy_static! {
     pub static ref POSITIONS: HashMap<PositionId, Position> = {
          let p = HashMap::from([
             (PositionId::default(), Position::default()),
             (PositionId::Goalkeeper, Position::build(
-                PositionId::Goalkeeper, 0
+                PositionId::Goalkeeper, "GK", 0
             )),
-            (PositionId::Defender, Position::build(
-                PositionId::Defender, 0
+            (PositionId::LeftDefender, Position::build(
+                PositionId::LeftDefender, "LD", 0
+            )),
+            (PositionId::RightDefender, Position::build(
+                PositionId::RightDefender, "RD", 0
             )),
             (PositionId::LeftWinger, Position::build(
-                PositionId::LeftWinger, 0
+                PositionId::LeftWinger, "LW", 0
             )),
             (PositionId::Centre, Position::build(
-                PositionId::Centre, 0
+                PositionId::Centre, "C", 0
             )),
             (PositionId::RightWinger, Position::build(
-                PositionId::RightWinger, 0
+                PositionId::RightWinger, "RW", 0
             )),
         ]);
         return p;
@@ -86,6 +91,18 @@ pub fn initialise() {
     for name in country_names.iter() {
         Country::build_and_save(name);
     }
+
+    // Generate 50 players per team.
+    let mut rng = rng();
+    for _ in 0..TEAMS.lock().unwrap().len() * 50 {
+        Player::build_and_save_random(&mut rng);
+    }
+
+    // Set up the teams.
+    let mut teams = TEAMS.lock().unwrap().clone();
+    for team in teams.values_mut() {
+        team.setup(0, 0);
+    }
 }
 
 // Add competitions.
@@ -93,23 +110,26 @@ fn add_competition_data() {
     // 1: Liiga
     Competition::build_and_save(
         "Liiga",
-        &vec![
-            Team::build_and_save("Blues"),      // 1
-            Team::build_and_save("HIFK"),       // 2
-            Team::build_and_save("HPK"),        // 3
-            Team::build_and_save("Ilves"),      // 4
-            Team::build_and_save("Jokerit"),    // 5
-            Team::build_and_save("JYP"),        // 6
-            Team::build_and_save("KalPa"),      // 7
-            Team::build_and_save("Kärpät"),     // 8
-            Team::build_and_save("Lukko"),      // 9
-            Team::build_and_save("Pelican"),    // 10
-            Team::build_and_save("SaiPa"),      // 11
-            Team::build_and_save("Tappara"),    // 12
-            Team::build_and_save("TPS"),        // 13
-            Team::build_and_save("Ässät"),      // 14
+        vec![
+            Team::build_and_save("Ruiske"),     // 1
+            Team::build_and_save("Atomi"),      // 2
+            Team::build_and_save("Uupuneet"),   // 3
+            Team::build_and_save("SantaClaus"), // 4
+            Team::build_and_save("HardCore"),   // 5
+            Team::build_and_save("Ikirouta"),   // 6
+            Team::build_and_save("Kelarotat"),  // 7
+            Team::build_and_save("Vety"),       // 8
+            Team::build_and_save("Saappaat"),   // 9
+            Team::build_and_save("Siat"),       // 10
+            Team::build_and_save("Turmio"),     // 11
+            Team::build_and_save("Sirkus"),     // 12
+            Team::build_and_save("Polkka"),     // 13
+            Team::build_and_save("Teurastus"),  // 14
         ],
-        AnnualWindow::build(9, 1, 6, 1),
+        AnnualWindow::build(
+            AnnualDate::build(9, 1),
+            AnnualDate::build(6, 1)
+        ),
         Vec::new(),
         0,
         None,
@@ -119,8 +139,11 @@ fn add_competition_data() {
     // 2: Liiga Regular Season.
     Competition::build_and_save(
         "Regular Season",
-        &Vec::new(),
-        AnnualWindow::build(9, 1, 4, 1),
+        Vec::new(),
+        AnnualWindow::build(
+            AnnualDate::build(9, 1),
+            AnnualDate::build(4, 1)
+        ),
         vec![CompConnection::build([1, 10], 3, Seed::GetFromPosition, false)],
         14,
         format::Format::build(
@@ -144,7 +167,10 @@ fn add_competition_data() {
     knockout_generator::build(
         "Playoffs",
         vec!["Säälit"],
-        AnnualWindow::build(4, 2, 6, 1),
+        AnnualWindow::build(
+            AnnualDate::build(4, 2),
+            AnnualDate::build(6, 1)
+        ),
         vec![match_event::Rules::build(3, 1200, 0, true)],
         vec![2, 4],
         vec![10],

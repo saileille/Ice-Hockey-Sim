@@ -1,6 +1,6 @@
 // Functions exclusive to knockout stages.
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Clone, Default)]
 pub struct KnockoutRound {
     pub wins_required: u8,

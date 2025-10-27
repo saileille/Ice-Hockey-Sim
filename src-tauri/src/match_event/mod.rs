@@ -1,10 +1,11 @@
-mod event;
+pub mod event;
 pub mod team;
+mod cache;
 
-use std::collections::HashMap;
+use serde_json::json;
 
 use crate::{
-    competition::Competition, event as logic_event, team::Team, types::{
+    competition::{season::team::TeamCompData, Competition}, database::COMPETITIONS, event as logic_event, match_event::cache::GameCache, types::{
         convert, CompetitionId, TeamId
     }
 };
@@ -15,19 +16,28 @@ use self::{
 
 #[derive(Debug)]
 #[derive(Default, Clone)]
+enum Attacker {
+    #[default]
+    Null,
+    Home,
+    Away,
+}
+
+#[derive(Debug)]
+#[derive(Default, Clone)]
 pub struct Game {
     pub date: String,
     pub home: TeamGameData,
     pub away: TeamGameData,
     clock: Clock,
     comp_id: CompetitionId,
-    attacker: Option<TeamGameData>,
-    defender: Option<TeamGameData>,
+    cache: Option<GameCache>,
+    attacker: Attacker,
 }
 
 // Basics.
 impl Game {
-    pub fn build(home: TeamId, away: TeamId, comp_id: CompetitionId, date: &str) -> Self {
+    pub fn build(home: &TeamCompData, away: &TeamCompData, comp_id: CompetitionId, date: &str) -> Self {
         let mut game = Game::default();
         game.home = TeamGameData::build(home);
         game.away = TeamGameData::build(away);
@@ -45,12 +55,23 @@ impl Game {
 
     // Get the game rules.
     fn get_rules(&self) -> Rules {
-        Competition::fetch_from_db(&self.comp_id).unwrap().format.as_ref().unwrap().match_rules.clone()
+        COMPETITIONS.lock().unwrap().get(&self.comp_id).unwrap().format.as_ref().unwrap().match_rules.clone()
     }
 
     // Get the competition of the game.
     fn get_comp(&self) -> Competition {
-        Competition::fetch_from_db(&self.comp_id).unwrap()
+        Competition::fetch_from_db(&self.comp_id)
+    }
+
+    // Get nice data for a competition screen.
+    pub fn get_comp_screen_json(&self) -> serde_json::Value {
+        json!({
+            "home": self.home.get_comp_screen_json(),
+            "away": self.away.get_comp_screen_json(),
+            "date": self.date,
+            "had_overtime": self.has_overtime(),
+            "is_over": self.clock != Clock::default()
+        })
     }
 }
 
@@ -63,26 +84,40 @@ impl Game {
 
     // Call when both teams must submit their lineups.
     fn get_team_lineups(&mut self) {
-        let mut home = self.home.get_team();
-        let mut away = self.away.get_team();
+        let cache = self.cache.as_mut().unwrap();
 
-        // The human's lineup should not be auto-built.
-        home.auto_build_lineup();
-        away.auto_build_lineup();
+        // The human's lineup should not be forced to autobuild, eventually.
+        cache.home.team.auto_build_lineup();
+        cache.away.team.auto_build_lineup();
 
-        self.home.lineup = home.lineup;
-        self.away.lineup = away.lineup;
+        self.home.lineup = cache.home.team.lineup.clone();
+        self.away.lineup = cache.away.team.lineup.clone();
+
+        self.cache.as_mut().unwrap().build_lineups(&self.home.lineup, &self.away.lineup);
     }
 
     // Do things like submitting lineups.
     fn do_pre_game_tasks(&mut self) {
+        self.cache = Some(GameCache::build(&self.home, &self.away, &self.get_rules()));
         self.get_team_lineups();
+
+        if !self.home.lineup.is_full() {
+            let team = self.home.get_team();
+            println!("Lineup of {} is not full.", team.name);
+            println!("{:#?}", team.lineup);
+            println!("{:#?}", team.player_needs);
+        }
+        if !self.away.lineup.is_full() {
+            let team = self.away.get_team();
+            println!("Lineup of {} is not full.", team.name);
+            println!("{:#?}", team.lineup);
+            println!("{:#?}", team.player_needs);
+        }
     }
 
     // Do everything that needs to be done after the game is concluded.
     fn do_post_game_tasks(&mut self) {
-        self.attacker = None;
-        self.defender = None;
+        self.cache = None;
 
         // Update the teams' comp datas.
         // self.get_comp().update_teamdata(&self.home, &self.away, self.has_overtime());
@@ -129,71 +164,55 @@ impl Game {
     fn simulate_second(&mut self) {
         self.change_players_on_ice();
         self.change_puck_possession();
-        self.attempt_shot();
+        Self::attempt_shot(&mut self.home, &mut self.away, &self.clock, self.cache.as_ref().unwrap(), &self.attacker);
 
-        self.update_teamdata();
         self.clock.advance();
     }
 
     // Change the players on ice for home and away teams.
     fn change_players_on_ice(&mut self) {
-        self.home.change_players_on_ice();
-        self.away.change_players_on_ice();
+        self.cache.as_mut().unwrap().home.lineup.change_players_on_ice();
+        self.cache.as_mut().unwrap().away.lineup.change_players_on_ice();
     }
 
     // Change which team has the puck.
     fn change_puck_possession(&mut self) {
-        let modifier = self.home.players_on_ice.as_ref().unwrap().get().get_skaters_ability_ratio(
-            self.away.players_on_ice.as_ref().unwrap());
+        let modifier = self.cache.as_ref().unwrap().home.lineup.players_on_ice.get_skaters_ability_ratio(
+            &self.cache.as_ref().unwrap().away.lineup.players_on_ice
+        );
 
         if logic_event::Type::fetch_from_db(&logic_event::Id::PuckPossessionChange).get_outcome(modifier) {
-            self.attacker = Some(self.home.clone());
-            self.defender = Some(self.away.clone());
+            self.attacker = Attacker::Home;
         }
         else {
-            self.attacker = Some(self.away.clone());
-            self.defender = Some(self.home.clone());
+            self.attacker = Attacker::Away;
         }
     }
 
     // The attacking team attempts to shoot the puck.
-    fn attempt_shot(&mut self) {
-        let attacker = self.attacker.as_mut().unwrap();
-        let attacker_players = attacker.players_on_ice.as_ref().unwrap();
-        let defender_players = self.defender.as_ref().unwrap().players_on_ice.as_ref().unwrap();
+    // fn attempt_shot(&mut self) {
+    fn attempt_shot(home: &mut TeamGameData, away: &mut TeamGameData, clock: &Clock, cache: &GameCache, attacker: &Attacker) {
+        let (attacker, defender) = match attacker {
+            Attacker::Home => (&cache.home, &cache.away),
+            Attacker::Away => (&cache.away, &cache.home),
+            _ => panic!("attacker cannot be null when attempting a shot")
+        };
 
-        let modifier = attacker_players.get().get_skaters_ability_ratio(defender_players);
+        let modifier = attacker.lineup.players_on_ice.get_skaters_ability_ratio(
+            &defender.lineup.players_on_ice
+        );
+
         let success = logic_event::Type::fetch_from_db(&logic_event::Id::ShotAtGoal).get_outcome(modifier);
 
         if success {
-            let mut shot = Shot::build(self.clock.clone(), attacker_players, defender_players);
-            shot.create_shooter_and_assisters();
-            shot.calculate_goal();
-            attacker.shots.push(shot);
-        }
-    }
+            let shot = Shot::simulate(clock.clone(), &attacker.lineup.players_on_ice, &defender.lineup.players_on_ice);
 
-    // Update the attacker and defender teamdata.
-    fn update_teamdata(&mut self) {
-        let attacker = self.attacker.as_ref().unwrap();
-        let defender = self.defender.as_ref().unwrap();
-
-        if attacker.team_id == self.home.team_id {
-            self.home = attacker.clone();
-            self.away = defender.clone();
-        }
-        else {
-            self.away = attacker.clone();
-            self.home = defender.clone();
-        }
-    }
-
-    // Get the name of the game if it has not begun.
-    // Get the score as well if it has.
-    pub fn get_name_and_score_if_started(&self) -> String {
-        match self.clock == Clock::default() {
-            true => self.get_name(),
-            _ => self.get_name_and_score()
+            if home.team_id == attacker.team.id {
+                home.shots.push(shot);
+            }
+            else {
+                away.shots.push(shot);
+            }
         }
     }
 
@@ -227,7 +246,18 @@ impl Game {
 
     // Get the total seconds that have passed in the game.
     fn get_game_total_seconds(&self) -> u32 {
-        (self.clock.periods_completed as u32) * (self.get_rules().period_length as u32) + (self.clock.period_total_seconds as u32)
+        let rules;
+        let rules_ref;
+
+        if self.cache.is_none() {
+            rules = self.get_rules();
+            rules_ref = &rules;
+        }
+        else {
+            rules_ref = &self.cache.as_ref().unwrap().rules;
+        }
+
+        (self.clock.periods_completed as u32) * (rules_ref.period_length as u32) + (self.clock.period_total_seconds as u32)
     }
 
     // Get the amount of minutes that have passed in the game.
@@ -247,12 +277,12 @@ impl Game {
 
     // Check if the regular time of the game is over.
     fn is_regular_time_over(&self) -> bool {
-        self.clock.periods_completed >= self.get_rules().periods
+        self.clock.periods_completed >= self.cache.as_ref().unwrap().rules.periods
     }
 
     // Check if the currently ongoing period is over.
     fn is_period_over(&self) -> bool {
-        self.clock.period_total_seconds >= self.get_rules().period_length
+        self.clock.period_total_seconds >= self.cache.as_ref().unwrap().rules.period_length
     }
 
     // Check if the overtime period is over.
@@ -267,17 +297,28 @@ impl Game {
             return true;
         }
 
-        if self.get_rules().continuous_overtime {
+        if self.cache.as_ref().unwrap().rules.continuous_overtime {
             return false;
         }
 
-        return self.get_time_expired_in_overtime() >= (self.get_rules().overtime_length as i32);
+        return self.get_time_expired_in_overtime() >= (self.cache.as_ref().unwrap().rules.overtime_length as i32);
     }
 
     // How much overtime has been played so far.
     // Negative values mean that the regular time is still ongoing.
     fn get_time_expired_in_overtime(&self) -> i32 {
-        convert::u32_to_i32(self.get_game_total_seconds()) - (self.get_rules().get_regular_time() as i32)
+        let rules;
+        let rules_ref;
+
+        if self.cache.is_none() {
+            rules = self.get_rules();
+            rules_ref = &rules;
+        }
+        else {
+            rules_ref = &self.cache.as_ref().unwrap().rules;
+        }
+
+        convert::u32_to_i32(self.get_game_total_seconds()) - (rules_ref.get_regular_time() as i32)
     }
 
     // Check if the game has or had overtime.
@@ -344,7 +385,7 @@ impl Game {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct Rules {
     periods: u8,
@@ -378,9 +419,9 @@ impl Rules {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone, PartialEq)]
-struct Clock {
+pub struct Clock {
     periods_completed: u8,
     period_total_seconds: u16,
 }

@@ -2,12 +2,12 @@
 
 mod sorting;
 
-use std::{collections::{HashMap, HashSet}, ops::Range};
+use std::{collections::{HashMap, HashSet}, iter::zip};
 use rand::{rng, rngs::ThreadRng, seq::SliceRandom, Rng};
 use ::time::Date;
 
 use crate::{
-    competition::{format::{self, round_robin::MatchGenType}, season::{knockout::{KnockoutPair, KnockoutRound}, team::TeamCompData, Season}, Competition}, match_event::Game, team::Team, time::{date_to_db_string, db_string_to_date, get_dates}, types::{convert, CompetitionId, TeamId}
+    competition::{format::{round_robin::{MatchGenType, RoundRobin as RoundRobinFormat}}, season::{knockout_round::{KnockoutPair, KnockoutRound as KnockoutRoundSeason}, team::TeamCompData, Season}, Competition}, match_event::Game, time::{date_to_db_string, db_string_to_date, get_dates}, types::{convert, TeamId}
 };
 
 impl Season {
@@ -15,7 +15,7 @@ impl Season {
     pub fn generate_schedule(&mut self, comp: &Competition) {
         let mut match_pool = self.generate_match_pool(comp);
         let matchdays = generate_matchdays(&mut match_pool);
-        self.upcoming_games = assign_dates(&matchdays, &db_string_to_date(&self.start_date), &db_string_to_date(&self.end_date), self.comp_id, true);
+        self.upcoming_games = assign_dates(matchdays, &db_string_to_date(&self.start_date), &db_string_to_date(&self.end_date), comp, true);
     }
 
     // Generate matches for a round robin stage.
@@ -100,8 +100,8 @@ impl Season {
     ) -> Vec<TeamScheduleData> {
         let prev_schedule_map = TeamScheduleData::vector_to_hashmap(prev_schedule_data);
 
-        let team1_sort = format::round_robin::RoundRobin::MATCH_GEN_TYPE.clone();
-        let team2_sort = format::round_robin::RoundRobin::MATCH_GEN_TYPE.clone();
+        let team1_sort = RoundRobinFormat::MATCH_GEN_TYPE.clone();
+        let team2_sort = RoundRobinFormat::MATCH_GEN_TYPE.clone();
 
         let team1_sorts = if team1_sort == MatchGenType::Alternating {
            Vec::from([MatchGenType::Random, MatchGenType::MatchCount])
@@ -117,7 +117,7 @@ impl Season {
         };
 
         let mut data = Vec::new();
-        for i in (Range {start: 0, end: attempts}) {
+        for i in 0..attempts {
             // Alternate between sort_types.
             let index = i as usize;
             let (team1_index, team2_index) = if team1_sorts.len() > 1 && team2_sorts.len() > 1 {
@@ -169,7 +169,7 @@ impl Season {
     ) -> bool {
         // Randomise and sort.
         schedule_data.shuffle(rng);
-        sorting::sort_default(&format::round_robin::RoundRobin::MATCH_GEN_TYPE, schedule_data, prev_schedule_map, rng);
+        sorting::sort_default(&RoundRobinFormat::MATCH_GEN_TYPE, schedule_data, prev_schedule_map, rng);
         let mut temp_schedule_data = schedule_data.clone();
 
         let mut team1 = temp_schedule_data.swap_remove(0);
@@ -201,7 +201,7 @@ impl Season {
         // team1 needs a home game.
         if away_filter.len() == 0 || (home_filter.len() > 0 && home_away_diff <= 0) {
             temp_schedule_data = home_filter;
-            sorting::sort_away(&format::round_robin::RoundRobin::MATCH_GEN_TYPE, &mut temp_schedule_data, prev_schedule_map, rng);
+            sorting::sort_away(&RoundRobinFormat::MATCH_GEN_TYPE, &mut temp_schedule_data, prev_schedule_map, rng);
             team2 = temp_schedule_data.swap_remove(0);
             created_matches.push([team1.team_id, team2.team_id]);
 
@@ -212,7 +212,7 @@ impl Season {
         // team1 needs an away game.
         else {
             temp_schedule_data = away_filter;
-            sorting::sort_home(&format::round_robin::RoundRobin::MATCH_GEN_TYPE, &mut temp_schedule_data, prev_schedule_map, rng);
+            sorting::sort_home(&RoundRobinFormat::MATCH_GEN_TYPE, &mut temp_schedule_data, prev_schedule_map, rng);
             team2 = temp_schedule_data.swap_remove(0);
             created_matches.push([team2.team_id, team1.team_id]);
 
@@ -235,23 +235,21 @@ impl Season {
 }
 
 // Give each matchday a date, build the games and return them.
-pub fn assign_dates(matchdays: &Vec<Vec<[TeamId; 2]>>, start_date: &Date, end_date: &Date, comp_id: CompetitionId, randomise_order: bool) -> Vec<Game> {
-    let mut dates = get_dates(start_date, end_date);
+pub fn assign_dates(matchdays: Vec<Vec<[TeamId; 2]>>, start_date: &Date, end_date: &Date, comp: &Competition, randomise_order: bool) -> Vec<Game> {
+let mut dates = get_dates(start_date, end_date);
     let mut rng = rng();
     let mut game_dates = Vec::new();
 
-    for _ in (Range {start: 0, end: matchdays.len() }) {
-        game_dates.push(dates.swap_remove(rng.random_range(Range {start: 0, end: dates.len()})));
+    for _ in 0..matchdays.len() {
+        game_dates.push(dates.swap_remove(rng.random_range(0..dates.len())));
     }
 
-    if !randomise_order {
-        game_dates.sort();
-    }
+    if !randomise_order { game_dates.sort(); }
 
     let mut games = Vec::new();
-    for (date, matchday) in game_dates.iter().zip(matchdays.iter()) {
+    for (date, matchday) in zip(game_dates.iter(), matchdays.iter()) {
         let date_string = date_to_db_string(&date);
-        build_games(matchday, &date_string, comp_id, &mut games);
+        build_games(matchday, &date_string, comp, &mut games);
     }
 
     // Sort the games so that the earliest are LAST.
@@ -263,9 +261,13 @@ pub fn assign_dates(matchdays: &Vec<Vec<[TeamId; 2]>>, start_date: &Date, end_da
 }
 
 // Convert the simple representations of two teams into Game elements.
-fn build_games(match_pool: &Vec<[TeamId; 2]>, date: &str, comp_id: CompetitionId, games: &mut Vec<Game>) {
+fn build_games(match_pool: &[[TeamId; 2]], date: &str, comp: &Competition, games: &mut Vec<Game>) {
+    let season = Season::fetch_from_db(&comp.id, comp.get_seasons_amount() - 1);
+
     for matchup in match_pool {
-        games.push(Game::build(matchup[0], matchup[1], comp_id, date));
+        let home = &season.teams[season.get_team_index(matchup[0])];
+        let away = &season.teams[season.get_team_index(matchup[1])];
+        games.push(Game::build(home, away, comp.id, date));
     }
 }
 
@@ -276,7 +278,7 @@ fn generate_matchday(match_pool: &mut Vec<[TeamId; 2]>, rng: &mut ThreadRng) -> 
     let mut matchday = Vec::new();
 
     while !valid_matches.is_empty() {
-        let game = valid_matches.swap_remove(rng.random_range(Range {start: 0, end: valid_matches.len()}));
+        let game = valid_matches.swap_remove(rng.random_range(0..valid_matches.len()));
         matchday.push(game.clone());
 
         // Remove all matches from valid_matches where either of the teams play.
@@ -301,10 +303,10 @@ pub fn generate_matchdays(match_pool: &mut Vec<[TeamId; 2]>) -> Vec<Vec<[TeamId;
     return matchdays;
 }
 
-impl KnockoutRound {
+impl KnockoutRoundSeason {
     // Generate matchdays for the knockout round.
     pub fn generate_matchdays(&self, comp: &Competition) -> Vec<Vec<[TeamId; 2]>> {
-        let matches = comp.format.as_ref().unwrap().knockout.as_ref().unwrap().get_maximum_matches_in_pair();
+        let matches = comp.format.as_ref().unwrap().knockout_round.as_ref().unwrap().get_maximum_matches_in_pair();
         let mut matchdays = vec![Vec::new(); matches as usize];
         for pair in self.pairs.iter() {
             pair.generate_matchdays(&mut matchdays);
@@ -401,7 +403,7 @@ impl TeamScheduleData {
 // Static
 impl TeamScheduleData {
     // Check that everyone has a valid schedule.
-    fn is_valid_schedule_for_all(schedule_data: &Vec<Self>, matches: u8) -> bool {
+    fn is_valid_schedule_for_all(schedule_data: &[Self], matches: u8) -> bool {
         for team in schedule_data.iter() {
             if !team.is_valid_schedule(matches) { return false; }
         }
@@ -410,7 +412,7 @@ impl TeamScheduleData {
     }
 
     // Get a new schedule_data vector with only teams that can play away games.
-    fn filter_for_home_game(schedule_data: &Vec<Self>, prev_schedule_map: &HashMap<TeamId, Self>, matches: u8) -> Vec<Self> {
+    fn filter_for_home_game(schedule_data: &[Self], prev_schedule_map: &HashMap<TeamId, Self>, matches: u8) -> Vec<Self> {
         let mut filtered = Vec::new();
         for item in schedule_data {
             let prev = match prev_schedule_map.get(&item.team_id) {
@@ -426,7 +428,7 @@ impl TeamScheduleData {
     }
 
     // Get a new schedule_data vector with only teams that can play home games.
-    fn filter_for_away_game(schedule_data: &Vec<Self>, prev_schedule_map: &HashMap<TeamId, Self>, matches: u8) -> Vec<Self> {
+    fn filter_for_away_game(schedule_data: &[Self], prev_schedule_map: &HashMap<TeamId, Self>, matches: u8) -> Vec<Self> {
         let mut filtered = Vec::new();
         for item in schedule_data {
             let prev = match prev_schedule_map.get(&item.team_id) {
@@ -457,7 +459,7 @@ impl TeamScheduleData {
     }
 
     // Generate schedule data objects.
-    fn generate(comp_teams: &Vec<TeamCompData>) -> Vec<Self> {
+    fn generate(comp_teams: &[TeamCompData]) -> Vec<Self> {
         let mut schedule_data = Vec::new();
         for team_data in comp_teams.iter() {
             schedule_data.push(Self {

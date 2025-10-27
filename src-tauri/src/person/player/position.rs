@@ -1,27 +1,60 @@
+use rand::{rngs::ThreadRng, Rng};
+
 use crate::database::POSITIONS;
 
 #[derive(Eq, Hash, PartialEq)]
 #[derive(Default, Clone, Debug)]
+#[repr(u8)]
 pub enum PositionId {
     #[default]
-    Null,
-    Goalkeeper,
-    Defender,
-    LeftWinger,
-    Centre,
-    RightWinger,
+    Null = 0,
+    Goalkeeper = 1,
+    LeftDefender = 2,
+    RightDefender = 3,
+    LeftWinger = 4,
+    Centre = 5,
+    RightWinger = 6,
+}
+
+impl PositionId {
+    // Get a random position, weighted by need.
+    pub fn get_random(rng: &mut ThreadRng) -> Self {
+        let weights = vec![
+            (Self::Goalkeeper, 2),
+            (Self::LeftDefender, 4),
+            (Self::RightDefender, 4),
+            (Self::LeftWinger, 4),
+            (Self::Centre, 4),
+            (Self::RightWinger, 4)
+        ];
+
+        let total_weight: u8 = weights.iter().map(|(_, a)| a).sum();
+        let random = rng.random_range(0..total_weight);
+
+        let mut counter = 0;
+        for (id, weight) in weights {
+            counter += weight;
+            if random < counter {
+                return id;
+            }
+        }
+
+        return Self::Null;
+    }
 }
 
 #[derive(Default, Clone)]
 pub struct Position {
     pub id: PositionId,
+    pub abbreviation: String,
     pub offensive_value: u8,
 }
 
 impl Position {
-    pub fn build(id: PositionId, offensive_value: u8) -> Self {
+    pub fn build(id: PositionId, abbreviation: &str, offensive_value: u8) -> Self {
         let mut position = Position::default();
         position.id = id;
+        position.abbreviation = abbreviation.to_string();
         position.offensive_value = offensive_value;
         return position;
     }

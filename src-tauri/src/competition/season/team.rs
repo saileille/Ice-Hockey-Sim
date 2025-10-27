@@ -1,8 +1,11 @@
 // Data for teams.
 
-use crate::{competition::format, match_event::team::TeamGameData, team::Team, types::{convert, TeamId}};
+use ordinal::ToOrdinal;
+use serde_json::json;
 
-#[derive(Debug)]
+use crate::{competition::{format, Competition}, match_event::team::TeamGameData, team::Team, types::{convert, TeamId}};
+
+#[derive(Debug, serde::Serialize)]
 #[derive(PartialEq)]
 #[derive(Default, Clone)]
 pub struct TeamCompData {
@@ -31,8 +34,40 @@ impl TeamCompData {
     }
 
     // Get the team element tied to this TeamData.
-    fn get_team(&self) -> Team {
+    pub fn get_team(&self) -> Team {
         Team::fetch_from_db(&self.team_id)
+    }
+
+    // Get relevant information for a competition screen.
+    pub fn get_comp_screen_json(&self, comp: &Competition, index: usize) -> serde_json::Value {
+        json!({
+            "id": self.team_id,
+            "name": self.get_team().name,
+            "rank": (index + 1).to_ordinal_string(),
+            "games": self.get_game_count(),
+            "wins": self.regular_wins,
+            "ot_wins": self.ot_wins,
+            "draws": self.draws,
+            "ot_losses": self.ot_losses,
+            "losses": self.regular_losses,
+            "total_wins": self.get_wins(),
+            "total_losses": self.get_losses(),
+            "goals_scored": self.goals_scored,
+            "goals_conceded": self.goals_conceded,
+            "goal_difference": self.get_goal_difference(),
+            "points": self.get_points(&comp.get_round_robin_format()),
+            "seed": self.seed
+        })
+    }
+
+    // Get information for the competition screen tournament tree.
+    pub fn get_comp_screen_json_pair(&self) -> serde_json::Value {
+        json!({
+            "id": self.team_id,
+            "name": self.get_team().name,
+            "wins": self.get_wins(),
+            "seed": self.seed
+        })
     }
 }
 
@@ -62,10 +97,10 @@ impl TeamCompData {
         self.regular_losses * rr.points_for_loss
     }
 
-    pub fn get_goal_difference(&self) -> i8 {
+    pub fn get_goal_difference(&self) -> i16 {
         let gf = convert::u16_to_i16(self.goals_scored);
         let ga = convert::u16_to_i16(self.goals_conceded);
-        return convert::i16_to_i8(gf - ga);
+        return gf - ga;
     }
 
     // Update the team data after a match.
