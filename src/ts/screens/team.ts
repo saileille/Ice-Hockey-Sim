@@ -65,7 +65,7 @@ const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
         </table>
     `);
 
-    const roster = (document.querySelector("#players") as HTMLTableElement).children[0] as HTMLTableSectionElement;
+    const roster = (document.querySelector("#players") as HTMLTableElement).children[1] as HTMLTableSectionElement;
 
     for (const player of players) {
         const row = document.createElement("tr");

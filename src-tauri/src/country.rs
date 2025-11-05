@@ -5,17 +5,14 @@ use std::
 use rand::random_range;
 
 use crate::{
-    types::CountryId,
-    database::COUNTRIES,
-    io::load_country_names
+    database::COUNTRIES, io::load_country_names, person::Gender, types::{CountryId, CountryNamePool}
 };
 
 #[derive(Default, Clone)]
 pub struct Country {
     pub id: CountryId,
     pub name: String,
-    pub forenames: NamePool,
-    surnames: NamePool,
+    names: CountryNamePool,
 }
 
 impl Country {  // Basics.
@@ -51,9 +48,7 @@ impl Country {  // Basics.
 
     // Update the Country to database.
     pub fn save(&self) {
-        COUNTRIES.lock()
-            .expect(&format!("something went wrong when trying to update Country {}: {} to COUNTRIES", self.id, self.name))
-            .insert(self.id, self.clone());
+        COUNTRIES.lock().unwrap().insert(self.id, self.clone());
     }
 
     // Get a Country from the database with the given name.
@@ -70,23 +65,50 @@ impl Country {  // Basics.
     // Make sure the country does not contain illegal values.
     fn is_valid(&self) -> bool {
         self.id != 0 &&
-        self.name != String::default() &&
+        self.name != String::default() /*&&
         self.forenames.is_valid() &&
-        self.surnames.is_valid()
+        self.surnames.is_valid()*/
     }
 }
 
 impl Country {
     // Assign surnames and forenames to the country.
     fn assign_names(&mut self) {
-        let names = load_country_names(&self.name);
-        self.forenames.populate(names.get("forenames").unwrap().clone());
-        self.surnames.populate(names.get("surnames").unwrap().clone());
+        let json = load_country_names(&self.name);
+        for (gender, gender_data) in json.iter() {
+            let gender_enum;
+            match gender.as_ref() {
+                "male" => {
+                    gender_enum = Gender::Male;
+                    self.names.insert(gender_enum.clone(), HashMap::new());
+                },
+                "female" => {
+                    gender_enum = Gender::Female;
+                    self.names.insert(gender_enum.clone(), HashMap::new());
+                },
+                _ => panic!("no")
+            };
+
+            for (name_type, namedata) in gender_data.iter() {
+                self.names.get_mut(&gender_enum).unwrap().insert(name_type.clone(), NamePool::build(namedata.clone()));
+            }
+        }
     }
 
     // Generate a name from the country's name databases.
-    pub fn generate_name(&self) -> (String, String) {
-        (self.forenames.draw_name(), self.surnames.draw_name())
+    pub fn generate_name(&self, gender: &Gender) -> (String, String) {
+        let forename = self.names.get(gender).unwrap().get("forenames").unwrap().draw_name();
+        let surname = self.names.get(gender).unwrap().get("surnames").unwrap().draw_name();
+
+        (forename, surname)
+    }
+
+    // Get the combined name weight of the country's namepools.
+    pub fn get_combined_name_weight(&self) -> u32 {
+        self.names.get(&Gender::Male).unwrap().get("forenames").unwrap().total_weight +
+        self.names.get(&Gender::Male).unwrap().get("surnames").unwrap().total_weight +
+        self.names.get(&Gender::Female).unwrap().get("forenames").unwrap().total_weight +
+        self.names.get(&Gender::Female).unwrap().get("surnames").unwrap().total_weight
     }
 }
 
@@ -95,10 +117,23 @@ impl Country {
 pub struct NamePool {
     names: Vec<String>,
     weights: Vec<u16>,
-    pub total_weight: usize,
+    pub total_weight: u32,
 }
+// Basics.
+impl NamePool {
+    pub fn build(names: HashMap<String, u16>) -> Self {
+        let mut pool = Self::default();
 
-impl NamePool { // Basics.
+        for (name, weight) in names.into_iter() {
+            pool.names.push(name);
+            pool.weights.push(weight);
+        }
+
+        pool.calculate_weight();
+
+        return pool;
+    }
+
     // Check that the NamePool does not contain illegal values.
     fn is_valid(&self) -> bool {
         if self.names.len() == 0 || self.names.len() != self.weights.len() {
@@ -107,22 +142,17 @@ impl NamePool { // Basics.
 
         let mut sum = 0;
         for weight in self.weights.iter() {
-            sum += *weight as usize;
+            sum += *weight as u32;
         }
 
         return self.total_weight == sum;
     }
 
-    // Populate the namepool with names and calculate total_weight.
-    fn populate(&mut self, name_map: HashMap<String, u16>) {
-        self.names = Vec::new();
-        self.weights = Vec::new();
+    // Calculate the weight.
+    fn calculate_weight(&mut self) {
         self.total_weight = 0;
-
-        for (name, weight) in name_map {
-            self.names.push(name);
-            self.weights.push(weight);
-            self.total_weight += weight as usize;
+        for weight in self.weights.iter() {
+            self.total_weight += *weight as u32;
         }
     }
 }
@@ -138,7 +168,7 @@ impl NamePool {
         let random = random_range(0..self.total_weight);
         let mut counter = 0;
         for (i, weight) in self.weights.iter().enumerate() {
-            counter += *weight as usize;
+            counter += *weight as u32;
             if random < counter {
                 return i;
             }

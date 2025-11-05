@@ -6,6 +6,8 @@ use std::{
     io::Read
 };
 
+use crate::{country::NamePool, person::Gender, types::CountryNamePool};
+
 // Get a file, or error if it does not exist.
 fn get_file(path: &str) -> io::Result<fs::File> {
     return fs::File::open(path);
@@ -24,8 +26,8 @@ fn read_json_file(path: &str) -> io::Result<String> {
     return Ok(json);
 }
 
-pub fn load_country_names(country: &str) -> HashMap<String, HashMap<String, u16>> {
-    // Load names of a specific country.
+// Load names of a specific country.
+pub fn load_country_names(country: &str) -> HashMap<String, HashMap<String, HashMap<String, u16>>> {
     let json = match read_json_file(&format!("./json/names/{}.json", country)) {
         Ok(j) => j,
         Err(_) => {
@@ -33,8 +35,7 @@ pub fn load_country_names(country: &str) -> HashMap<String, HashMap<String, u16>
         }
     };
 
-    let names = serde_json::from_str(&json).unwrap();
-    return names
+    return serde_json::from_str(&json).unwrap();
 }
 
 // Function for listing all JSON files in the names folder.

@@ -66,16 +66,12 @@ impl Team {
 
     // Update the Team to database.
     pub fn save(&self) {
-        TEAMS.lock()
-            .expect(&format!("something went wrong when trying to update Team {}: {} to TEAMS", self.id, self.name))
-            .insert(self.id, self.clone());
+        TEAMS.lock().unwrap().insert(self.id, self.clone());
     }
 
     // Delete the Team from the database.
     pub fn delete_from_db(&self) {
-        TEAMS.lock()
-            .expect(&format!("something went wrong when trying to delete Team {}: {} from TEAMS", self.id, self.name))
-            .remove(&self.id);
+        TEAMS.lock().unwrap().remove(&self.id);
     }
 
     // Check that the team does not have illegal values.

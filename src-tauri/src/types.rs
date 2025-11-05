@@ -1,13 +1,21 @@
 // Custom types that are widely used are defined here.
 
+use std::collections::HashMap;
+
+use crate::{country::NamePool, person::Gender};
+
 // Database ID types.
 pub type CountryId = u8;
 pub type CompetitionId = u8;
-pub type GameId = u8;
 
 pub type TeamId = u8;
 pub type PlayerId = u16;
 pub type ManagerId = u8;
+
+pub type CountryNamePool = HashMap<Gender, HashMap<String, NamePool>>;
+
+// Person attributes. Divide by 100 to get the actual attribute.
+pub type AttributeValue = u16;
 
 // Type conversions.
 pub mod convert {

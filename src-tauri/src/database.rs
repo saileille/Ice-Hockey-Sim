@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 use crate::{
     competition::{
         format::{self}, knockout_generator, season::{ranking::RankCriteria, Season}, CompConnection, Competition, Seed
-    }, country::Country, event, io, match_event, person::{manager::Manager, player::{
+    }, country::Country, event, io, match_event, person::{attribute::{Attribute, AttributeId}, manager::Manager, player::{
         position::{Position, PositionId}, Player
     }}, team::Team, time::{AnnualDate, AnnualWindow}, types::{CompetitionId, CountryId, ManagerId, PlayerId, TeamId}
 };
@@ -30,8 +30,7 @@ pub static MANAGERS: LazyLock<Mutex<HashMap<ManagerId, Manager>>> = LazyLock::ne
 
 lazy_static! {
     pub static ref POSITIONS: HashMap<PositionId, Position> = {
-         let p = HashMap::from([
-            (PositionId::default(), Position::default()),
+         HashMap::from([
             (PositionId::Goalkeeper, Position::build(
                 PositionId::Goalkeeper, "GK", 0
             )),
@@ -50,8 +49,27 @@ lazy_static! {
             (PositionId::RightWinger, Position::build(
                 PositionId::RightWinger, "RW", 0
             )),
-        ]);
-        return p;
+        ])
+    };
+
+    pub static ref ATTRIBUTES: HashMap<AttributeId, Attribute> = {
+         HashMap::from([
+             (AttributeId::Defending, Attribute::build(
+                AttributeId::Defending, 0
+            )),
+            (AttributeId::Shooting, Attribute::build(
+                AttributeId::Shooting, 0
+            )),
+            (AttributeId::Passing, Attribute::build(
+                AttributeId::Passing, 0
+            )),
+            (AttributeId::Faceoffs, Attribute::build(
+                AttributeId::Faceoffs, 0
+            )),
+            (AttributeId::General, Attribute::build(
+                AttributeId::General, 0
+            )),
+        ])
     };
 
     pub static ref EVENT_TYPES: HashMap<event::Id, event::Type> = {

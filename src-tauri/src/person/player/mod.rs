@@ -2,13 +2,12 @@ pub mod position;
 mod ai;
 
 use rand::{rngs::ThreadRng, Rng};
-use rand::seq::IteratorRandom;
 use serde_json::json;
 
 use crate::{
-    database::{PLAYERS, POSITIONS}, types::{PlayerId, TeamId}
+    database::PLAYERS, types::{PlayerId, TeamId}
 };
-use super::{Person, Gender};
+use super::Person;
 use self::position::{Position, PositionId};
 
 #[derive(Debug)]
@@ -64,15 +63,12 @@ impl Player {
 
     // Update the Team to database.
     pub fn save(&self) {
-        PLAYERS.lock()
-            .expect(&format!("something went wrong when trying to update Player {}: {} to PLAYERS", self.id, self.person.get_full_name())).insert(self.id, self.clone());
+        PLAYERS.lock().unwrap().insert(self.id, self.clone());
     }
 
     // Delete the Player from the database.
     pub fn delete_from_db(&self) {
-        PLAYERS.lock()
-            .expect(&format!("something went wrong when trying to delete Player {}: {} from PLAYERS", self.id, self.person.get_full_name()))
-            .remove(&self.id);
+        PLAYERS.lock().unwrap().remove(&self.id);
     }
 
     // Check if the player in question is not the default placeholder.

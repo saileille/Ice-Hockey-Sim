@@ -1,5 +1,6 @@
 pub mod player;
 pub mod manager;
+pub mod attribute;
 
 use rand;
 use serde_json::json;
@@ -9,9 +10,10 @@ use crate::{
     competition::Competition, country::Country, database::{COUNTRIES, TODAY}, team::Team, time::{date_to_db_string, db_string_to_date}, types::{convert, CountryId, TeamId}
 };
 
+#[derive(Eq, Hash)]
 #[derive(Debug)]
 #[derive(Default, Clone, PartialEq)]
-enum Gender {
+pub enum Gender {
     #[default] Null,
     Male,
     Female,
@@ -33,9 +35,9 @@ impl Person {
     fn build(country_id: CountryId, gender: Gender) -> Self {
         let mut person = Person::default();
         person.country_id = country_id;
-        (person.forename, person.surname) = Country::fetch_from_db(&person.country_id).generate_name();
-
         person.gender = gender;
+
+        (person.forename, person.surname) = Country::fetch_from_db(&person.country_id).generate_name(&person.gender);
 
         return person;
     }
@@ -49,8 +51,8 @@ impl Person {
         for country in countries.values() {
             let weight = match country.name == "Finland" {
                 // Making Finns more likely to appear in what tries to emulate some kind of a Finnish league.
-                true => country.forenames.total_weight * 20,
-                _ => country.forenames.total_weight,
+                true => country.get_combined_name_weight() * 20,
+                _ => country.get_combined_name_weight(),
             };
 
             total_weight += weight;

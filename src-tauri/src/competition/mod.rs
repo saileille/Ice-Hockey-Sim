@@ -93,9 +93,7 @@ impl Competition {
 
     // Update the Competition to database.
     pub fn save(&self) {
-        COMPETITIONS.lock()
-            .expect(&format!("something went wrong when trying to update Competition {}: {} to COMPETITIONS", self.id, self.name))
-            .insert(self.id, self.clone());
+        COMPETITIONS.lock().unwrap().insert(self.id, self.clone());
     }
 
     // Create a new season for the competition.
