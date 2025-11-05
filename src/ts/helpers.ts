@@ -32,8 +32,6 @@ export const createLink = (type: LinkType, id: number, text: string, parentEleme
     const span = createElement("span", { "textContent": text });
     span.className = `${type}${id} link`;
 
-    // The event listener needs to be created later.
-
     for (const [i, element] of parentElements.entries()) {
         if (i === 0) {
             element.appendChild(span);
