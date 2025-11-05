@@ -3,12 +3,7 @@
 use rand::
     seq::IndexedRandom
 ;
-use crate::{
-    event, person::player::Player, team::lineup::cache::PlayersOnIceCache, types::PlayerId
-};
-use super::{
-    Clock,
-};
+use crate::{event, match_event::Clock, person::player::Player, team::lineup::cache::PlayersOnIceCache, types::PlayerId};
 
 #[derive(Debug)]
 #[derive(Default, Clone)]
@@ -143,8 +138,8 @@ impl Shot {
     // Check if the shot ends up in goal.
     // Only taking shooter into account for now.
     fn calculate_goal(&mut self, shooter_and_assisters: &[Player], defenders: &PlayersOnIceCache) {
-        let gk_ability = defenders.gk.as_ref().unwrap().ability as f64;
-        let shooter_ability = shooter_and_assisters[0].ability as f64;
+        let gk_ability = defenders.gk.as_ref().unwrap().ability.get() as f64;
+        let shooter_ability = shooter_and_assisters[0].ability.get() as f64;
         let total_ability = gk_ability + shooter_ability;
         let modifier;
 

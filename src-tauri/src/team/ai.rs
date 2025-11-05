@@ -63,7 +63,7 @@ impl PlayerNeed {
         let mut index = 0.0;
 
         for ability in self.abilities.iter() {
-            if player.ability as f64 > *ability {
+            if player.ability.get_display() as f64 > *ability {
                 break;
             }
             index += 1.0;
@@ -120,7 +120,7 @@ impl PlayerNeed {
             _ => self.get_worst()
         };
 
-        (player.ability as f64 - worst) * self.urgency * (1.0 / (player.person.contract_offers.len() + 1) as f64)
+        (player.ability.get_display() as f64 - worst) * self.urgency * (1.0 / (player.person.contract_offers.len() + 1) as f64)
     }
 }
 
@@ -130,7 +130,7 @@ impl Team {
     pub fn evaluate_player_needs(&mut self) {
         let mut roster_build = self.get_players();
         roster_build.append(&mut self.get_approached_players());
-        roster_build.sort_by(|a, b| b.ability.cmp(&a.ability));
+        roster_build.sort_by(|a, b| b.ability.get_display().cmp(&a.ability.get_display()));
         let players = get_players_per_position(roster_build);
 
 
@@ -227,7 +227,7 @@ impl Team {
         }
 
         let mut free_agents = Player::get_free_agents_for_team(positions, self.id);
-        free_agents.sort_by(|a, b| b.ability.cmp(&a.ability));
+        free_agents.sort_by(|a, b| b.ability.get_display().cmp(&a.ability.get_display()));
 
         return free_agents;
     }
@@ -254,7 +254,7 @@ fn get_players_per_position(players: Vec<Player>) -> HashMap<PositionId, Vec<Pla
 fn evaluate_position_needs(position: &PositionId, players: &[Player]) -> PlayerNeed {
     let mut need = PlayerNeed::build(position.clone());
     let players_in_lineup = players.len().clamp(0, need.get_lineup_places() as usize);
-    need.abilities = players[0..players_in_lineup].iter().map(|a| a.ability as f64).collect();
+    need.abilities = players[0..players_in_lineup].iter().map(|a| a.ability.get_display() as f64).collect();
 
     return need;
 }

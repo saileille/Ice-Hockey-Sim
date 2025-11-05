@@ -5,7 +5,7 @@ use rand::{rngs::ThreadRng, Rng};
 use serde_json::json;
 
 use crate::{
-    database::PLAYERS, types::{PlayerId, TeamId}
+    database::PLAYERS, person::attribute::PersonAttribute, types::{AttributeValue, PlayerId, TeamId}
 };
 use super::Person;
 use self::position::{Position, PositionId};
@@ -15,7 +15,7 @@ use self::position::{Position, PositionId};
 pub struct Player {
     pub id: PlayerId,
     pub person: Person,
-    pub ability: u8,
+    pub ability: PersonAttribute,
     pub position_id: PositionId,
 }
 
@@ -29,17 +29,17 @@ impl Player {
         };
     }
 
-    fn build(person: Person, ability: u8, position_id: PositionId) -> Self {
+    fn build(person: Person, ability: AttributeValue, position_id: PositionId) -> Self {
         let mut player = Self::default();
         player.person = person;
-        player.ability = ability;
+        player.ability = PersonAttribute::build(super::attribute::AttributeId::General, ability);
         player.position_id = position_id;
 
         return player;
     }
 
     // Create a player and store it in the database. Return a clone of the Player.
-    pub fn build_and_save(person: Person, ability: u8, position_id: PositionId) -> Self {
+    pub fn build_and_save(person: Person, ability: AttributeValue, position_id: PositionId) -> Self {
         let mut player = Self::build(person, ability, position_id);
         player.create_id(PLAYERS.lock().unwrap().len() + 1);
         player.save();
@@ -50,7 +50,7 @@ impl Player {
     pub fn build_and_save_random(rng: &mut ThreadRng) -> Self {
         let person = Person::build_random();
 
-        let ability = rng.random_range(0..=u8::MAX);
+        let ability = rng.random_range(0..=u16::MAX);
         let position_id = PositionId::get_random(rng);
 
         return Self::build_and_save(person, ability, position_id);
@@ -117,7 +117,7 @@ impl Player {
         }).collect();
 
         players.sort_by(|a, b|
-            b.ability.cmp(&a.ability)
+            b.ability.get_display().cmp(&a.ability.get_display())
             .then((a.position_id.clone() as u8).cmp(&(b.position_id.clone() as u8)))
             .then(a.person.surname.cmp(&b.person.surname))
             .then(a.person.forename.cmp(&b.person.forename))
@@ -138,7 +138,7 @@ impl Player {
             "name": self.person.get_full_name(),
             "country": self.person.get_country().name,
             "position": self.get_position().abbreviation,
-            "ability": self.ability,
+            "ability": self.ability.get_display(),
             "seasons_left": seasons_left,
         })
     }
@@ -156,7 +156,7 @@ impl Player {
             "name": self.person.get_full_name(),
             "country": self.person.get_country().name,
             "position": self.get_position().abbreviation,
-            "ability": self.ability,
+            "ability": self.ability.get_display(),
             "contract": contract,
             "offers": contract_offers
         })
@@ -169,7 +169,7 @@ impl Player {
             "name": self.person.get_full_name(),
             "country": self.person.get_country().name,
             "position": self.get_position().abbreviation,
-            "ability": self.ability,
+            "ability": self.ability.get_display(),
             "offers": contract_offers
         })
     }

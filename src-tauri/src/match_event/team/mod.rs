@@ -2,13 +2,7 @@ pub mod cache;
 
 use serde_json::json;
 
-use crate::{
-    competition::season::team::TeamCompData, team::{
-        lineup::LineUp,
-        Team
-    }, types::{convert, TeamId}
-};
-use super::event::Shot;
+use crate::{competition::season::team::TeamCompData, match_event::event::Shot, team::{Team, lineup::LineUp}, types::{TeamId, convert}};
 
 #[derive(Debug)]
 #[derive(Default, Clone)]

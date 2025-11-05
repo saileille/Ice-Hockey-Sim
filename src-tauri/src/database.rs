@@ -124,6 +124,8 @@ pub fn initialise() {
 }
 
 // Add competitions.
+// NOTE: Season window of the parent competition MUST go at least one day past the last day of the last stage.
+// Otherwise some contracts might expire before the last match day is played.
 fn add_competition_data() {
     // 1: Liiga
     Competition::build_and_save(
@@ -160,7 +162,7 @@ fn add_competition_data() {
         Vec::new(),
         AnnualWindow::build(
             AnnualDate::build(9, 1),
-            AnnualDate::build(4, 1)
+            AnnualDate::build(3, 31)
         ),
         vec![CompConnection::build([1, 10], 3, Seed::GetFromPosition, false)],
         14,
@@ -186,8 +188,8 @@ fn add_competition_data() {
         "Playoffs",
         vec!["Säälit"],
         AnnualWindow::build(
-            AnnualDate::build(4, 2),
-            AnnualDate::build(6, 1)
+            AnnualDate::build(4, 1),
+            AnnualDate::build(5, 31)
         ),
         vec![match_event::Rules::build(3, 1200, 0, true)],
         vec![2, 4],
@@ -196,6 +198,4 @@ fn add_competition_data() {
         Vec::new(),
         vec![RankCriteria::Seed]
     );
-
-
 }

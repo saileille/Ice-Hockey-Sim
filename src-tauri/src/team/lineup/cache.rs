@@ -57,33 +57,33 @@ impl LineUpCache {
 
         for gk in self.goalkeepers.iter() {
             if gk.is_some() {
-                total_ability += gk.as_ref().unwrap().ability as u16;
+                total_ability += gk.as_ref().unwrap().ability.get_display() as u16;
                 counter += 1;
             }
         }
 
         for pair in self.defence_pairs.iter() {
             if pair.ld.is_some() {
-                total_ability += pair.ld.as_ref().unwrap().ability as u16;
+                total_ability += pair.ld.as_ref().unwrap().ability.get_display() as u16;
                 counter += 1;
             }
             if pair.rd.is_some() {
-                total_ability += pair.rd.as_ref().unwrap().ability as u16;
+                total_ability += pair.rd.as_ref().unwrap().ability.get_display() as u16;
                 counter += 1;
             }
         }
 
         for line in self.forward_lines.iter() {
             if line.lw.is_some() {
-                total_ability += line.lw.as_ref().unwrap().ability as u16;
+                total_ability += line.lw.as_ref().unwrap().ability.get_display() as u16;
                 counter += 1;
             }
             if line.c.is_some() {
-                total_ability += line.c.as_ref().unwrap().ability as u16;
+                total_ability += line.c.as_ref().unwrap().ability.get_display() as u16;
                 counter += 1;
             }
             if line.rw.is_some() {
-                total_ability += line.rw.as_ref().unwrap().ability as u16;
+                total_ability += line.rw.as_ref().unwrap().ability.get_display() as u16;
                 counter += 1;
             }
         }
@@ -144,15 +144,15 @@ pub struct PlayersOnIceCache {
 
 impl PlayersOnIceCache {
     // Get the total ability of skaters (not goalkeeper).
-    fn get_skaters_ability(&self) -> u16 {
+    fn get_skaters_ability(&self) -> u32 {
         let mut total_ability = 0;
 
-        if self.ld.is_some() { total_ability += self.ld.as_ref().unwrap().ability as u16 }
-        if self.rd.is_some() { total_ability += self.rd.as_ref().unwrap().ability as u16 }
-        if self.lw.is_some() { total_ability += self.lw.as_ref().unwrap().ability as u16 }
-        if self.c.is_some() { total_ability += self.c.as_ref().unwrap().ability as u16 }
-        if self.rw.is_some() { total_ability += self.rw.as_ref().unwrap().ability as u16 }
-        if self.extra_attacker.is_some() { total_ability += self.extra_attacker.as_ref().unwrap().ability as u16 }
+        if self.ld.is_some() { total_ability += self.ld.as_ref().unwrap().ability.get() as u32 }
+        if self.rd.is_some() { total_ability += self.rd.as_ref().unwrap().ability.get() as u32 }
+        if self.lw.is_some() { total_ability += self.lw.as_ref().unwrap().ability.get() as u32 }
+        if self.c.is_some() { total_ability += self.c.as_ref().unwrap().ability.get() as u32 }
+        if self.rw.is_some() { total_ability += self.rw.as_ref().unwrap().ability.get() as u32 }
+        if self.extra_attacker.is_some() { total_ability += self.extra_attacker.as_ref().unwrap().ability.get() as u32 }
 
         return total_ability;
     }

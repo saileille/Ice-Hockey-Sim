@@ -1,12 +1,6 @@
 // Input/output logic.
-use std::{
-    collections::HashMap,
-    fs,
-    io,
-    io::Read
-};
+use std::{collections::HashMap, fs, io, io::Read};
 
-use crate::{country::NamePool, person::Gender, types::CountryNamePool};
 
 // Get a file, or error if it does not exist.
 fn get_file(path: &str) -> io::Result<fs::File> {

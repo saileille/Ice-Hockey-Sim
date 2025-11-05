@@ -65,11 +65,11 @@ impl Player {
         let mut need = need_option.unwrap();
 
         // Removing the player's ability from needs so the player does not compare against himself.
-        let player_index = need.abilities.iter().position(|a| *a == self.ability as f64);
+        let player_index = need.abilities.iter().position(|a| *a == self.ability.get_display() as f64);
         if player_index.is_some() { need.abilities.remove(player_index.unwrap()); }
 
         // A player never wants to join a team where their playing time is uncertain.
-        if self.ability as f64 <= need.get_worst() {
+        if self.ability.get_display() as f64 <= need.get_worst() {
             return -1000.0;
         }
 

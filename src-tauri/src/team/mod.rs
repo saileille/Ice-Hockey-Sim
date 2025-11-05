@@ -8,10 +8,10 @@ use rand::{
 use serde_json::json;
 use time::Date;
 use crate::{
-    database::{TEAMS, TODAY}, person::{manager::Manager, player::{
-        position::PositionId, Player
-    }, Contract, Person}, team::ai::PlayerNeed, time::date_to_db_string, types::{
-        CompetitionId, ManagerId, PlayerId, TeamId
+    database::{TEAMS, TODAY}, person::{Contract, Person, manager::Manager, player::{
+        Player, position::PositionId
+    }}, team::ai::PlayerNeed, time::date_to_db_string, types::{
+        AttributeValue, CompetitionId, ManagerId, PlayerId, TeamId
     }
 };
 use self::lineup::LineUp;
@@ -102,7 +102,7 @@ impl Team {
         let mut approached_players = self.get_approached_players();
         players.append(&mut approached_players);
 
-        players.sort_by(|a, b| (a.position_id.clone() as u8).cmp(&(b.position_id.clone() as u8)).then(b.ability.cmp(&a.ability)));
+        players.sort_by(|a, b| (a.position_id.clone() as u8).cmp(&(b.position_id.clone() as u8)).then(b.ability.get_display().cmp(&a.ability.get_display())));
 
         let json_players: Vec<serde_json::Value> = players.iter().map(|a| a.get_team_screen_json()).collect();
         json!({
@@ -140,7 +140,7 @@ impl Team {
         self.lineup.clear();
 
         let mut players = self.get_players();
-        players.sort_by(|a, b| b.ability.cmp(&a.ability));
+        players.sort_by(|a, b| b.ability.get_display().cmp(&a.ability.get_display()));
 
         self.lineup.auto_add(players);
         self.save();
@@ -156,7 +156,7 @@ impl Team {
 // Tests.
 impl Team {
     // Generate a basic roster of players for the team.
-    fn generate_roster(&mut self, min_ability: u8, max_ability: u8) {
+    fn generate_roster(&mut self, min_ability: AttributeValue, max_ability: AttributeValue) {
         self.roster = Vec::new();
         let range = Uniform::new_inclusive(min_ability, max_ability)
             .expect(&format!("error: low: {min_ability}, high: {max_ability}"));
