@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen } from "./basics";
 import { Contract } from "./player";
 import { createElement, createEventListener, createLink, extractIdFromElement } from "../helpers";
-import { HumanInfo as HumanPackage, Listener } from "../types";
+import { HumanPackage as HumanPackage, Listener } from "../types";
 
 type Player = {
     id: number,

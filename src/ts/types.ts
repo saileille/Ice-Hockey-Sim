@@ -11,13 +11,13 @@ export const LINK_TYPES = ["team", "player", "comp"];
 export type LinkType = (typeof LINK_TYPES)[number];
 
 
-export type HumanTeamInfo = {
+export type HumanTeamPackage = {
     id: number,
     actions_remaining: number,
     approached_players: Array<number>
 };
 
 // Important info of a human manager.
-export type HumanInfo = {
-    team: HumanTeamInfo | null
+export type HumanPackage = {
+    team: HumanTeamPackage | null
 };

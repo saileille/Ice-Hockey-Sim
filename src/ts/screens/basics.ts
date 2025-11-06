@@ -2,13 +2,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createEventListener, createElement, createLink } from "../helpers.ts";
 import { drawScreen as drawCompScreen } from "./competition.ts";
-import { Listener } from "../types.ts";
+import { HumanPackage, HumanTeamPackage, Listener } from "../types.ts";
 import { onClickHomeScreen } from "./home.ts";
 import { drawScreen as drawHomeScreen } from "./home.ts";
 import { drawScreen as drawPlayerSearchScreen } from "./player_search.ts";
 
 type TopBarPackage = {
     "date": string,
+    "human": HumanPackage,
 };
 
 const initialiseTopBar = () => {
@@ -23,6 +24,7 @@ const initialiseTopBar = () => {
             <button id="continue">Continue</button>
             <button id="home-screen">Home Screen</button>
             <button id="player-search">Scouting</button>
+            <span>Actions remaining: <span id="actions-remaining"></span></span>
         </div>
     `;
 
@@ -40,8 +42,10 @@ const resetCompSelect = () => {
 // Update the date and stuff in the top bar.
 export const updateTopBar = async () => {
     initialiseTopBar();
+
     const topBarPackage: TopBarPackage = await invoke("get_top_bar_package");
     displayDate(topBarPackage.date);
+    displayActionsRemaining(topBarPackage.human.team);
 
     // Making sure there is no obsolete information.
     initialiseContentScreen();
@@ -60,10 +64,19 @@ export const initialiseContentScreen = () => {
     return contentScreen;
 };
 
-const displayDate = async (date: string) => {
+const displayDate = (date: string) => {
     const dateDiv: HTMLDivElement = document.querySelector("#date") as HTMLDivElement;
-    // const dateString: string = await invoke("get_date_string");
     dateDiv.textContent = date;
+};
+
+const displayActionsRemaining = (team: HumanTeamPackage | null) => {
+    const actionsSpan = document.querySelector("#actions-remaining") as HTMLSpanElement;
+    let actions = "0";
+    if (team !== null) {
+        actions = team.actions_remaining.toString();
+    }
+
+    actionsSpan.textContent = actions;
 };
 
 export const createTopLevelCompSelect = async (element: Element) => {

@@ -170,5 +170,6 @@ pub fn offer_contract(player_id: PlayerId, team_id: TeamId, years: i32) {
 pub fn get_top_bar_package() -> serde_json::Value {
     json!({
         "date": date_to_db_string(&TODAY.lock().unwrap()),
+        "human": get_human_package(),
     })
 }

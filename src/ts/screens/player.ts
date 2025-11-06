@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
-import { initialiseContentScreen } from "./basics";
+import { initialiseContentScreen, updateTopBar } from "./basics";
 import { createElement, createEventListener, createLink } from "../helpers";
-import { HumanInfo as HumanPackage, HumanTeamInfo, Listener } from "../types";
+import { HumanPackage as HumanPackage, HumanTeamPackage, Listener } from "../types";
 import { drawScreen as drawHomeScreen } from "./home";
 
 type ContractTeam = {
@@ -133,7 +133,9 @@ const offerContractToPlayer: Listener = async (e: Event) => {
 
     const humanPackage: HumanPackage = await invoke("get_human_package");
     const years = Number((document.querySelector("#years") as HTMLSelectElement).value);
-    await invoke("offer_contract", { playerId: playerId, teamId: (humanPackage.team as HumanTeamInfo).id, years: years });
+    await invoke("offer_contract", { playerId: playerId, teamId: (humanPackage.team as HumanTeamPackage).id, years: years });
+
+    updateTopBar(); // Needs to be updated as one action is used here.
     drawScreen(playerId);
 };
 
