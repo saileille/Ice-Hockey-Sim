@@ -1,10 +1,10 @@
 // Player search screen, only free agents for now.
 
 import { invoke } from "@tauri-apps/api/core";
-import { initialiseTopBar, initialiseContentScreen } from "./basics";
+import { initialiseContentScreen } from "./basics";
 import { Contract } from "./player";
 import { createElement, createEventListener, createLink, extractIdFromElement } from "../helpers";
-import { HumanInfo, Listener } from "../types";
+import { HumanInfo as HumanPackage, Listener } from "../types";
 
 type Player = {
     id: number,
@@ -19,9 +19,9 @@ type PlayerFilter = "all" | "not-approached";
 
 // Draw the player search screen.
 export const drawScreen: Listener = async (_e: Event) => {
-    const players: Array<Player> = await invoke("get_free_agents");
+    const players: Array<Player> = await invoke("get_free_agents_package");
 
-    initialiseTopBar();
+    // initialiseTopBar();
     const screen = initialiseContentScreen();
     screen.innerHTML = `
         <select id="player-filter">
@@ -54,7 +54,7 @@ export const drawScreen: Listener = async (_e: Event) => {
 // Get a row of a single player.
 const drawPlayer = (player: Player) => {
     const row = document.createElement("tr");
-    createLink("player", player.id, player.name, [document.createElement("td"), row]);
+    createLink("span", "player", player.id, player.name, [document.createElement("td"), row]);
     row.appendChild(createElement("td", { "textContent": player.country }));
     row.appendChild(createElement("td", { "textContent": player.position }));
     row.appendChild(createElement("td", { "textContent": player.ability }));
@@ -66,22 +66,22 @@ const onChangePlayerFilter: Listener = async (e: Event) => {
     const element = e.target as HTMLSelectElement;
     const tbody = (document.querySelector("#players") as HTMLTableElement).children[1] as HTMLTableSectionElement;
 
-    const humanInfo: HumanInfo = await invoke("get_human_info");
-
-    await changePlayerFilter(element.value as PlayerFilter, tbody, humanInfo);
+    const humanPackage: HumanPackage = await invoke("get_human_package");
+    await changePlayerFilter(element.value as PlayerFilter, tbody, humanPackage);
 };
 
-const changePlayerFilter = async (filter: PlayerFilter, tbody: HTMLTableSectionElement, humanInfo: HumanInfo) => {
+const changePlayerFilter = async (filter: PlayerFilter, tbody: HTMLTableSectionElement, humanPackage: HumanPackage) => {
     for (const row of tbody.children) {
         const r = row as HTMLTableRowElement;
-        if (filter === "all" || humanInfo.team === null) {
+        if (filter === "all" || humanPackage.team === null) {
             r.style.display = "table-row";
             continue;
         }
 
         const spanElement = r.children[0].children[0];
-        const id = extractIdFromElement("player", spanElement) as number;
-        if (humanInfo.team.approached_players.includes(id)) {
+
+        const [_, id] = extractIdFromElement(spanElement) as [string, number];
+        if (humanPackage.team.approached_players.includes(id)) {
             r.style.display = "none";
         }
         else {

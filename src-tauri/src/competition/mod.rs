@@ -84,7 +84,11 @@ impl Competition {
     }
 
     pub fn fetch_from_db(id: &CompetitionId) -> Self {
-        COMPETITIONS.lock().unwrap().get(id).cloned().unwrap()
+        Self::fetch_from_db_option(id).unwrap()
+    }
+
+    pub fn fetch_from_db_option(id: &CompetitionId) -> Option<Self> {
+        COMPETITIONS.lock().unwrap().get(id).cloned()
     }
 
     // Save a competition to the database for the first time.
@@ -103,6 +107,11 @@ impl Competition {
     // Update the Competition to database.
     pub fn save(&self) {
         COMPETITIONS.lock().unwrap().insert(self.id, self.clone());
+    }
+
+    fn get_parent(&self) -> Option<Competition> {
+        // Get the parent of this competition.
+        return Competition::fetch_from_db_option(&self.parent_comp_id);
     }
 
     // Create a new season for the competition.
@@ -210,8 +219,53 @@ impl Competition {
         });
     }
 
+    // Create a full competition tree.
+    fn get_select_data(&self) -> Vec<Vec<(CompetitionId, String)>> {
+        let mut select_data = Vec::new();
+
+        self.get_parent_package(&mut select_data);
+        select_data.push(self.get_sibling_package());
+
+        let child_comp_package = self.get_child_package();
+        if child_comp_package.len() > 0 { select_data.push(child_comp_package); }
+
+        return select_data;
+    }
+
+    // Get the IDs of all parent competitions and their siblings.
+    fn get_parent_package(&self, select_data: &mut Vec<Vec<(CompetitionId, String)>>) {
+        match self.get_parent() {
+            Some(parent) => {
+                parent.get_parent_package(select_data);
+                select_data.push(parent.get_sibling_package());
+            },
+            _ => return
+        };
+    }
+
+    // Get the IDs of sibling competitions, including this one.
+    fn get_sibling_package(&self) -> Vec<(CompetitionId, String)> {
+        let mut ids = match self.get_parent() {
+            Some(parent) => parent.get_child_package(),
+            _ => vec![(self.id, self.name.clone())]
+        };
+
+        // Putting this competition at the top.
+        ids.sort_by(|(a, _), (b, _)| {
+            if *a == self.id { return Ordering::Less }
+            if *b == self.id { return Ordering::Greater }
+            a.cmp(&b)
+        });
+
+        return ids;
+    }
+
+    fn get_child_package(&self) -> Vec<(CompetitionId, String)> {
+        self.child_comp_ids.iter().map(|id| (*id, Competition::fetch_from_db(id).name)).collect()
+    }
+
     // Get relevant information for a competition screen.
-    pub fn get_comp_screen_json(&self) -> serde_json::Value {
+    pub fn get_comp_screen_package(&self) -> serde_json::Value {
         let season = Season::fetch_from_db(&self.id, self.get_seasons_amount() - 1);
 
         json!({
@@ -223,14 +277,13 @@ impl Competition {
                 self.format.as_ref().unwrap().get_comp_screen_json()
             },
             "season": season.get_comp_screen_json(self),
-            "child_comp_ids": self.child_comp_ids,
-            "parent_comp_id": self.parent_comp_id,
-            "parent_format": self.competition_type,
+            "comp_nav": self.get_select_data(),
+            "competition_type": self.competition_type,
         })
     }
 
     // Get relevant information for a tournament tree competition screen.
-    pub fn get_tournament_comp_screen_json(&self) -> serde_json::Value {
+    pub fn get_tournament_comp_screen_package(&self) -> serde_json::Value {
         let mut child_comps: Vec<Competition> = self.child_comp_ids.iter().map(|id| Competition::fetch_from_db(id)).collect();
         let season_index = self.get_seasons_amount() - 1;
         let mut child_seasons: Vec<Season> = child_comps.iter().map(|a| Season::fetch_from_db(&a.id, season_index)).collect();
@@ -252,7 +305,9 @@ impl Competition {
         // Played games with most recent last.
         played_games.sort_by(|a, b| db_string_to_date(&a.date).cmp(&db_string_to_date(&b.date)));
 
-        let mut comp_json = self.get_comp_screen_json();
+        // Using the default competition package as base.
+        let mut comp_json = self.get_comp_screen_package();
+
         comp_json["season"]["upcoming_games"] = upcoming_games.iter().map(|a| a.get_comp_screen_json()).collect();
         comp_json["season"]["played_games"] = played_games.iter().map(|a| a.get_comp_screen_json()).collect();
         comp_json["season"]["rounds"] = json!(rounds);

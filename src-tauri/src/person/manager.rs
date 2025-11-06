@@ -78,7 +78,7 @@ impl Manager {
     pub fn get_package(&self) -> serde_json::Value {
         json!({
             "team": match self.person.contract.as_ref() {
-                Some(contract) => Some(contract.get_team().get_manager_package_info()),
+                Some(contract) => Some(contract.get_team().get_manager_package()),
                 _ => None
             }
         })

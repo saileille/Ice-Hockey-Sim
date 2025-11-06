@@ -1,8 +1,9 @@
 // Generic helper functions to alleviate the tedious verbosity.
 
-import { Query, Listener, EventType, TagName, LinkType, LINK_TYPES } from "./types";
+import { Query, Listener, EventType, TagName, LinkType } from "./types";
 import { drawScreen as drawTeamScreen } from "./screens/team";
 import { drawScreen as drawPlayerScreen } from "./screens/player";
+import { drawScreen as drawCompScreen } from "./screens/competition";
 
 // Do not touch anything, It Just Works™.
 export const createEventListener = (query: Query, event: EventType, listener: Listener) => {
@@ -28,8 +29,8 @@ export const createElement = (elementType: TagName, attributes: any) => {
 
 
 // Draw a link field for any purpose.
-export const createLink = (type: LinkType, id: number, text: string, parentElements: Array<HTMLElement>) => {
-    const span = createElement("span", { "textContent": text });
+export const createLink = (tag: string, type: LinkType, id: number, text: string, parentElements: Array<HTMLElement>) => {
+    const span = createElement(tag, { "textContent": text });
     span.className = `${type}${id} link`;
 
     for (const [i, element] of parentElements.entries()) {
@@ -44,42 +45,44 @@ export const createLink = (type: LinkType, id: number, text: string, parentEleme
 
 // A dynamic link listener function that makes it possible to create listeners without having the associated element in the document.
 export const linkListener: Listener = (e: Event) => {
-    const target = e.target;
+    const element = e.target as Element;
 
     // Getting rid of possible bad actors early.
-    if (target === null || !("tagName" in target) || target.tagName !== "SPAN") { return; }
-    const element = target as HTMLSpanElement;
+    if (element === null || !element.classList.contains("link")) { return; }
 
-    for (const linkType of LINK_TYPES) {
-        const id = extractIdFromElement(linkType, element);
-        if (id === undefined) {
-            continue;
+    // Getting the link type and the ID from the element.
+    const link = extractIdFromElement(element);
+    // console.dir(link);
+
+    if (link === undefined) { return; }
+
+    switch (link[0]) {
+        case "comp": {
+            drawCompScreen(link[1]);
+            return;
         }
-
-        switch (linkType) {
-            case "team": {
-                drawTeamScreen(id);
-                return;
-            }
-            case "player": {
-                drawPlayerScreen(id);
-                return;
-            }
-            default: {
-                console.error(`Unknown link type ${linkType} with ID ${id}`);
-            }
+        case "team": {
+            drawTeamScreen(link[1]);
+            return;
+        }
+        case "player": {
+            drawPlayerScreen(link[1]);
+            return;
+        }
+        default: {
+            console.error(`Unknown link type ${link[0]} with ID ${link[1]}`);
         }
     }
 };
 
 // Extract the ID of a data item from DOM element ID.
-export const extractIdFromElement = (linkType: LinkType, element: Element): number | undefined => {
-    const regex = new RegExp(`${linkType}([0-9]+)`);
+export const extractIdFromElement = (element: Element): [LinkType, number] | undefined => {
+    const regex = new RegExp(`([a-z]+)([0-9]+)`);
 
     for (const className of element.classList) {
         const match = className.match(regex);
         if (match === null) { continue; }
 
-        return Number(match[1]);
+        return [match[1], Number(match[2])];
     }
 };

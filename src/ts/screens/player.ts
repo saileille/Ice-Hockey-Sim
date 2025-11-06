@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
-import { initialiseTopBar, initialiseContentScreen } from "./basics";
+import { initialiseContentScreen } from "./basics";
 import { createElement, createEventListener, createLink } from "../helpers";
-import { HumanInfo, HumanTeamInfo, Listener } from "../types";
+import { HumanInfo as HumanPackage, HumanTeamInfo, Listener } from "../types";
 import { drawScreen as drawHomeScreen } from "./home";
 
 type ContractTeam = {
@@ -27,10 +27,9 @@ type Player = {
 
 // Draw the screen of a given player.
 export const drawScreen = async (id: number) => {
-    const player: Player = await invoke("get_player_screen_info", { id: id });
-    const humanInfo: HumanInfo = await invoke("get_human_info");
+    const player: Player = await invoke("get_player_screen_package", { id: id });
+    const humanPackage: HumanPackage = await invoke("get_human_package");
 
-    initialiseTopBar();
     const screen = initialiseContentScreen();
 
     let pageTitle = `${player.name} (`;
@@ -52,9 +51,9 @@ export const drawScreen = async (id: number) => {
     // Contract offer can be made if...
     if (
         player.contract === null && // ...player does not have a contract,
-        humanInfo.team !== null &&  // ...human is managing a team,
-        !humanInfo.team.approached_players.includes(id) &&  // ...human's team has not approached the player,
-        humanInfo.team.actions_remaining > 0    // ...and human team has actions remaining.
+        humanPackage.team !== null &&  // ...human is managing a team,
+        !humanPackage.team.approached_players.includes(id) &&  // ...human's team has not approached the player,
+        humanPackage.team.actions_remaining > 0    // ...and human team has actions remaining.
     ) {
         screen.appendChild(createElement("button", { "id": `offer-contract${id}`, "textContent": "Offer Contract" }));
         createEventListener(`#offer-contract${id}`, "click", drawNegotiationScreen);
@@ -73,7 +72,7 @@ const drawContract = (contract: Contract) => {
     contractTable.appendChild(firstRow);
 
     const secondRow = document.createElement("tr");
-    createLink("team", contract.team.id, contract.team.name, [document.createElement("td"), secondRow]);
+    createLink("span", "team", contract.team.id, contract.team.name, [document.createElement("td"), secondRow]);
     secondRow.appendChild(createElement("td", { "textContent": contract.start_date }));
     secondRow.appendChild(createElement("td", { "textContent": contract.end_date }));
     secondRow.appendChild(createElement("td", { "textContent": contract.seasons_left }));
@@ -93,7 +92,7 @@ const drawOffers = (offers: Array<Contract>) => {
 
     for (const offer of offers) {
         const row = document.createElement("tr");
-        createLink("team", offer.team.id, offer.team.name, [document.createElement("td"), row]);
+        createLink("span", "team", offer.team.id, offer.team.name, [document.createElement("td"), row]);
         row.appendChild(createElement("td", { "textContent": offer.start_date, "colSpan": 2 }));
         row.appendChild(createElement("td", { "textContent": offer.seasons_left }));
         contractTable.appendChild(row);
@@ -108,7 +107,6 @@ const drawNegotiationScreen: Listener = async (e: Event) => {
         return;
     }
 
-    initialiseTopBar();
     const screen = initialiseContentScreen();
     screen.innerHTML = `
         <label for="years">Seasons:</label>
@@ -127,13 +125,15 @@ const drawNegotiationScreen: Listener = async (e: Event) => {
 const offerContractToPlayer: Listener = async (e: Event) => {
     const playerId = getPlayerIdFromContractOfferButton(e.target);
     if (playerId === 0) {
+
+        // Top bar should be updated here if actions remaining are displayed there...
         drawHomeScreen();
         return;
     }
 
-    const humanInfo: HumanInfo = await invoke("get_human_info");
+    const humanPackage: HumanPackage = await invoke("get_human_package");
     const years = Number((document.querySelector("#years") as HTMLSelectElement).value);
-    await invoke("offer_contract", { playerId: playerId, teamId: (humanInfo.team as HumanTeamInfo).id, years: years });
+    await invoke("offer_contract", { playerId: playerId, teamId: (humanPackage.team as HumanTeamInfo).id, years: years });
     drawScreen(playerId);
 };
 

@@ -2,6 +2,7 @@ pub mod continue_game;
 
 use std::cmp::Ordering;
 
+use serde_json::json;
 use time::Date;
 
 use crate::{competition::{self, Competition}, database::{COMPETITIONS, TODAY}, person::{Contract, manager::Manager, player::Player}, team::Team, time::date_to_db_string, types::{CompetitionId, PlayerId, TeamId}};
@@ -9,7 +10,7 @@ use crate::{competition::{self, Competition}, database::{COMPETITIONS, TODAY}, p
 
 // Get name and ID of all competitions that are not part of another competition.
 #[tauri::command]
-pub fn get_comp_select_info() -> Vec<(String, String)> {
+pub fn get_comp_select_package() -> Vec<(String, String)> {
     let mut comps: Vec<(String, String)> = COMPETITIONS.lock().unwrap().iter().filter_map(|(id, a)| {
         if a.parent_comp_id == 0 {
             Some((id.to_string(), a.name.clone()))
@@ -36,7 +37,7 @@ pub fn get_comp_select_info() -> Vec<(String, String)> {
 
 // Get name and ID of all competitions that are children of the given competition.
 #[tauri::command]
-pub fn get_child_comp_select_info(id: CompetitionId) -> Vec<(String, String)> {
+pub fn get_child_comp_select_package(id: CompetitionId) -> Vec<(String, String)> {
     let parent_comp = Competition::fetch_from_db(&id);
     let mut child_comps: Vec<(String, String)> = parent_comp.child_comp_ids.iter().map(|a| (a.to_string(), Competition::fetch_from_db(a).name)).collect();
 
@@ -52,7 +53,7 @@ pub fn get_child_comp_select_info(id: CompetitionId) -> Vec<(String, String)> {
 
 // Get name and ID of teams that are part of a competition.
 #[tauri::command]
-pub fn get_team_select_info(id: CompetitionId) -> Vec<(String, String)> {
+pub fn get_team_select_package(id: CompetitionId) -> Vec<(String, String)> {
     let teams = Competition::fetch_from_db(&id).get_teams();
     let mut select_options: Vec<(String, String)> = teams.iter().map(|a| (a.id.to_string(), a.name.clone())).collect();
 
@@ -73,27 +74,27 @@ pub fn get_team_select_info(id: CompetitionId) -> Vec<(String, String)> {
 
 // Get all the info for a competition screen in a JSON string.
 #[tauri::command]
-pub fn get_comp_screen_info(id: CompetitionId) -> serde_json::Value {
+pub fn get_comp_screen_package(id: CompetitionId) -> serde_json::Value {
     let comp = Competition::fetch_from_db(&id);
 
     if comp.competition_type == competition::Type::Tournament {
-        return comp.get_tournament_comp_screen_json();
+        return comp.get_tournament_comp_screen_package();
     }
     else {
-        return comp.get_comp_screen_json();
+        return comp.get_comp_screen_package();
     }
 }
 
 // Get all info for a team screen in a JSON string.
 #[tauri::command]
-pub fn get_team_screen_info(id: TeamId) -> serde_json::Value {
-    Team::fetch_from_db(&id).get_team_screen_json()
+pub fn get_team_screen_package(id: TeamId) -> serde_json::Value {
+    Team::fetch_from_db(&id).get_team_screen_package()
 }
 
 // Get info for a player screen in a JSON string.
 #[tauri::command]
-pub fn get_player_screen_info(id: PlayerId) -> serde_json::Value {
-    Player::fetch_from_db(&id).unwrap().get_player_screen_json()
+pub fn get_player_screen_package(id: PlayerId) -> serde_json::Value {
+    Player::fetch_from_db(&id).unwrap().get_player_screen_package()
 }
 
 // Create a human manager in the game.
@@ -132,21 +133,21 @@ pub fn create_human_manager(id: TeamId) {
 
 // Get information about the human.
 #[tauri::command]
-pub fn get_human_info() -> serde_json::Value {
+pub fn get_human_package() -> serde_json::Value {
     let human = Manager::get_human().unwrap();
     return human.get_package();
 }
 
 // Get all free agents.
 #[tauri::command]
-pub fn get_free_agents() -> serde_json::Value {
-    Player::get_all_free_agents_json()
+pub fn get_free_agents_package() -> serde_json::Value {
+    Player::get_all_free_agents_package()
 }
 
 // Get player with player search data on it.
 #[tauri::command]
-pub fn get_player_search_info(id: PlayerId) -> serde_json::Value {
-    Player::fetch_from_db(&id).unwrap().get_player_search_screen_json()
+pub fn get_player_search_package(id: PlayerId) -> serde_json::Value {
+    Player::fetch_from_db(&id).unwrap().get_player_search_package()
 }
 
 // Offer a contract to a player.
@@ -162,4 +163,12 @@ pub fn offer_contract(player_id: PlayerId, team_id: TeamId, years: i32) {
     // This is for players to evaluate this team's attractiveness.
     team.evaluate_player_needs();
     team.save();
+}
+
+// Get relevant information for the top bar.
+#[tauri::command]
+pub fn get_top_bar_package() -> serde_json::Value {
+    json!({
+        "date": date_to_db_string(&TODAY.lock().unwrap()),
+    })
 }

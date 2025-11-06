@@ -1,6 +1,6 @@
 // Team screen stuffs.
 import { invoke } from "@tauri-apps/api/core";
-import { initialiseContentScreen, initialiseTopBar } from "./basics";
+import { initialiseContentScreen } from "./basics";
 import { createElement, createEventListener, createLink } from "../helpers";
 import { Listener } from "../types";
 
@@ -28,9 +28,8 @@ type Team = {
 
 // Draw the screen of a given team.
 export const drawScreen = async (id: number) => {
-    const team: Team = await invoke("get_team_screen_info", { id: id });
+    const team: Team = await invoke("get_team_screen_package", { id: id });
 
-    initialiseTopBar();
     const screen = initialiseContentScreen();
 
     screen.insertAdjacentHTML("beforeend", `
@@ -69,7 +68,7 @@ const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
 
     for (const player of players) {
         const row = document.createElement("tr");
-        createLink("player", player.id, player.name, [document.createElement("td"), row]);
+        createLink("span", "player", player.id, player.name, [document.createElement("td"), row]);
         row.appendChild(createElement("td", { "textContent": player.country }));
         row.appendChild(createElement("td", { "textContent": player.position }));
         row.appendChild(createElement("td", { "textContent": player.ability }));

@@ -7,7 +7,7 @@ type CreateElement = Document["createElement"];
 export type TagName = Parameters<CreateElement>[0];
 
 // Types allowed in creating links.
-export const LINK_TYPES = ["team", "player"];
+export const LINK_TYPES = ["team", "player", "comp"];
 export type LinkType = (typeof LINK_TYPES)[number];
 
 

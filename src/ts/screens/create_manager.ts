@@ -1,6 +1,6 @@
 // The manager creation screen.
 import { invoke } from "@tauri-apps/api/core";
-import { initialiseContentScreen, createCompSelect } from "./basics";
+import { createTopLevelCompSelect, initialiseContentScreen, updateTopBar} from "./basics";
 import { createElement, createEventListener, linkListener } from "../helpers";
 import { drawScreen as drawHomeScreen } from "./home";
 import { Listener } from "../types";
@@ -10,8 +10,8 @@ const drawScreen = async () => {
     const screen = initialiseContentScreen();
     screen.innerHTML = "<h1>Choose your competition and team</h1>";
 
-    // This function must be awaited.
-    await createCompSelect(screen, 0);
+    // This function must be awaited. (?)
+    await createTopLevelCompSelect(screen);
 
     // Removing the default option because we do not need it.
     const comps = document.querySelector("#comps") as HTMLSelectElement;
@@ -37,7 +37,7 @@ const onChangeCompSelect: Listener = (e: Event) => {
 
 const updateTeamSelection = async (id: Number) => {
     const teamSelect = document.querySelector("#teams") as HTMLSelectElement;
-    const optionData: Array<[string, string]> = await invoke("get_team_select_info", { id: id });
+    const optionData: Array<[string, string]> = await invoke("get_team_select_package", { id: id });
 
     while (teamSelect.lastChild) { teamSelect.removeChild(teamSelect.lastChild); }
 
@@ -52,6 +52,8 @@ const updateTeamSelection = async (id: Number) => {
 const createManager: Listener = async (_e: Event) => {
     const teamSelect = document.querySelector("#teams") as HTMLSelectElement;
     await invoke("create_human_manager", { id: Number(teamSelect.value) });
+
+    updateTopBar();
     drawHomeScreen();
 };
 

@@ -47,7 +47,7 @@ impl PersonAttribute {
     const MAX: AttributeValue = AttributeValue::MAX;
 
     // Multiply by this amount when doing logarithmic stuff.
-    // Currently 277 / 16. ((u8::MAX + 1 + MIN) / AttributeValue::BITS)
+    // Currently 275 / 16. ((u8::MAX + 1 + MIN) / AttributeValue::BITS)
     const DISPLAY_MULTIPLIER: f64 = 17.1875;
 
     // Subtract by this amount when doing logarithmic stuff.

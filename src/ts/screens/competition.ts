@@ -1,7 +1,7 @@
 // Draw the competition screen of the competition given in the ID.
 import { invoke } from "@tauri-apps/api/core";
-import { initialiseTopBar, createCompSelect, goToChildCompetition, initialiseContentScreen } from "./basics";
-import { createEventListener, createElement, createLink } from "../helpers";
+import { initialiseContentScreen, createCompNav } from "./basics";
+import { createElement, createLink } from "../helpers";
 
 type Format = {
     round_robin: RoundRobinFormat | null,
@@ -97,25 +97,23 @@ type Competition = {
     full_name: string,
     format: Format | null,
     season: Season,
-    child_comp_ids: Array<number>,
-    parent_comp_id: number,
+    comp_nav: Array<Array<[string, string]>>,
     competition_type: CompetitionType
 };
 
 // Draw any competition screen.
 export const drawScreen = async (id: number) => {
-    const comp: Competition = await invoke("get_comp_screen_info", { id: id });
+    const comp: Competition = await invoke("get_comp_screen_package", { id: id });
 
-    initialiseTopBar();
     const screen = initialiseContentScreen();
 
     // If the competition is something like playoffs.
     if (comp.season.rounds !== undefined) {
-        drawScreenTournament(screen, comp, comp.season.rounds, id);
+        drawScreenTournament(screen, comp, comp.season.rounds);
     }
 
     else if (comp.format === null) {
-        drawScreenParent(screen, comp, id);
+        drawScreenParent(screen, comp);
     }
     else if (comp.format.type === "RoundRobin") {
         drawScreenRoundRobin(screen, comp);
@@ -128,9 +126,8 @@ export const drawScreen = async (id: number) => {
 };
 
 // Draw a screen for tournament-type competitions.
-const drawScreenTournament = (screen: HTMLDivElement, comp: Competition, rounds: Array<KnockoutRound>, id: number) => {
-    createCompSelect(screen, id);
-    createEventListener("#child-comps", "change", goToChildCompetition);
+const drawScreenTournament = (screen: HTMLDivElement, comp: Competition, rounds: Array<KnockoutRound>) => {
+    createCompNav(screen, comp.comp_nav);
 
     screen.insertAdjacentHTML("beforeend", `
         <table id="tree"><tbody><tr></tr></tbody></table>
@@ -152,16 +149,14 @@ const drawScreenTournament = (screen: HTMLDivElement, comp: Competition, rounds:
 };
 
 // Draw a screen for parent competitions.
-const drawScreenParent = (screen: HTMLDivElement, comp: Competition, id: number) => {
-    createCompSelect(screen, id);
+const drawScreenParent = (screen: HTMLDivElement, comp: Competition) => {
+    createCompNav(screen, comp.comp_nav);
     drawRanking(screen, comp.season.teams);
-    createEventListener("#child-comps", "change", goToChildCompetition);
 }
 
 // Draw a screen for round robin competitions.
 const drawScreenRoundRobin = (screen: HTMLDivElement, comp: Competition) => {
-    createCompSelect(screen, comp.parent_comp_id);
-    createEventListener("#child-comps", "change", goToChildCompetition);
+    createCompNav(screen, comp.comp_nav);
 
     drawRoundRobinStandings(screen, comp.season.teams);
     drawSchedule(screen, comp.season, false);
@@ -169,8 +164,7 @@ const drawScreenRoundRobin = (screen: HTMLDivElement, comp: Competition) => {
 
 // Draw a screen for a knockout round.
 const drawScreenKnockoutRound = (screen: HTMLDivElement, comp: Competition) => {
-    createCompSelect(screen, comp.parent_comp_id);
-    createEventListener("#child-comps", "change", goToChildCompetition);
+    createCompNav(screen, comp.comp_nav);
 
     drawKnockoutPairs(screen, (comp.season.knockout_round as KnockoutRound).pairs);
     drawSchedule(screen, comp.season, true);
@@ -204,7 +198,7 @@ const drawRoundRobinStandings = (screen: HTMLDivElement, teams: Array<Team>) => 
 
         row.appendChild(createElement("td", { "textContent": team.rank }));
 
-        createLink("team", team.id, team.name, [document.createElement("td"), row]);
+        createLink("span", "team", team.id, team.name, [document.createElement("td"), row]);
         row.appendChild(createElement("td", { "textContent": team.games.toString() }));
         row.appendChild(createElement("td", { "textContent": team.wins.toString() }));
         row.appendChild(createElement("td", { "textContent": team.ot_wins.toString() }));
@@ -291,9 +285,9 @@ const drawGame = (query: string, game: Game, displaySeed: boolean) => {
 
     const row: HTMLTableRowElement = document.createElement("tr");
 
-    createLink("team", game.home.id, game.home.name, [document.createElement("td"), row]);
+    createLink("span", "team", game.home.id, game.home.name, [document.createElement("td"), row]);
     row.appendChild(createElement("td", { "textContent": scoreString }));
-    createLink("team", game.away.id, game.away.name, [document.createElement("td"), row]);
+    createLink("span", "team", game.away.id, game.away.name, [document.createElement("td"), row]);
 
     if (displaySeed) {
         row.insertBefore(createElement("td", { "textContent": `(${game.home.seed}.)` }), row.firstChild);
@@ -317,7 +311,7 @@ const drawRanking = (screen: HTMLDivElement, teams: Array<Team>) => {
         const row = document.createElement("tr");
 
         row.appendChild(createElement("td", { "textContent": team.rank }));
-        createLink("team", team.id, team.name, [document.createElement("td"), row]);
+        createLink("span", "team", team.id, team.name, [document.createElement("td"), row]);
         ranking.appendChild(row);
     }
 };
@@ -344,7 +338,7 @@ const drawKnockoutPairTeam = (team: KnockoutTeam, tbody: HTMLTableSectionElement
     const row = document.createElement("tr");
     row.appendChild(createElement("td", { "textContent": `${team.seed}.` }));
 
-    createLink("team", team.id, team.name, [document.createElement("td"), row]);
+    createLink("span", "team", team.id, team.name, [document.createElement("td"), row]);
     row.appendChild(createElement("td", { "textContent": team.wins }));
 
     tbody.appendChild(row);

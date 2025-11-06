@@ -97,7 +97,7 @@ impl Team {
     }
 
     // Get info for a team screen in JSON.
-    pub fn get_team_screen_json(&self) -> serde_json::Value {
+    pub fn get_team_screen_package(&self) -> serde_json::Value {
         let mut players = self.get_players();
         let mut approached_players = self.get_approached_players();
         players.append(&mut approached_players);
@@ -125,7 +125,7 @@ impl Team {
     }
 
     // Get relevant info of the team for a human manager.
-    pub fn get_manager_package_info(&self) -> serde_json::Value {
+    pub fn get_manager_package(&self) -> serde_json::Value {
         json!({
             "id": self.id,
             "actions_remaining": self.actions_remaining,

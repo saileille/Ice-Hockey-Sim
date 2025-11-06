@@ -4,12 +4,12 @@ use std::collections::HashSet;
 
 use time::Date;
 
-use crate::{competition::season::Season, database::{COMPETITIONS, MANAGERS, PLAYERS, TODAY}, team::Team, time::{date_to_db_string, db_string_to_date}, types::TeamId};
+use crate::{competition::season::Season, database::{COMPETITIONS, MANAGERS, PLAYERS, TODAY}, team::Team, time::db_string_to_date, types::TeamId};
 
 
 // Advance the time with one day.
 #[tauri::command]
-pub fn go_to_next_day() -> String {
+pub fn go_to_next_day() {
     let today = TODAY.lock().unwrap().clone();
 
     handle_managers_and_teams(&today);
@@ -19,13 +19,6 @@ pub fn go_to_next_day() -> String {
     handle_comps(&today);
 
     *TODAY.lock().unwrap() = today.next_day().unwrap();
-    return get_date_string();
-}
-
-// Get the current date as a string.
-#[tauri::command]
-pub fn get_date_string() -> String {
-    date_to_db_string(&TODAY.lock().unwrap())
 }
 
 // Do the daily tasks of competitions.

@@ -108,7 +108,7 @@ impl Player {
     }
 
     // Get all free agents in the game.
-    pub fn get_all_free_agents_json() -> serde_json::Value {
+    pub fn get_all_free_agents_package() -> serde_json::Value {
         let mut players: Vec<Self> = PLAYERS.lock().unwrap().iter().filter_map(|(_, a)| {
             match a.person.contract.is_none() {
                 true => Some(a.clone()),
@@ -123,7 +123,7 @@ impl Player {
             .then(a.person.forename.cmp(&b.person.forename))
         );
 
-        players.iter().map(|a| a.get_player_search_screen_json()).collect()
+        players.iter().map(|a| a.get_player_search_package()).collect()
     }
 
     // Get relevant information of the player for team screen.
@@ -144,7 +144,7 @@ impl Player {
     }
 
     // Get relevant information of the player for the player screen.
-    pub fn get_player_screen_json(&self) -> serde_json::Value {
+    pub fn get_player_screen_package(&self) -> serde_json::Value {
         let contract = match self.person.contract.as_ref() {
             Some(contract) => Some(contract.get_person_screen_json()),
             _ => None
@@ -162,7 +162,7 @@ impl Player {
         })
     }
 
-    pub fn get_player_search_screen_json(&self) -> serde_json::Value {
+    pub fn get_player_search_package(&self) -> serde_json::Value {
         let contract_offers: Vec<serde_json::Value> = self.person.contract_offers.iter().map(|a| a.get_person_screen_json()).collect();
         json!({
             "id": self.id,

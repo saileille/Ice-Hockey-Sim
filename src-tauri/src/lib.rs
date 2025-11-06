@@ -34,17 +34,17 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::continue_game::go_to_next_day,
-            commands::continue_game::get_date_string,
-            commands::get_comp_select_info,
-            commands::get_child_comp_select_info,
-            commands::get_team_select_info,
-            commands::get_comp_screen_info,
-            commands::get_team_screen_info,
-            commands::get_player_screen_info,
+            commands::get_top_bar_package,
+            commands::get_comp_select_package,
+            commands::get_child_comp_select_package,
+            commands::get_team_select_package,
+            commands::get_comp_screen_package,
+            commands::get_team_screen_package,
+            commands::get_player_screen_package,
             commands::create_human_manager,
-            commands::get_human_info,
-            commands::get_free_agents,
-            commands::get_player_search_info,
+            commands::get_human_package,
+            commands::get_free_agents_package,
+            commands::get_player_search_package,
             commands::offer_contract,
         ])
         .run(tauri::generate_context!())
