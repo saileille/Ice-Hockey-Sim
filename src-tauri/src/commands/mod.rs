@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 
 use time::Date;
 
-use crate::{competition::Competition, database::{COMPETITIONS, TODAY}, person::{manager::Manager, player::Player, Contract}, team::Team, time::date_to_db_string, types::{CompetitionId, PlayerId, TeamId}};
+use crate::{competition::{self, Competition}, database::{COMPETITIONS, TODAY}, person::{Contract, manager::Manager, player::Player}, team::Team, time::date_to_db_string, types::{CompetitionId, PlayerId, TeamId}};
 
 
 // Get name and ID of all competitions that are not part of another competition.
@@ -76,7 +76,7 @@ pub fn get_team_select_info(id: CompetitionId) -> Vec<(String, String)> {
 pub fn get_comp_screen_info(id: CompetitionId) -> serde_json::Value {
     let comp = Competition::fetch_from_db(&id);
 
-    if comp.is_tournament_tree {
+    if comp.competition_type == competition::Type::Tournament {
         return comp.get_tournament_comp_screen_json();
     }
     else {

@@ -1,7 +1,6 @@
 {
 	"female": {
 		"forenames": {
-			"": 64,
 			"A": 1,
 			"A.": 4,
 			"AJ": 1,
@@ -16726,7 +16725,6 @@
 	},
 	"male": {
 		"forenames": {
-			"": 284,
 			"A": 13,
 			"A.": 6,
 			"A.A.": 1,
@@ -25748,8 +25746,7 @@
 			"Noble": 3,
 			"Nodin": 2,
 			"Noe": 3,
-			"Noel": 36,
-			"Noel Bigomia": 1,
+			"Noel": 37,
 			"Noelan": 1,
 			"Noha": 1,
 			"Nohl": 2,
@@ -29426,7 +29423,6 @@
 			"Ézékiel": 3
 		},
 		"surnames": {
-			"": 2,
 			"AP": 1,
 			"Aa Titus": 1,
 			"AaKrow": 1,
@@ -33865,6 +33861,7 @@
 			"Bignell": 16,
 			"Bigney": 2,
 			"Bignucolo": 2,
+			"Bigomia - Tjonason": 1,
 			"Bigonesse": 2,
 			"Bigoo": 1,
 			"Bigoraj": 1,
@@ -85981,7 +85978,6 @@
 			"Tjepkema": 1,
 			"Tjin": 1,
 			"Tjoa": 2,
-			"Tjonason": 1,
 			"Tjostheim": 1,
 			"Tkach": 5,
 			"Tkachanko": 1,

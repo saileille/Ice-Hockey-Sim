@@ -1,7 +1,6 @@
 {
 	"female": {
 		"forenames": {
-			"": 1,
 			"Adeline": 1,
 			"Adrienne": 1,
 			"Agnès": 1,
@@ -2340,7 +2339,6 @@
 	},
 	"male": {
 		"forenames": {
-			"": 941,
 			".": 1,
 			"A": 10,
 			"A.": 2,
@@ -5100,7 +5098,6 @@
 			"Özcem": 1
 		},
 		"surnames": {
-			"": 15,
 			"156914": 1,
 			"Aamos": 1,
 			"Abbate": 1,

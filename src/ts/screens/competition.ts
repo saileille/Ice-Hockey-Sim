@@ -10,6 +10,8 @@ type Format = {
     type: string
 };
 
+type CompetitionType = "Null" | "Tournament";
+
 type RoundRobinFormat = {
     rounds: number,
     extra_matches: number,
@@ -97,7 +99,7 @@ type Competition = {
     season: Season,
     child_comp_ids: Array<number>,
     parent_comp_id: number,
-    is_tournament_tree: boolean
+    competition_type: CompetitionType
 };
 
 // Draw any competition screen.

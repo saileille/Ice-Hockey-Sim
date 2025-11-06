@@ -10,6 +10,7 @@ const drawScreen = async () => {
     const screen = initialiseContentScreen();
     screen.innerHTML = "<h1>Choose your competition and team</h1>";
 
+    // This function must be awaited.
     await createCompSelect(screen, 0);
 
     // Removing the default option because we do not need it.

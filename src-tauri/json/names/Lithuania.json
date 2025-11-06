@@ -286,7 +286,6 @@
 	},
 	"male": {
 		"forenames": {
-			"": 55,
 			"A": 1,
 			"A.": 104,
 			"Adas": 1,
@@ -739,7 +738,6 @@
 			"Zygimantas": 5
 		},
 		"surnames": {
-			"": 1,
 			"Abaris": 1,
 			"Abragimovic": 1,
 			"Abramavicius": 2,

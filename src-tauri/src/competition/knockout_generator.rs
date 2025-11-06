@@ -4,7 +4,7 @@ use ordinal::ToOrdinal as _;
 use rand::{rng, Rng};
 use time::Duration;
 
-use crate::{competition::{format::{self, knockout_round::KnockoutRound as KnockoutRoundFormat}, season::ranking::RankCriteria, CompConnection, Competition, Seed}, match_event, time::{get_dates, AnnualDate, AnnualWindow}, types::{convert, CompetitionId}};
+use crate::{competition::{self, CompConnection, Competition, Seed, format::{self, knockout_round::KnockoutRound as KnockoutRoundFormat}, season::ranking::RankCriteria}, match_event, time::{AnnualDate, AnnualWindow, get_dates}, types::{CompetitionId, convert}};
 
 // Generate a knockout competition with each round being represented as its own competition element.
 pub fn build(
@@ -19,7 +19,7 @@ pub fn build(
     rank_criteria: Vec<RankCriteria>
 ) {
     let mut parent_comp = Competition::build_and_save(name, Vec::new(), season_window, connections, teams_in_rounds[0], None, Vec::new(), Vec::new());
-    parent_comp.is_tournament_tree = true;
+    parent_comp.competition_type = competition::Type::Tournament;
 
     get_teams_in_rounds(&mut teams_in_rounds, teams_at_end);
     let mut rounds = create_rounds(round_names, match_rules, wins_required, teams_in_rounds, rank_criteria, parent_comp.id);

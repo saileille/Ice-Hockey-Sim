@@ -23,9 +23,6 @@ pub struct Format {
     pub round_robin: Option<RoundRobinFormat>,
     pub knockout_round: Option<KnockoutRoundFormat>,
     format_type: Type,   // Easy way to check whether the competition is a knockout or round robin type.
-
-    // Tests.
-    // pub failures: usize,
 }
 
 // Basics

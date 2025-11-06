@@ -5,13 +5,22 @@ pub mod knockout_generator;
 
 use std::{cmp::Ordering, iter::zip};
 
+use serde::Serialize;
 use serde_json::json;
 
 use crate::{competition::season::{ranking::{get_sort_functions, RankCriteria}, team::TeamCompData, Season}, database::{COMPETITIONS, SEASONS}, team::Team, time::{db_string_to_date, AnnualWindow}, types::{convert, CompetitionId, TeamId}};
 
 use self::format::Format;
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, PartialEq)]
+#[derive(Default, Clone, Serialize)]
+pub enum Type {
+    #[default]
+    Simple, // Indicates that this is either round robin or knockout round.
+    Tournament,
+}
+
+#[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct Competition {
     pub id: CompetitionId,
@@ -24,7 +33,7 @@ pub struct Competition {
 
     pub child_comp_ids: Vec<CompetitionId>,
     pub parent_comp_id: CompetitionId,
-    pub is_tournament_tree: bool,  // Make this true if the competition consists solely of child knockout rounds.
+    pub competition_type: Type,
 }
 
 // Basics.
@@ -216,7 +225,7 @@ impl Competition {
             "season": season.get_comp_screen_json(self),
             "child_comp_ids": self.child_comp_ids,
             "parent_comp_id": self.parent_comp_id,
-            "is_tournament_tree": self.is_tournament_tree
+            "parent_format": self.competition_type,
         })
     }
 

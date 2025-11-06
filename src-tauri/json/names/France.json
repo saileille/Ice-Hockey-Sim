@@ -1622,7 +1622,6 @@
 	},
 	"male": {
 		"forenames": {
-			"": 26,
 			"A": 1,
 			"Aargan": 1,
 			"Aaron": 5,
@@ -3060,7 +3059,6 @@
 			"Étienne": 4
 		},
 		"surnames": {
-			"": 2,
 			"Abaleo": 1,
 			"Abback": 1,
 			"Abbey": 1,

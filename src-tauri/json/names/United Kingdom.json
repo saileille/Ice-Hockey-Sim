@@ -1,7 +1,6 @@
 {
 	"female": {
 		"forenames": {
-			"": 1,
 			"Aaliyah": 3,
 			"Aamina": 1,
 			"Abbie": 12,
@@ -3791,7 +3790,6 @@
 	},
 	"male": {
 		"forenames": {
-			"": 96,
 			"A": 5,
 			"A.": 6,
 			"A. D.": 1,
@@ -5696,7 +5694,6 @@
 			"Zuriel": 1
 		},
 		"surnames": {
-			"": 12,
 			"Abban": 1,
 			"Abbett": 1,
 			"Abbot": 1,
