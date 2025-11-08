@@ -1,7 +1,7 @@
 // Team screen stuffs.
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen } from "./basics";
-import { createElement, createEventListener, createLink } from "../helpers";
+import { createElement, createLink } from "../helpers";
 import { Listener } from "../types";
 
 type RosterSetting = "roster" | "approached" | "both";
@@ -30,54 +30,55 @@ type Team = {
 export const drawScreen = async (id: number) => {
     const team: Team = await invoke("get_team_screen_package", { id: id });
 
-    const screen = initialiseContentScreen();
-
-    screen.insertAdjacentHTML("beforeend", `
-        <h1>${team.name}</h1>
-        <div id="manager"></div>
-    `);
+    const elements: Array<HTMLElement> = [
+        createElement("h1", {"textContent": team.name}, [])
+    ];
 
     if (team.manager !== null) {
-        (document.querySelector("#manager") as HTMLDivElement).textContent = `Manager: ${team.manager.name}`;
+        elements.push(createElement("div", { "textContent": `Manager: ${team.manager.name}` }, []));
     }
 
+    const screen = initialiseContentScreen();
+    screen.append(...elements);
     drawRoster(screen, team.players);
 };
 
 // Draw the roster of a team.
 const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
-    screen.insertAdjacentHTML("beforeend", `
-        <select id="player-filters">
-            <option value="both">Roster + Approached</option>
-            <option value="roster">Roster</option>
-            <option value="approached">Approached</option>
-        </select>
-        <table id="players">
-            <thead><tr>
-                <th>Name</th>
-                <th>Country</th>
-                <th>Position</th>
-                <th>Ability</th>
-                <th>Seasons Left</th>
-            </tr></thead>
-            <tbody></tbody>
-        </table>
-    `);
+    const filterSelect = createElement("select", {}, [
+        createElement("option", {"value": "both", "textContent": "Roster + Approached"}, []),
+        createElement("option", {"value": "roster", "textContent": "Roster"}, []),
+        createElement("option", {"value": "approached", "textContent": "Approached"}, []),
+    ])
 
-    const roster = (document.querySelector("#players") as HTMLTableElement).children[1] as HTMLTableSectionElement;
-
+    const roster = document.createElement("tbody");
     for (const player of players) {
-        const row = document.createElement("tr");
-        createLink("span", "player", player.id, player.name, [document.createElement("td"), row]);
-        row.appendChild(createElement("td", { "textContent": player.country }));
-        row.appendChild(createElement("td", { "textContent": player.position }));
-        row.appendChild(createElement("td", { "textContent": player.ability }));
-        row.appendChild(createElement("td", { "textContent": player.seasons_left }));
-
-        roster.appendChild(row);
+        roster.appendChild(createElement("tr", {}, [
+            createElement("td", {}, [createLink("span", "player", player.id, player.name)]),
+            createElement("td", { "textContent": player.country }, []),
+            createElement("td", { "textContent": player.position }, []),
+            createElement("td", { "textContent": player.ability }, []),
+            createElement("td", { "textContent": player.seasons_left }, []),
+        ]));
     }
 
-    createEventListener("#player-filters", "change", onChangePlayerFilter);
+    screen.append(
+        filterSelect,
+        createElement("table", {}, [
+            createElement("thead", {}, [
+                createElement("tr", {}, [
+                    createElement("th", { "textContent": "Name" }, []),
+                    createElement("th", { "textContent": "Country" }, []),
+                    createElement("th", { "textContent": "Position" }, []),
+                    createElement("th", { "textContent": "Ability" }, []),
+                    createElement("th", { "textContent": "Seasons Left" }, []),
+                ])
+            ]),
+            roster
+        ])
+    );
+
+    filterSelect.addEventListener("change", onChangePlayerFilter);
 };
 
 // When the user changes the player filter of a team screen.

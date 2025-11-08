@@ -127,7 +127,7 @@ impl Player {
     }
 
     // Get relevant information of the player for team screen.
-    pub fn get_team_screen_json(&self) -> serde_json::Value {
+    pub fn get_team_screen_package(&self) -> serde_json::Value {
         let seasons_left = match self.person.contract.as_ref() {
             Some(contract) => contract.get_seasons_left(),
             _ => 0
@@ -171,6 +171,15 @@ impl Player {
             "position": self.get_position().abbreviation,
             "ability": self.ability.get_display(),
             "offers": contract_offers
+        })
+    }
+
+    // Get the position and the ID of the player.
+    pub fn get_roster_overview_package(&self, in_roster: bool) -> serde_json::Value {
+        json!({
+            "position": Position::fetch_from_db(&self.position_id).abbreviation,
+            "id": self.id,
+            "in_roster": in_roster,
         })
     }
 }

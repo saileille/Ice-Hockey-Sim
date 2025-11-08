@@ -35,22 +35,6 @@ pub fn get_comp_select_package() -> Vec<(String, String)> {
     return comps;
 }
 
-// Get name and ID of all competitions that are children of the given competition.
-#[tauri::command]
-pub fn get_child_comp_select_package(id: CompetitionId) -> Vec<(String, String)> {
-    let parent_comp = Competition::fetch_from_db(&id);
-    let mut child_comps: Vec<(String, String)> = parent_comp.child_comp_ids.iter().map(|a| (a.to_string(), Competition::fetch_from_db(a).name)).collect();
-
-    // Parent competition is the default option.
-    child_comps.push(("0".to_string(), parent_comp.name));
-
-    // Sort according to the ID, meaning the earlier stage should always be first.
-    // Could be sorted with start dates too, but that would require extracting comps from the db.
-    child_comps.sort_by(|a, b| a.0.cmp(&b.0));
-
-    return child_comps;
-}
-
 // Get name and ID of teams that are part of a competition.
 #[tauri::command]
 pub fn get_team_select_package(id: CompetitionId) -> Vec<(String, String)> {

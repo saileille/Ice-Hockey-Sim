@@ -11,10 +11,22 @@ export const LINK_TYPES = ["team", "player", "comp"];
 export type LinkType = (typeof LINK_TYPES)[number];
 
 
+export type Position = "GK" | "LD" | "RD" | "LW" | "C" | "RW";
+
+export type RosterOverview = Array<{
+    "position": Position,
+    "id": number,
+    "in_roster": boolean,
+}>;
+
 export type HumanTeamPackage = {
     id: number,
     actions_remaining: number,
-    approached_players: Array<number>
+
+    // Roster overview includes approached players as well.
+    // This is dupliocated information, but makes accessing it much easier.
+    roster_overview: RosterOverview,
+    approached_players: Array<number>,
 };
 
 // Important info of a human manager.

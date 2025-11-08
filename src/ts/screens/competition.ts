@@ -97,7 +97,7 @@ type Competition = {
     full_name: string,
     format: Format | null,
     season: Season,
-    comp_nav: Array<Array<[string, string]>>,
+    comp_nav: Array<Array<[number, string]>>,
     competition_type: CompetitionType
 };
 
@@ -129,217 +129,224 @@ export const drawScreen = async (id: number) => {
 const drawScreenTournament = (screen: HTMLDivElement, comp: Competition, rounds: Array<KnockoutRound>) => {
     createCompNav(screen, comp.comp_nav);
 
-    screen.insertAdjacentHTML("beforeend", `
-        <table id="tree"><tbody><tr></tr></tbody></table>
-    `);
+    screen.append(
+        drawTournamentTree(rounds),
+        drawSchedule(comp.season, true)
+    );
 
-    const tree = ((document.querySelector("#tree") as HTMLTableElement).children[0] as HTMLTableSectionElement).children[0] as HTMLTableRowElement;
-    for (const [index, round] of rounds.entries()) {
-        const roundCell = document.createElement("td");
-        const roundTable = createElement("table", { "id": `round${index}` });
-        const tbody = document.createElement("tbody");
-        roundTable.appendChild(tbody);
+};
 
-        createKnockoutPairElements(round.pairs, tbody);
-        roundCell.appendChild(roundTable);
-        tree.appendChild(roundCell);
+// Draw a tournament tree for a round-robin competition.
+const drawTournamentTree = (rounds: Array<KnockoutRound>): HTMLTableElement => {
+    const row = document.createElement("tr");
+    for (const round of rounds) {
+        row.appendChild(
+            createElement("td", {}, [
+                drawRoundPairs(round.pairs)
+            ])
+        );
     }
 
-    drawSchedule(screen, comp.season, true);
+    return createElement("table", {}, [
+        createElement("tbody", {}, [row]),
+    ]);
 };
 
 // Draw a screen for parent competitions.
 const drawScreenParent = (screen: HTMLDivElement, comp: Competition) => {
     createCompNav(screen, comp.comp_nav);
-    drawRanking(screen, comp.season.teams);
-}
+    screen.appendChild(drawRanking(comp.season.teams));
+};
 
 // Draw a screen for round robin competitions.
 const drawScreenRoundRobin = (screen: HTMLDivElement, comp: Competition) => {
     createCompNav(screen, comp.comp_nav);
 
-    drawRoundRobinStandings(screen, comp.season.teams);
-    drawSchedule(screen, comp.season, false);
+    screen.append(
+        drawRoundRobinStandings(comp.season.teams),
+        drawSchedule(comp.season, false)
+    );
 };
 
 // Draw a screen for a knockout round.
 const drawScreenKnockoutRound = (screen: HTMLDivElement, comp: Competition) => {
     createCompNav(screen, comp.comp_nav);
 
-    drawKnockoutPairs(screen, (comp.season.knockout_round as KnockoutRound).pairs);
-    drawSchedule(screen, comp.season, true);
+    screen.append(
+        drawRoundPairs((comp.season.knockout_round as KnockoutRound).pairs),
+        drawSchedule(comp.season, true)
+    );
 };
 
 // Draw the standings for round robin.
-const drawRoundRobinStandings = (screen: HTMLDivElement, teams: Array<Team>) => {
-    screen.insertAdjacentHTML("beforeend", `
-        <table id="standings">
-            <thead><tr>
-                <th>Rank</th>
-                <th>Name</th>
-                <th>Games</th>
-                <th>Wins</th>
-                <th>OT Wins</th>
-                <th>Draws</th>
-                <th>OT Losses</th>
-                <th>Losses</th>
-                <th>Goals For</th>
-                <th>Goals Against</th>
-                <th>Goal Difference</th>
-                <th>Points</th>
-            </tr></thead>
-            <tbody></tbody>
-        </table>
-    `);
+const drawRoundRobinStandings = (teams: Array<Team>): HTMLTableElement => {
+    const table = createElement("table", {}, [
+        createElement("thead", {}, [
+            createElement("tr", {}, [
+                createElement("th", { "textContent": "Rank" }, []),
+                createElement("th", { "textContent": "Name" }, []),
+                createElement("th", { "textContent": "GP" }, []),
+                createElement("th", { "textContent": "W" }, []),
+                createElement("th", { "textContent": "OTW" }, []),
+                createElement("th", { "textContent": "D" }, []),
+                createElement("th", { "textContent": "OTL" }, []),
+                createElement("th", { "textContent": "L" }, []),
+                createElement("th", { "textContent": "GF" }, []),
+                createElement("th", { "textContent": "GA" }, []),
+                createElement("th", { "textContent": "Diff" }, []),
+                createElement("th", { "textContent": "Pts." }, []),
+            ])
+        ])
+    ]);
 
-    const standings = (document.querySelector("#standings") as HTMLTableElement).children[1] as HTMLTableSectionElement;
+    const standings = document.createElement("tbody");
     for (const team of teams) {
-        const row: HTMLTableRowElement = document.createElement("tr");
-
-        row.appendChild(createElement("td", { "textContent": team.rank }));
-
-        createLink("span", "team", team.id, team.name, [document.createElement("td"), row]);
-        row.appendChild(createElement("td", { "textContent": team.games.toString() }));
-        row.appendChild(createElement("td", { "textContent": team.wins.toString() }));
-        row.appendChild(createElement("td", { "textContent": team.ot_wins.toString() }));
-        row.appendChild(createElement("td", { "textContent": team.draws.toString() }));
-        row.appendChild(createElement("td", { "textContent": team.ot_losses.toString() }));
-        row.appendChild(createElement("td", { "textContent": team.losses.toString() }));
-        row.appendChild(createElement("td", { "textContent": team.goals_scored.toString() }));
-        row.appendChild(createElement("td", { "textContent": team.goals_conceded.toString() }));
-        row.appendChild(createElement("td", { "textContent": team.goal_difference.toString() }));
-        row.appendChild(createElement("td", { "textContent": team.points.toString() }));
-
-        standings.appendChild(row);
-        // createEventListener(`.team${team.id}`, "click", drawTeamScreen);
+        standings.appendChild(createElement("tr", {}, [
+            createElement("td", { "textContent": team.rank }, []),
+            createElement("td", {}, [createLink("span", "team", team.id, team.name)]),
+            createElement("td", { "textContent": team.games }, []),
+            createElement("td", { "textContent": team.wins }, []),
+            createElement("td", { "textContent": team.ot_wins }, []),
+            createElement("td", { "textContent": team.draws }, []),
+            createElement("td", { "textContent": team.ot_losses }, []),
+            createElement("td", { "textContent": team.losses }, []),
+            createElement("td", { "textContent": team.goals_scored }, []),
+            createElement("td", { "textContent": team.goals_conceded }, []),
+            createElement("td", { "textContent": team.goal_difference }, []),
+            createElement("td", { "textContent": team.points }, []),
+        ]));
     }
+
+    table.appendChild(standings);
+    return table;
 };
 
 // Draw a competition schedule.
 // Only previous and next matches for now.
-const drawSchedule = (screen: HTMLDivElement, season: Season, displaySeed: boolean) => {
-    screen.insertAdjacentHTML("beforeend", `
-        <table><tr>
-            <td style="vertical-align: top;">
-                <table id="previous"><tbody><tr>
-                    <th id="previous-date"></th>
-                </tr></tbody></table>
-            </td>
-            <td style="vertical-align: top;">
-                <table id="next"><tbody><tr>
-                    <th id="next-date"></th>
-                </tr></tbody></table>
-            </td>
-        </tr></table>
-    `);
-
-    drawGameDay("previous", season.played_games, displaySeed);
-    drawGameDay("next", season.upcoming_games, displaySeed);
+const drawSchedule = (season: Season, displaySeed: boolean): HTMLTableElement => {
+    return createElement("table", {}, [
+        createElement("tbody", {}, [
+            createElement("tr", {}, [
+                drawGameDay(true, season.played_games, displaySeed),
+                drawGameDay(false, season.upcoming_games, displaySeed)
+            ])
+        ])
+    ]);
 };
 
 // Draw either a past or a future gameday.
 // Query can either be "previous" or "next".
-const drawGameDay = (query: string, gameList: Array<Game>, displaySeed: boolean) => {
-    const table = (document.querySelector(`#${query}`) as HTMLTableElement).children[0] as HTMLTableSectionElement;
-    const dateCell = document.querySelector(`#${query}-date`) as HTMLTableCellElement;
+const drawGameDay = (isPast: boolean, gameList: Array<Game>, displaySeed: boolean): HTMLTableCellElement => {
+    const tbody = document.createElement("tbody");
     let date = "";
 
-    if (displaySeed) {
-        dateCell.colSpan = 5;
-    }
-    else {
-        dateCell.colSpan = 3;
-    }
+    let dateColumns = 3;
+    if (displaySeed) dateColumns = 5;
 
-    for (let i = gameList.length - 1; i >= 0; i--) {
-        const match = gameList[i];
+    const matches = [];
+    for (const match of gameList) {
         if (date === "") { date = match.date; }
         else if (date !== match.date) { break; }
 
-        table.appendChild(drawGame(query, match, displaySeed));
+        matches.push(drawGame(isPast, match, displaySeed));
     }
 
+    // We need to reverse the games if the date is in the future.
+    if (!isPast) matches.reverse();
+    tbody.append(...matches);
+
     if (date === "") {
-        if (query === "previous") { date = "No previous games."; }
+        if (isPast) { date = "No previous games."; }
         else { date = "No upcoming games." }
     }
     else {
-        if (query === "previous") { date = `Previous games from ${date}.`; }
+        if (isPast) { date = `Previous games from ${date}.`; }
         else { date = `Next games on ${date}.`; }
     }
 
-    dateCell.textContent = date;
+    return createElement("td", { "style": "vertical-align: top;" }, [
+        createElement("table", {}, [
+            createElement("thead", {}, [
+                createElement("tr", {}, [
+                    createElement("th", {
+                        "textContent": date,
+                        "colSpan": dateColumns,
+                    }, [])
+                ])
+            ]),
+            tbody
+        ])
+    ]);
 };
 
 // Draw a game row for competition screen schedule.
-const drawGame = (query: string, game: Game, displaySeed: boolean) => {
+const drawGame = (isPast: boolean, game: Game, displaySeed: boolean) => {
+    const row = document.createElement("tr");
+    if (displaySeed) {
+        row.appendChild(createElement("td", { "textContent": `(${game.home.seed}.)` }, []));
+    }
+
+    row.append(
+        createElement("td", {}, [createLink("span", "team", game.home.id, game.home.name)]),
+        createElement("td", { "textContent": getScoreString(isPast, game) }, []),
+        createElement("td", {}, [createLink("span", "team", game.away.id, game.away.name)]),
+    );
+
+    if (displaySeed) {
+        row.appendChild(createElement("td", { "textContent": `(${game.away.seed}.)` }, []));
+    }
+
+    return row;
+};
+
+// Return the score string for a game.
+const getScoreString = (isPast: boolean, game: Game) => {
     let scoreString = "-";
-    // Add score.
-    if (query === "previous") {
+    if (isPast) {
         let otString = "";
         if (game.had_overtime) {
             otString = " OT";
         }
         scoreString = `${game.home.goals} ${scoreString} ${game.away.goals}${otString}`;
     }
-
-    const row: HTMLTableRowElement = document.createElement("tr");
-
-    createLink("span", "team", game.home.id, game.home.name, [document.createElement("td"), row]);
-    row.appendChild(createElement("td", { "textContent": scoreString }));
-    createLink("span", "team", game.away.id, game.away.name, [document.createElement("td"), row]);
-
-    if (displaySeed) {
-        row.insertBefore(createElement("td", { "textContent": `(${game.home.seed}.)` }), row.firstChild);
-        row.appendChild(createElement("td", { "textContent": `(${game.away.seed}.)` }));
-    }
-
-    return row;
+    return scoreString;
 };
 
 // Draw rankings for a competition.
-const drawRanking = (screen: HTMLDivElement, teams: Array<Team>) => {
-    screen.insertAdjacentHTML("beforeend", `
-        <table id="ranking"><tbody><tr>
-            <th>Rank</th>
-            <th>Team</th>
-        </tr></tbody></table>
-    `);
+const drawRanking = (teams: Array<Team>): HTMLTableElement => {
+    const tbody = createElement("tbody", {}, [
+        createElement("tr", {}, [
+            createElement("th", { "textContent": "Rank" }, []),
+            createElement("th", { "textContent": "Team" }, []),
+        ])
+    ]);
 
-    const ranking = (document.querySelector("#ranking") as HTMLTableElement).children[0] as HTMLTableSectionElement;
     for (const team of teams) {
-        const row = document.createElement("tr");
-
-        row.appendChild(createElement("td", { "textContent": team.rank }));
-        createLink("span", "team", team.id, team.name, [document.createElement("td"), row]);
-        ranking.appendChild(row);
+        tbody.appendChild(createElement("tr", {}, [
+            createElement("td", { "textContent": team.rank }, []),
+            createElement("td", {}, [createLink("span", "team", team.id, team.name)]),
+        ]));
     }
+
+    return createElement("table", {}, [tbody]);
 };
 
-// Draw pairs of the knockout round.
-const drawKnockoutPairs = (screen: HTMLDivElement, pairs: Array<KnockoutPair>) => {
-    screen.insertAdjacentHTML("beforeend", `
-        <table id="pairs"><tbody></tbody></table>
-    `);
-
-    const tbody = (document.querySelector("#pairs") as HTMLTableElement).children[0] as HTMLTableSectionElement;
-    createKnockoutPairElements(pairs, tbody);
-};
-
-// Create elements of knockout pairs and append them to the given parent element.
-const createKnockoutPairElements = (pairs: Array<KnockoutPair>, tbody: HTMLTableSectionElement) => {
+// Draw the pairs of a knockout round.
+const drawRoundPairs = (pairs: Array<KnockoutPair>): HTMLTableElement => {
+    const tbody = document.createElement("tbody");
     for (const pair of pairs) {
-        drawKnockoutPairTeam(pair.home, tbody);
-        drawKnockoutPairTeam(pair.away, tbody);
+        tbody.append(
+            drawKnockoutPairTeam(pair.home),
+            drawKnockoutPairTeam(pair.away)
+        );
     }
+
+    return createElement("table", {}, [tbody]);
 };
 
-const drawKnockoutPairTeam = (team: KnockoutTeam, tbody: HTMLTableSectionElement) => {
-    const row = document.createElement("tr");
-    row.appendChild(createElement("td", { "textContent": `${team.seed}.` }));
-
-    createLink("span", "team", team.id, team.name, [document.createElement("td"), row]);
-    row.appendChild(createElement("td", { "textContent": team.wins }));
-
-    tbody.appendChild(row);
+const drawKnockoutPairTeam = (team: KnockoutTeam): HTMLTableRowElement => {
+    return createElement("tr", {}, [
+        createElement("td", { "textContent": `${team.seed}.` }, []),
+        createElement("td", {}, [createLink("span", "team", team.id, team.name)])
+    ]);
 }

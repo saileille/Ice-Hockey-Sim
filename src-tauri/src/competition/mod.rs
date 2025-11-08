@@ -220,14 +220,15 @@ impl Competition {
     }
 
     // Create a full competition tree.
-    fn get_select_data(&self) -> Vec<Vec<(CompetitionId, String)>> {
+    fn get_nav_data(&self) -> Vec<Vec<(CompetitionId, String)>> {
         let mut select_data = Vec::new();
-
         self.get_parent_package(&mut select_data);
-        select_data.push(self.get_sibling_package());
 
-        let child_comp_package = self.get_child_package();
-        if child_comp_package.len() > 0 { select_data.push(child_comp_package); }
+        let siblings = self.get_sibling_package();
+        if siblings.len() > 1 { select_data.push(siblings); }
+
+        let children = self.get_child_package("Overview");
+        if children.len() > 1 { select_data.push(children); }
 
         return select_data;
     }
@@ -237,7 +238,9 @@ impl Competition {
         match self.get_parent() {
             Some(parent) => {
                 parent.get_parent_package(select_data);
-                select_data.push(parent.get_sibling_package());
+
+                let uncles = parent.get_sibling_package();
+                if uncles.len() > 1 { select_data.push(uncles); }
             },
             _ => return
         };
@@ -245,23 +248,36 @@ impl Competition {
 
     // Get the IDs of sibling competitions, including this one.
     fn get_sibling_package(&self) -> Vec<(CompetitionId, String)> {
-        let mut ids = match self.get_parent() {
-            Some(parent) => parent.get_child_package(),
-            _ => vec![(self.id, self.name.clone())]
+        let mut select_data = match self.get_parent() {
+            Some(parent) => parent.get_child_package(&parent.name),
+            _ => vec![self.get_name_and_id()]
         };
 
-        // Putting this competition at the top.
-        ids.sort_by(|(a, _), (b, _)| {
-            if *a == self.id { return Ordering::Less }
-            if *b == self.id { return Ordering::Greater }
-            a.cmp(&b)
-        });
+        select_data.sort_by(|(a, _), (b, _)| a.cmp(&b));
 
-        return ids;
+        // Replace this competition's ID with 0, to keep track of which competition is selected.
+        for comp in select_data.iter_mut() {
+            if comp.0 == self.id {
+                comp.0 = 0;
+                break;
+            }
+        }
+
+        return select_data;
     }
 
-    fn get_child_package(&self) -> Vec<(CompetitionId, String)> {
-        self.child_comp_ids.iter().map(|id| (*id, Competition::fetch_from_db(id).name)).collect()
+    // Get the IDs and names of child competitions.
+    fn get_child_package(&self, self_name: &str) -> Vec<(CompetitionId, String)> {
+        let mut children: Vec<(CompetitionId, String)> = self.child_comp_ids.iter().map(|id| Competition::fetch_from_db(id).get_name_and_id()).collect();
+
+        // Adding this competition so selecting a child becomes possible.
+        children.insert(0, (self.id, self_name.to_string()));
+        return children;
+    }
+
+    // Get the name and ID of the competition.
+    fn get_name_and_id(&self) -> (CompetitionId, String) {
+        return (self.id, self.name.clone());
     }
 
     // Get relevant information for a competition screen.
@@ -277,7 +293,7 @@ impl Competition {
                 self.format.as_ref().unwrap().get_comp_screen_json()
             },
             "season": season.get_comp_screen_json(self),
-            "comp_nav": self.get_select_data(),
+            "comp_nav": self.get_nav_data(),
             "competition_type": self.competition_type,
         })
     }

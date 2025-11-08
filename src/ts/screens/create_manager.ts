@@ -8,24 +8,26 @@ import { Listener } from "../types";
 // Draw the thing.
 const drawScreen = async () => {
     const screen = initialiseContentScreen();
-    screen.innerHTML = "<h1>Choose your competition and team</h1>";
 
-    // This function must be awaited. (?)
-    await createTopLevelCompSelect(screen);
+    screen.appendChild(
+        createElement("h1", { "textContent": "Choose your competition and team" }, [])
+    );
+
+    // This function must be awaited.
+    const compSelect = await createTopLevelCompSelect(screen);
 
     // Removing the default option because we do not need it.
-    const comps = document.querySelector("#comps") as HTMLSelectElement;
-    if (comps.firstChild !== null) {
-        comps.removeChild(comps.firstChild);
+    if (compSelect.firstChild !== null) {
+        compSelect.removeChild(compSelect.firstChild);
     }
 
-    screen.insertAdjacentHTML("beforeend", `
-        <select id="teams"></select>
-        <button id="done">Done!</button>
-    `);
+    screen.append(
+        createElement("select", { "id": "teams" }, []),
+        createElement("button", { "id": "done", "textContent": "Done!" }, [])
+    );
 
-    updateTeamSelection(Number(comps.value));
-    createEventListener("#comps", "change", onChangeCompSelect);
+    updateTeamSelection(Number(compSelect.value));
+    compSelect.addEventListener("change", onChangeCompSelect);
     createEventListener("#done", "click", createManager);
 };
 
@@ -41,12 +43,15 @@ const updateTeamSelection = async (id: Number) => {
 
     while (teamSelect.lastChild) { teamSelect.removeChild(teamSelect.lastChild); }
 
+    const teams = [];
     for (const team of optionData) {
-        teamSelect.appendChild(createElement("option", {
+        teams.push(createElement("option", {
             "value": team[0],
             "textContent": team[1]
-        }));
+        }, []));
     }
+
+    teamSelect.append(...teams);
 };
 
 const createManager: Listener = async (_e: Event) => {

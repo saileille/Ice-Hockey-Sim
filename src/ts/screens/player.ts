@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen, updateTopBar } from "./basics";
 import { createElement, createEventListener, createLink } from "../helpers";
-import { HumanPackage as HumanPackage, HumanTeamPackage, Listener } from "../types";
+import { HumanPackage as HumanPackage, HumanTeamPackage, Listener, Position } from "../types";
 import { drawScreen as drawHomeScreen } from "./home";
 
 type ContractTeam = {
@@ -19,10 +19,21 @@ export type Contract = {
 type Player = {
     name: string,
     country: string,
-    position: string,
+    position: Position,
     ability: number,
     contract: Contract | null,
     offers: Array<Contract>
+};
+
+// Get the player screen title.
+const getTitle = (player: Player): HTMLHeadingElement => {
+    const element = document.createElement("h1");
+    element.append(`${player.name} (`);
+    if (player.contract !== null) {
+        element.appendChild(createLink("span", "team", player.contract.team.id, player.contract.team.name));
+    }
+    element.append(`${player.position}, ${player.ability}, ${player.country})`);
+    return element;
 };
 
 // Draw the screen of a given player.
@@ -31,22 +42,10 @@ export const drawScreen = async (id: number) => {
     const humanPackage: HumanPackage = await invoke("get_human_package");
 
     const screen = initialiseContentScreen();
-
-    let pageTitle = `${player.name} (`;
-    if (player.contract !== null) { pageTitle += `<span class="team${player.contract.team.id}">${player.contract.team.name}</span>, `; }
-    pageTitle += `${player.position}, ${player.ability}, ${player.country})`;
-
-    screen.insertAdjacentHTML("beforeend", `
-        <h1>${pageTitle}</h1>
-        <table id="contract"><tbody>
-        </tbody></table>
-    `);
-
-    if (player.contract !== null) {
-        drawContract(player.contract);
-    }
-
-    drawOffers(player.offers);
+    screen.append(
+        getTitle(player),
+        drawContractTable(player),
+    );
 
     // Contract offer can be made if...
     if (
@@ -55,48 +54,63 @@ export const drawScreen = async (id: number) => {
         !humanPackage.team.approached_players.includes(id) &&  // ...human's team has not approached the player,
         humanPackage.team.actions_remaining > 0    // ...and human team has actions remaining.
     ) {
-        screen.appendChild(createElement("button", { "id": `offer-contract${id}`, "textContent": "Offer Contract" }));
+        screen.appendChild(createElement("button", { "id": `offer-contract${id}`, "textContent": "Offer Contract" }, []));
         createEventListener(`#offer-contract${id}`, "click", drawNegotiationScreen);
     }
 };
 
+// Draw the contract table.
+const drawContractTable = (player: Player) => {
+    return createElement("table", {}, [
+        createElement("tbody", {}, [
+            ...drawContract(player.contract),
+            ...drawOffers(player.offers),
+        ])
+    ])
+}
+
 // Draw the current contract of the player.
-const drawContract = (contract: Contract) => {
-    const contractTable = (document.querySelector("#contract") as HTMLTableElement).children[0] as HTMLTableSectionElement;
+const drawContract = (contract: Contract | null): Array<HTMLTableRowElement> => {
+    if (contract === null) {
+        return [];
+    }
 
-    const firstRow = document.createElement("tr");
-    firstRow.appendChild(createElement("th", { "textContent": "Current Contract" }));
-    firstRow.appendChild(createElement("th", { "textContent": "Started" }));
-    firstRow.appendChild(createElement("th", { "textContent": "Ends" }));
-    firstRow.appendChild(createElement("th", { "textContent": "Seasons Left" }));
-    contractTable.appendChild(firstRow);
-
-    const secondRow = document.createElement("tr");
-    createLink("span", "team", contract.team.id, contract.team.name, [document.createElement("td"), secondRow]);
-    secondRow.appendChild(createElement("td", { "textContent": contract.start_date }));
-    secondRow.appendChild(createElement("td", { "textContent": contract.end_date }));
-    secondRow.appendChild(createElement("td", { "textContent": contract.seasons_left }));
-    contractTable.appendChild(secondRow);
+    return [
+        createElement("tr", {}, [
+            createElement("th", { "textContent": "Current Contract" }, []),
+            createElement("th", { "textContent": "Started" }, []),
+            createElement("th", { "textContent": "Ends" }, []),
+            createElement("th", { "textContent": "Season Left" }, []),
+        ]),
+        createElement("tr", {}, [
+            createElement("td", {}, [createLink("span", "team", contract.team.id, contract.team.name)]),
+            createElement("td", { "textContent": contract.start_date }, []),
+            createElement("td", { "textContent": contract.end_date }, []),
+            createElement("td", { "textContent": contract.seasons_left }, []),
+        ])
+    ];
 };
 
 // Draw contract offers made for the player.
-const drawOffers = (offers: Array<Contract>) => {
-    if (offers.length === 0) { return; }
-    const contractTable = (document.querySelector("#contract") as HTMLTableElement).children[0] as HTMLTableSectionElement;
+const drawOffers = (offers: Array<Contract>): Array<HTMLTableRowElement> => {
+    if (offers.length === 0) { return []; }
 
-    const firstRow = document.createElement("tr");
-    firstRow.appendChild(createElement("th", { "textContent": "Contract Offers" }));
-    firstRow.appendChild(createElement("th", { "textContent": "Date", "colSpan": 2 }));
-    firstRow.appendChild(createElement("th", { "textContent": "Seasons" }));
-    contractTable.appendChild(firstRow);
+    const offerElements = [];
+    offerElements.push(createElement("tr", {}, [
+        createElement("th", { "textContent": "Contract Offers" }, []),
+        createElement("th", { "textContent": "Date", "colSpan": 2 }, []),
+        createElement("th", { "textContent": "Seasons" }, []),
+    ]));
 
     for (const offer of offers) {
-        const row = document.createElement("tr");
-        createLink("span", "team", offer.team.id, offer.team.name, [document.createElement("td"), row]);
-        row.appendChild(createElement("td", { "textContent": offer.start_date, "colSpan": 2 }));
-        row.appendChild(createElement("td", { "textContent": offer.seasons_left }));
-        contractTable.appendChild(row);
+        offerElements.push(createElement("tr", {}, [
+            createElement("td", {}, [createLink("span", "team", offer.team.id, offer.team.name)]),
+            createElement("td", { "textContent": offer.start_date, "colSpan": 2 }, []),
+            createElement("td", { "textContent": offer.seasons_left }, []),
+        ]));
     }
+
+    return offerElements;
 };
 
 // Draw the negotiation screen and get that player!
@@ -108,19 +122,38 @@ const drawNegotiationScreen: Listener = async (e: Event) => {
     }
 
     const screen = initialiseContentScreen();
-    screen.innerHTML = `
-        <label for="years">Seasons:</label>
-        <select id="years">
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-        </select>
-        <button id="offer-contract${playerId}">Offer</button>
-    `;
+    screen.append(
+        ...drawYearSelection(),
+        createElement("button", {
+            "id": `offer-contract${playerId}`,
+            "textContent": "Offer",
+        }, [])
+    );
 
     createEventListener(`#offer-contract${playerId}`, "click", offerContractToPlayer);
 };
+
+// Draw the year selection element.
+const drawYearSelection = (): Array<HTMLElement> => {
+    const elements = [
+        createElement("label", {
+            "for": "years",
+            "textContent": "Seasons"
+        }, []),
+    ];
+
+    const select = createElement("select", { "id": "years" }, []);
+    for (let i = 1; i <= 4; i++) {
+        const years = i.toString();
+        select.appendChild(createElement("option", {
+            "value": years,
+            "textContent": years,
+        }, []));
+    }
+
+    elements.push(select);
+    return elements;
+}
 
 const offerContractToPlayer: Listener = async (e: Event) => {
     const playerId = getPlayerIdFromContractOfferButton(e.target);

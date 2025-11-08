@@ -19,28 +19,23 @@ export const createEventListener = (query: Query, event: EventType, listener: Li
 };
 
 // Create an HTML element, give it values that you want and return it.
-export const createElement = (elementType: TagName, attributes: any) => {
+export const createElement = (elementType: TagName, attributes: any, children: Array<Element | string>) => {
     const element: any = document.createElement(elementType);
     for (const [key, value] of Object.entries(attributes)) {
         element[key] = value;
     }
+
+    element.append(...children);
     return element;
 };
 
 
 // Draw a link field for any purpose.
-export const createLink = (tag: string, type: LinkType, id: number, text: string, parentElements: Array<HTMLElement>) => {
-    const span = createElement(tag, { "textContent": text });
-    span.className = `${type}${id} link`;
-
-    for (const [i, element] of parentElements.entries()) {
-        if (i === 0) {
-            element.appendChild(span);
-        }
-        else {
-            element.appendChild(parentElements[i - 1]);
-        }
-    }
+export const createLink = (tag: string, type: LinkType, id: number, text: string) => {
+    return createElement(tag, {
+        "textContent": text,
+        "className": `${type}${id} link`
+    }, []);
 };
 
 // A dynamic link listener function that makes it possible to create listeners without having the associated element in the document.

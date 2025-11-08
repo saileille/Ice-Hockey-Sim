@@ -104,7 +104,7 @@ impl Team {
 
         players.sort_by(|a, b| (a.position_id.clone() as u8).cmp(&(b.position_id.clone() as u8)).then(b.ability.get_display().cmp(&a.ability.get_display())));
 
-        let json_players: Vec<serde_json::Value> = players.iter().map(|a| a.get_team_screen_json()).collect();
+        let json_players: Vec<serde_json::Value> = players.iter().map(|a| a.get_team_screen_package()).collect();
         json!({
             "id": self.id,
             "name": self.name,
@@ -129,8 +129,25 @@ impl Team {
         json!({
             "id": self.id,
             "actions_remaining": self.actions_remaining,
-            "approached_players": self.approached_players
+            "roster_overview": self.get_roster_overview_package(),
+            "approached_players": self.approached_players,
         })
+    }
+
+    // Get a roster overview of the team.
+    fn get_roster_overview_package(&self) -> Vec<serde_json::Value> {
+        let mut overview: Vec<serde_json::Value> = self.roster.iter().map(|id| {
+            let player = Player::fetch_from_db(id).unwrap();
+            player.get_roster_overview_package(true)
+        }).collect();
+
+        let mut approached = self.approached_players.iter().map(|id| {
+            let player = Player::fetch_from_db(id).unwrap();
+            player.get_roster_overview_package(false)
+        }).collect();
+
+        overview.append(&mut approached);
+        return overview;
     }
 }
 

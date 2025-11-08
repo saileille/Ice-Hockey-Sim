@@ -3,7 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen } from "./basics";
 import { Contract } from "./player";
-import { createElement, createEventListener, createLink, extractIdFromElement } from "../helpers";
+import { createElement, createLink, extractIdFromElement } from "../helpers";
 import { HumanPackage as HumanPackage, Listener } from "../types";
 
 type Player = {
@@ -20,51 +20,51 @@ type PlayerFilter = "all" | "not-approached";
 // Draw the player search screen.
 export const drawScreen: Listener = async (_e: Event) => {
     const players: Array<Player> = await invoke("get_free_agents_package");
-
-    // initialiseTopBar();
     const screen = initialiseContentScreen();
-    screen.innerHTML = `
-        <select id="player-filter">
-            <option value="all">All</option>
-            <option value="not-approached">Not Approached</option>
-        </select>
-        <table id="players">
-            <thead><tr>
-                <th>Free Agents</th>
-                <th>Country</th>
-                <th>Position</th>
-                <th>Ability</th>
-                <th>No. of Offers</th>
-            </tr></thead>
-            <tbody></tbody>
-        </table>
-    `;
 
-    const tbody = (document.querySelector("#players") as HTMLTableElement).children[1] as HTMLTableSectionElement;
+    const playerFilter = createElement("select", {}, [
+        createElement("option", { "value": "all", "textContent": "All" }, []),
+        createElement("option", { "value": "not-approached", "textContent": "Not Approached" }, []),
+    ])
+
+    const tbody = createElement("tbody", { "id": "players" }, []);
     for (const player of players) {
         tbody.appendChild(drawPlayer(player));
     }
 
-    createEventListener("#player-filter", "change", onChangePlayerFilter);
+    screen.append(
+        playerFilter,
+        createElement("table", {}, [
+            createElement("thead", {}, [
+                createElement("tr", {}, [
+                    createElement("th", { "textContent": "Free Agents" }, []),
+                    createElement("th", { "textContent": "Country" }, []),
+                    createElement("th", { "textContent": "Position" }, []),
+                    createElement("th", { "textContent": "Ability" }, []),
+                    createElement("th", { "textContent": "No. of Offers" }, []),
+                ])
+            ]),
+            tbody
+        ])
+    );
 
-    // No need for this, since the all-inclusive option is default.
-    // changePlayerFilter("all", tbody, humanInfo);
+    playerFilter.addEventListener("change", onChangePlayerFilter);
 };
 
 // Get a row of a single player.
-const drawPlayer = (player: Player) => {
-    const row = document.createElement("tr");
-    createLink("span", "player", player.id, player.name, [document.createElement("td"), row]);
-    row.appendChild(createElement("td", { "textContent": player.country }));
-    row.appendChild(createElement("td", { "textContent": player.position }));
-    row.appendChild(createElement("td", { "textContent": player.ability }));
-    row.appendChild(createElement("td", { "textContent": player.offers.length }));
-    return row;
+const drawPlayer = (player: Player): HTMLTableRowElement => {
+    return createElement("tr", {}, [
+        createElement("td", {}, [createLink("span", "player", player.id, player.name)]),
+        createElement("td", { "textContent": player.country }, []),
+        createElement("td", { "textContent": player.position }, []),
+        createElement("td", { "textContent": player.ability }, []),
+        createElement("td", { "textContent": player.offers.length }, []),
+    ]);
 };
 
 const onChangePlayerFilter: Listener = async (e: Event) => {
     const element = e.target as HTMLSelectElement;
-    const tbody = (document.querySelector("#players") as HTMLTableElement).children[1] as HTMLTableSectionElement;
+    const tbody = document.querySelector("#players") as HTMLTableSectionElement;
 
     const humanPackage: HumanPackage = await invoke("get_human_package");
     await changePlayerFilter(element.value as PlayerFilter, tbody, humanPackage);

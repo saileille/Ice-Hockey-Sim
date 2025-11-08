@@ -36,7 +36,6 @@ pub fn run() {
             commands::continue_game::go_to_next_day,
             commands::get_top_bar_package,
             commands::get_comp_select_package,
-            commands::get_child_comp_select_package,
             commands::get_team_select_package,
             commands::get_comp_screen_package,
             commands::get_team_screen_package,
