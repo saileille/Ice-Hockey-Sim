@@ -244,15 +244,16 @@ const drawGameDay = (isPast: boolean, gameList: Array<Game>, displaySeed: boolea
     if (displaySeed) dateColumns = 5;
 
     const matches = [];
-    for (const match of gameList) {
+    for (let i = gameList.length - 1; i >= 0; i--) {
+        const match = gameList[i];
         if (date === "") { date = match.date; }
         else if (date !== match.date) { break; }
 
         matches.push(drawGame(isPast, match, displaySeed));
     }
 
-    // We need to reverse the games if the date is in the future.
-    if (!isPast) matches.reverse();
+    // We need to reverse the games if the date is in the past.
+    if (isPast) matches.reverse();
     tbody.append(...matches);
 
     if (date === "") {
@@ -347,6 +348,7 @@ const drawRoundPairs = (pairs: Array<KnockoutPair>): HTMLTableElement => {
 const drawKnockoutPairTeam = (team: KnockoutTeam): HTMLTableRowElement => {
     return createElement("tr", {}, [
         createElement("td", { "textContent": `${team.seed}.` }, []),
-        createElement("td", {}, [createLink("span", "team", team.id, team.name)])
+        createElement("td", {}, [createLink("span", "team", team.id, team.name)]),
+        createElement("td", { "textContent": `${team.wins}` }, []),
     ]);
 }

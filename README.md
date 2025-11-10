@@ -7,3 +7,12 @@ Some notes about the game:
  - You cannot renew contracts of players yet.
  - Players leave their teams at the end of the last day of their contract, meaning they can be signed the day after their contract is marked to expire.
  - I am aware the game is very barebones still, and there is plenty I plan to do still. It is an alpha version for a reason.
+
+
+ Changelist:
+ Upcoming:
+  - Fixed a visual bug where playoff wins were not visible.
+  - Fixed a visual bug where latest results were showing the most recent ones and next games were showing the last scheduled games of the competition.
+
+0.1.0-A:
+ - First release.
