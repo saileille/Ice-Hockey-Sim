@@ -1,1 +1,9 @@
-Nothing to see here, yet. Come back later.
+The Discord server of the project: https://discord.com/invite/kqQFFFPa8p
+
+Some notes about the game:
+ - Saving the game is not possible yet.
+ - All teams start with no players, and you must have a full team (2 goalkeepers, 4 skaters in each position) before the first match of the season, or you risk a CtD.
+ - You can only offer one contract per turn. There is an "Actions remaining" counter in the top bar.
+ - You cannot renew contracts of players yet.
+ - Players leave their teams at the end of the last day of their contract, meaning they can be signed the day after their contract is marked to expire.
+ - I am aware the game is very barebones still, and there is plenty I plan to do still. It is an alpha version for a reason.

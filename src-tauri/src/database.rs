@@ -129,7 +129,7 @@ pub fn initialise() {
 fn add_competition_data() {
     // 1: Liiga
     Competition::build_and_save(
-        "Liiga",
+        "PHL",
         vec![
             Team::build_and_save("Ruiske"),     // 1
             Team::build_and_save("Atomi"),      // 2
@@ -186,7 +186,7 @@ fn add_competition_data() {
     // 3: Liiga Playoffs.
     knockout_generator::build(
         "Playoffs",
-        vec!["Säälit"],
+        vec!["Pity Round"],
         AnnualWindow::build(
             AnnualDate::build(4, 1),
             AnnualDate::build(5, 31)
