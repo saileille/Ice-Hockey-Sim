@@ -2,29 +2,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen } from "./basics";
 import { createElement, createLink } from "../helpers";
-import { Listener } from "../types";
+import { RosterSetting, Team } from "../types/team";
+import { Player } from "../types/player";
+import { Listener } from "../types/dom";
 
-type RosterSetting = "roster" | "approached" | "both";
-
-type Player = {
-    id: number,
-    name: string,
-    country: string,
-    position: string,
-    ability: number,
-    seasons_left: number
-};
-
-type Manager = {
-    name: string
-};
-
-type Team = {
-    id: number,
-    name: string,
-    manager: Manager | null,
-    players: Array<Player>
-};
 
 // Draw the screen of a given team.
 export const drawScreen = async (id: number) => {
@@ -51,14 +32,19 @@ const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
         createElement("option", {"value": "approached", "textContent": "Approached"}, []),
     ])
 
-    const roster = document.createElement("tbody");
+    const roster = createElement("tbody", {"id": "players"}, []);
     for (const player of players) {
+        let seasonsLeft = 0;
+        if (player.contract !== null)
+            seasonsLeft = player.contract.seasons_left;
+
         roster.appendChild(createElement("tr", {}, [
             createElement("td", {}, [createLink("span", "player", player.id, player.name)]),
             createElement("td", { "textContent": player.country }, []),
             createElement("td", { "textContent": player.position }, []),
+            createElement("td", { "textContent": player.age }, []),
             createElement("td", { "textContent": player.ability }, []),
-            createElement("td", { "textContent": player.seasons_left }, []),
+            createElement("td", { "textContent": seasonsLeft }, []),
         ]));
     }
 
@@ -70,6 +56,7 @@ const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
                     createElement("th", { "textContent": "Name" }, []),
                     createElement("th", { "textContent": "Country" }, []),
                     createElement("th", { "textContent": "Position" }, []),
+                    createElement("th", { "textContent": "Age" }, []),
                     createElement("th", { "textContent": "Ability" }, []),
                     createElement("th", { "textContent": "Seasons Left" }, []),
                 ])
@@ -83,7 +70,7 @@ const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
 
 // When the user changes the player filter of a team screen.
 const onChangePlayerFilter: Listener = (e: Event) => {
-    const roster = (document.querySelector("#players") as HTMLTableElement).children[1] as HTMLTableSectionElement;
+    const roster = document.querySelector("#players") as HTMLTableSectionElement;
     const select = e.target as HTMLSelectElement;
     const setting = select.value as RosterSetting;
 
@@ -99,7 +86,7 @@ const changePlayerFilter = (roster: HTMLTableSectionElement, setting: RosterSett
             continue;
         }
 
-        const seasonsLeftCell = r.children[4];
+        const seasonsLeftCell = r.children[5];
         const seasonsLeft = seasonsLeftCell.textContent;
         if (setting === "roster") {
             if (seasonsLeft === "0") { r.style.display = "none"; }

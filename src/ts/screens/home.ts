@@ -1,8 +1,9 @@
 // The main screen of the game.
 import { invoke } from "@tauri-apps/api/core";
-import { HumanPackage, Listener, RosterOverview } from "../types";
 import { initialiseContentScreen } from "./basics";
 import { createElement } from "../helpers";
+import { HumanPackage, RosterOverview } from "../types/team";
+import { Listener } from "../types/dom";
 
 export const drawScreen = async () => {
     const screen = initialiseContentScreen();

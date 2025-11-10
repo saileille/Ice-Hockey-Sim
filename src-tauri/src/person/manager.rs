@@ -1,8 +1,10 @@
 // This is what a player is!
 
+use rand::rngs::ThreadRng;
 use serde_json::json;
+use time::Date;
 
-use crate::{database::MANAGERS, person::{Gender, Person}, types::{CountryId, ManagerId}};
+use crate::{database::MANAGERS, person::{Gender, Person}, types::ManagerId};
 
 #[derive(Default, Clone)]
 pub struct Manager {
@@ -22,23 +24,23 @@ impl Manager {
 
     // Build a manager.
     fn build(person: Person) -> Self {
-        let mut manager = Self::default();
-        manager.person = person;
-
-        return manager;
+        Self {
+            person: person,
+            ..Default::default()
+        }
     }
 
     // Create a manager and store it in the database. Return a clone of the Manager.
     fn build_and_save(person: Person) -> Self {
-        let mut player = Self::build(person);
-        player.create_id(MANAGERS.lock().unwrap().len() + 1);
-        player.save();
-        return player;
+        let mut manager = Self::build(person);
+        manager.create_id(MANAGERS.lock().unwrap().len() + 1);
+        manager.save();
+        return manager;
     }
 
     // Build a random manager.
-    pub fn build_and_save_random() -> Self {
-        let person = Person::build_random();
+    pub fn build_and_save_random(today: &Date, rng: &mut ThreadRng) -> Self {
+        let person = Person::create(today, rng, 30, 60, Gender::Male);
         return Self::build_and_save(person);
     }
 

@@ -5,8 +5,10 @@ pub mod knockout_generator;
 
 use std::{cmp::Ordering, iter::zip};
 
+use rand::rngs::ThreadRng;
 use serde::Serialize;
 use serde_json::json;
+use time::Date;
 
 use crate::{competition::season::{ranking::{get_sort_functions, RankCriteria}, team::TeamCompData, Season}, database::{COMPETITIONS, SEASONS}, team::Team, time::{db_string_to_date, AnnualWindow}, types::{convert, CompetitionId, TeamId}};
 
@@ -49,31 +51,28 @@ impl Competition {
     // Build a Competition element.
     fn build(name: &str, teams: &[Team], season_window: AnnualWindow, connections: Vec<CompConnection>,
     min_no_of_teams: u8, format: Option<Format>, rank_criteria: Vec<RankCriteria>, child_comp_ids: Vec<CompetitionId>) -> Self {
-        let mut comp = Self::default();
-        comp.name = name.to_string();
-        comp.season_window = season_window;
-        comp.connections = connections;
+        Self {
+            name: name.to_string(),
+            season_window: season_window,
+            connections: connections,
+            format: format,
+            rank_criteria: rank_criteria,
+            child_comp_ids: child_comp_ids,
 
-        // If min_no_of_teams is 0, competition must have teams assigned to it.
-        comp.min_no_of_teams = match min_no_of_teams {
-            0 => convert::usize_to_u8(teams.len()),
-            _ => min_no_of_teams
-        };
-
-        comp.format = format;
-        comp.rank_criteria = rank_criteria;
-
-        comp.child_comp_ids = child_comp_ids;
-
-        return comp;
+            min_no_of_teams: match min_no_of_teams {
+                0 => convert::usize_to_u8(teams.len()),
+                _ => min_no_of_teams
+            },
+            ..Default::default()
+        }
     }
 
     // Build a competition element and save it to the database.
     pub fn build_and_save(name: &str, mut teams: Vec<Team>, season_window: AnnualWindow, connections: Vec<CompConnection>,
-    min_no_of_teams: u8, format: Option<Format>, rank_criteria: Vec<RankCriteria>, child_comp_ids: Vec<CompetitionId>) -> Self {
+    min_no_of_teams: u8, format: Option<Format>, rank_criteria: Vec<RankCriteria>, child_comp_ids: Vec<CompetitionId>, today: &Date) -> Self {
         let mut comp = Self::build(name, &teams, season_window, connections, min_no_of_teams, format, rank_criteria, child_comp_ids);
 
-        comp.save_new(&teams);
+        comp.save_new(&teams, today);
 
         for team in teams.iter_mut() {
             team.primary_comp_id = comp.id;
@@ -92,7 +91,7 @@ impl Competition {
     }
 
     // Save a competition to the database for the first time.
-    fn save_new(&mut self, teams: &[Team]) {
+    fn save_new(&mut self, teams: &[Team], today: &Date) {
         self.create_id(COMPETITIONS.lock().unwrap().len() + 1);
         self.save();
 
@@ -101,7 +100,7 @@ impl Competition {
 
         // Create and save the first season.
         let team_ids: Vec<u8> = teams.iter().map(|a| a.id).collect();
-        self.create_new_season(&team_ids);
+        self.create_new_season(&team_ids, today);
     }
 
     // Update the Competition to database.
@@ -115,26 +114,26 @@ impl Competition {
     }
 
     // Create a new season for the competition.
-    fn create_new_season(&self, teams: &[TeamId]) {
-        Season::build_and_save(self, teams);
+    fn create_new_season(&self, teams: &[TeamId], today: &Date) {
+        Season::build_and_save(self, teams, today);
     }
 
     // Create a new season for this competition and all its child competitions.
-    fn create_new_seasons(&self, teams: &[TeamId]) {
-        self.create_new_season(teams);
+    fn create_new_seasons(&self, teams: &[TeamId], today: &Date) {
+        self.create_new_season(teams, today);
 
         // Saves an unnecessary element creation.
         if self.child_comp_ids.is_empty() { return; }
 
         let child_teams = Vec::new();
         for id in self.child_comp_ids.iter() {
-            Competition::fetch_from_db(id).create_new_seasons(&child_teams);        }
+            Competition::fetch_from_db(id).create_new_seasons(&child_teams, today);        }
     }
 
     // Create new season for this competition and its child competitions.
-    pub fn create_and_setup_seasons(&self, teams: &[TeamId]) {
-        self.create_new_seasons(teams);
-        self.setup_season(&mut Vec::new());
+    pub fn create_and_setup_seasons(&self, teams: &[TeamId], today: &Date, rng: &mut ThreadRng) {
+        self.create_new_seasons(teams, today);
+        self.setup_season(&mut Vec::new(), rng);
     }
 
     // Give child competitions this competition's ID.
@@ -189,7 +188,7 @@ impl Competition {
 // Functional.
 impl Competition {
     // Set up a season that has already been created and saved to the database.
-    pub fn setup_season(&self, teams: &mut Vec<TeamCompData>) {
+    pub fn setup_season(&self, teams: &mut Vec<TeamCompData>, rng: &mut ThreadRng) {
         let mut season = Season::fetch_from_db(&self.id, self.get_seasons_amount() - 1);
 
         while !teams.is_empty() && !season.has_enough_teams(self.min_no_of_teams) {
@@ -197,21 +196,21 @@ impl Competition {
         }
 
         if season.has_enough_teams(self.min_no_of_teams) {
-            season.setup(self);
+            season.setup(self, rng);
         }
 
         season.save();
     }
 
     // Sort a given list of teams with the competition's sort criteria.
-    fn sort_some_teams(&self, teams: &mut Vec<TeamCompData>) {
+    fn sort_some_teams(&self, teams: &mut Vec<TeamCompData>, rng: &mut ThreadRng) {
         let sort_functions = get_sort_functions();
         let rr = self.get_round_robin_format();
 
         teams.sort_by(|a, b| {
             let mut order = Ordering::Equal;
             for criterium in self.rank_criteria.iter() {
-                order = sort_functions[&criterium](a, b, &rr);
+                order = sort_functions[&criterium](a, b, &rr, rng);
 
                 if order.is_ne() { break; }
             }
@@ -365,7 +364,7 @@ impl CompConnection {
     }
 
     // Send teams onwards to the next stage.
-    fn send_teams(&self, teams: &[TeamCompData]) {
+    fn send_teams(&self, teams: &[TeamCompData], rng: &mut ThreadRng) {
         let mut teamdata = Vec::new();
 
         for i in self.teams_from_positions[0] - 1..self.teams_from_positions[1]  {
@@ -385,6 +384,6 @@ impl CompConnection {
             teamdata.push(team);
         }
 
-        Competition::fetch_from_db(&self.comp_to_connect).setup_season(&mut teamdata);
+        Competition::fetch_from_db(&self.comp_to_connect).setup_season(&mut teamdata, rng);
     }
 }

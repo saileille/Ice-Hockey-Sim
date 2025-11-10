@@ -39,11 +39,10 @@ pub fn run() {
             commands::get_team_select_package,
             commands::get_comp_screen_package,
             commands::get_team_screen_package,
-            commands::get_player_screen_package,
+            commands::get_player_package,
             commands::create_human_manager,
             commands::get_human_package,
             commands::get_free_agents_package,
-            commands::get_player_search_package,
             commands::offer_contract,
         ])
         .run(tauri::generate_context!())

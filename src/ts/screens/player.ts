@@ -1,29 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen, updateTopBar } from "./basics";
 import { createElement, createEventListener, createLink } from "../helpers";
-import { HumanPackage as HumanPackage, HumanTeamPackage, Listener, Position } from "../types";
 import { drawScreen as drawHomeScreen } from "./home";
-
-type ContractTeam = {
-    name: string,
-    id: number
-};
-
-export type Contract = {
-    start_date: string,
-    end_date: string,
-    seasons_left: number,
-    team: ContractTeam
-};
-
-type Player = {
-    name: string,
-    country: string,
-    position: Position,
-    ability: number,
-    contract: Contract | null,
-    offers: Array<Contract>
-};
+import { Contract, Player } from "../types/player";
+import { HumanPackage, HumanTeamPackage } from "../types/team";
+import { Listener } from "../types/dom";
 
 // Get the player screen title.
 const getTitle = (player: Player): HTMLHeadingElement => {
@@ -38,12 +19,13 @@ const getTitle = (player: Player): HTMLHeadingElement => {
 
 // Draw the screen of a given player.
 export const drawScreen = async (id: number) => {
-    const player: Player = await invoke("get_player_screen_package", { id: id });
+    const player: Player = await invoke("get_player_package", { id: id });
     const humanPackage: HumanPackage = await invoke("get_human_package");
 
     const screen = initialiseContentScreen();
     screen.append(
         getTitle(player),
+        createElement("div", {"textContent": `Birthday: ${player.birthday}`}, []),
         drawContractTable(player),
     );
 

@@ -2,15 +2,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createElement } from "../helpers.ts";
 import { drawScreen as drawCompScreen } from "./competition.ts";
-import { HumanPackage, HumanTeamPackage, Listener } from "../types.ts";
 import { onClickHomeScreen } from "./home.ts";
 import { drawScreen as drawHomeScreen } from "./home.ts";
 import { drawScreen as drawPlayerSearchScreen } from "./player_search.ts";
+import { HumanTeamPackage, TopBarPackage } from "../types/team.ts";
+import { Listener } from "../types/dom.ts";
 
-type TopBarPackage = {
-    "date": string,
-    "human": HumanPackage,
-};
 
 const initialiseTopBar = () => {
     // Check if the top bar has already been initialised.

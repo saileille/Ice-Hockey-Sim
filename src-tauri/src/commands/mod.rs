@@ -72,19 +72,19 @@ pub fn get_comp_screen_package(id: CompetitionId) -> serde_json::Value {
 // Get all info for a team screen in a JSON string.
 #[tauri::command]
 pub fn get_team_screen_package(id: TeamId) -> serde_json::Value {
-    Team::fetch_from_db(&id).get_team_screen_package()
+    Team::fetch_from_db(&id).get_team_screen_package(&TODAY.lock().unwrap().clone())
 }
 
 // Get info for a player screen in a JSON string.
 #[tauri::command]
-pub fn get_player_screen_package(id: PlayerId) -> serde_json::Value {
-    Player::fetch_from_db(&id).unwrap().get_player_screen_package()
+pub fn get_player_package(id: PlayerId) -> serde_json::Value {
+    Player::fetch_from_db(&id).unwrap().get_package(&TODAY.lock().unwrap().clone())
 }
 
 // Create a human manager in the game.
 #[tauri::command]
 pub fn create_human_manager(id: TeamId) {
-    let mut human = Manager::build_and_save_random();
+    let mut human = Manager::build_and_save_random(&TODAY.lock().unwrap().clone(), &mut rand::rng());
     human.is_human = true;
 
     human.person.forename = "Human".to_string();
@@ -125,13 +125,7 @@ pub fn get_human_package() -> serde_json::Value {
 // Get all free agents.
 #[tauri::command]
 pub fn get_free_agents_package() -> serde_json::Value {
-    Player::get_all_free_agents_package()
-}
-
-// Get player with player search data on it.
-#[tauri::command]
-pub fn get_player_search_package(id: PlayerId) -> serde_json::Value {
-    Player::fetch_from_db(&id).unwrap().get_player_search_package()
+    Player::get_all_free_agents_package(&TODAY.lock().unwrap().clone())
 }
 
 // Offer a contract to a player.

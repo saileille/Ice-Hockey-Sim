@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use rand::{rng, seq::IndexedRandom};
+use rand::{Rng, rngs::ThreadRng, seq::IndexedRandom};
 use time::Date;
 
 use crate::{person::{player::{position::PositionId, Player}, Contract}, team::Team, types::{convert, PlayerId}};
@@ -24,9 +24,10 @@ pub struct PlayerNeed {
 impl PlayerNeed {
     // Build the element.
     fn build(position: PositionId) -> Self {
-        let mut need = Self::default();
-        need.position = position;
-        return need;
+        Self {
+            position: position,
+            ..Default::default()
+        }
     }
 
     // Get how many players the team has that have to be left outside a match lineup.
@@ -147,18 +148,18 @@ impl Team {
 
     // Offer contract to a player, if the team needs one.
     // Return whether contract was offered or not.
-    pub fn offer_contract(&mut self, today: &Date) -> bool {
-        let mut player = self.select_player_from_shortlist();
+    pub fn offer_contract(&mut self, today: &Date, rng: &mut ThreadRng) -> bool {
+        let mut player = self.select_player_from_shortlist(rng);
         if player.is_none() { return false; }
 
-        let contract = self.create_contract_offer(player.as_ref().unwrap(), today);
+        let contract = self.create_contract_offer(player.as_ref().unwrap(), today, rng);
         self.offer_contract_to_player(player.as_mut().unwrap(), contract);
         return true;
     }
 
     // Give the team an opportunity to offer a contract to a player.
     // Assumes that self.player_needs is up-to-date!
-    fn select_player_from_shortlist(&self) -> Option<Player> {
+    fn select_player_from_shortlist(&self, rng: &mut ThreadRng) -> Option<Player> {
         let free_agents = self.get_player_shortlist();
 
         // Do not offer any contracts if there is no-one the team wants.
@@ -191,7 +192,7 @@ impl Team {
             }
         }
 
-        let choice = choices.choose(&mut rng()).unwrap();
+        let choice = choices.choose(rng).unwrap();
 
         return Player::fetch_from_db(&choice.0);
     }
@@ -207,8 +208,8 @@ impl Team {
 
     // AI makes a contract offer to a player.
     // The player itself should affect the contract offer at some point.
-    fn create_contract_offer(&self, player: &Player, today: &Date) -> Contract {
-        let years = rand::random_range(1..=4);  // 1-4 year contract offers, just like MHM.
+    pub fn create_contract_offer(&self, player: &Player, today: &Date, rng: &mut ThreadRng) -> Contract {
+        let years = rng.random_range(1..=4);  // 1-4 year contract offers, just like MHM.
         return Contract::build_from_years(self, today, years);
     }
 

@@ -1,12 +1,8 @@
 // Countries and such.
-use std::
-    collections::HashMap
-;
-use rand::random_range;
+use std::collections::HashMap;
+use rand::{Rng, rngs::ThreadRng};
 
-use crate::{
-    database::COUNTRIES, io::load_country_names, person::Gender, types::{CountryId, CountryNamePool}
-};
+use crate::{database::COUNTRIES, io::load_country_names, person::Gender, types::{CountryId, CountryNamePool}};
 
 #[derive(Default, Clone)]
 pub struct Country {
@@ -26,8 +22,11 @@ impl Country {  // Basics.
 
     // Build a country element.
     fn build(name: &str) -> Self {
-        let mut country = Self::default();
-        country.name = name.to_string();
+        let mut country = Self {
+            name: name.to_string(),
+            ..Default::default()
+        };
+
         country.assign_names();
         return country;
     }
@@ -96,9 +95,9 @@ impl Country {
     }
 
     // Generate a name from the country's name databases.
-    pub fn generate_name(&self, gender: &Gender) -> (String, String) {
-        let forename = self.names.get(gender).unwrap().get("forenames").unwrap().draw_name();
-        let surname = self.names.get(gender).unwrap().get("surnames").unwrap().draw_name();
+    pub fn generate_name(&self, gender: &Gender, rng: &mut ThreadRng) -> (String, String) {
+        let forename = self.names.get(gender).unwrap().get("forenames").unwrap().draw_name(rng);
+        let surname = self.names.get(gender).unwrap().get("surnames").unwrap().draw_name(rng);
 
         (forename, surname)
     }
@@ -130,7 +129,6 @@ impl NamePool {
         }
 
         pool.calculate_weight();
-
         return pool;
     }
 
@@ -159,13 +157,13 @@ impl NamePool {
 
 impl NamePool {
     // Draw a single name from the name pool.
-    fn draw_name(&self) -> String {
-        return self.names[self.draw_index()].clone()
+    fn draw_name(&self, rng: &mut ThreadRng) -> String {
+        return self.names[self.draw_index(rng)].clone()
     }
 
     // Get a random index of the weights/names vector.
-    fn draw_index(&self) -> usize {
-        let random = random_range(0..self.total_weight);
+    fn draw_index(&self, rng: &mut ThreadRng) -> usize {
+        let random = rng.random_range(0..self.total_weight);
         let mut counter = 0;
         for (i, weight) in self.weights.iter().enumerate() {
             counter += *weight as u32;

@@ -1,14 +1,11 @@
 pub mod lineup;
 pub mod ai;
 
-use rand::{
-    distr::Uniform,
-    Rng
-};
+use rand::{Rng, distr::Uniform, rngs::ThreadRng};
 use serde_json::json;
 use time::Date;
 use crate::{
-    database::{TEAMS, TODAY}, person::{Contract, Person, manager::Manager, player::{
+    competition::Competition, database::{TEAMS, TODAY}, person::{Contract, Gender, Person, manager::Manager, player::{
         Player, position::PositionId
     }}, team::ai::PlayerNeed, time::date_to_db_string, types::{
         AttributeValue, CompetitionId, ManagerId, PlayerId, TeamId
@@ -45,10 +42,10 @@ impl Team {
     }
 
     fn build(name: &str) -> Self {
-        let mut team = Team::default();
-        team.name = name.to_string();
-
-        return team;
+        Self {
+            name: name.to_string(),
+            ..Default::default()
+        }
     }
 
     // Create a team and store it in the database. Return a clone of the Team.
@@ -88,7 +85,14 @@ impl Team {
 
     // Get every player in the roster.
     fn get_players(&self) -> Vec<Player> {
-        self.roster.iter().map(|id| Player::fetch_from_db(id).unwrap()).collect()
+        self.roster.iter().map(|id| {
+            let player = Player::fetch_from_db(id).unwrap();
+            if !player.person.is_active {
+                println!("{} has a retired player {} ({})", self.name, player.person.get_full_name(), player.id);
+            }
+            player
+
+        }).collect()
     }
 
     // Get the players to whom the team has offered contracts.
@@ -96,15 +100,19 @@ impl Team {
         self.approached_players.iter().map(|id| Player::fetch_from_db(id).unwrap()).collect()
     }
 
+    fn get_primary_competition(&self) -> Competition {
+        Competition::fetch_from_db(&self.primary_comp_id)
+    }
+
     // Get info for a team screen in JSON.
-    pub fn get_team_screen_package(&self) -> serde_json::Value {
+    pub fn get_team_screen_package(&self, today: &Date) -> serde_json::Value {
         let mut players = self.get_players();
         let mut approached_players = self.get_approached_players();
         players.append(&mut approached_players);
 
         players.sort_by(|a, b| (a.position_id.clone() as u8).cmp(&(b.position_id.clone() as u8)).then(b.ability.get_display().cmp(&a.ability.get_display())));
 
-        let json_players: Vec<serde_json::Value> = players.iter().map(|a| a.get_team_screen_package()).collect();
+        let json_players: Vec<serde_json::Value> = players.iter().map(|a| a.get_package(today)).collect();
         json!({
             "id": self.id,
             "name": self.name,
@@ -116,8 +124,8 @@ impl Team {
         })
     }
 
-    // Get relevant info for a player screen.
-    pub fn get_player_screen_json(&self) -> serde_json::Value {
+    // Get relevant team info for a contract.
+    pub fn get_contract_package(&self) -> serde_json::Value {
         json!({
             "id": self.id,
             "name": self.name
@@ -168,54 +176,14 @@ impl Team {
     pub fn return_actions_to_full(&mut self) {
         self.actions_remaining = 1;
     }
+
+    // Return whether this day is the season end date.
+    fn is_season_end_date(&self, today: &Date) -> bool {
+        return self.get_primary_competition().season_window.is_last_day(today);
+    }
 }
 
-// Tests.
 impl Team {
-    // Generate a basic roster of players for the team.
-    fn generate_roster(&mut self, min_ability: AttributeValue, max_ability: AttributeValue) {
-        self.roster = Vec::new();
-        let range = Uniform::new_inclusive(min_ability, max_ability)
-            .expect(&format!("error: low: {min_ability}, high: {max_ability}"));
-
-        let mut rng = rand::rng();
-        // Goalkeepers...
-        for _ in 0..2 {
-            let player = Player::build_and_save(Person::build_random(), rng.sample(range), PositionId::Goalkeeper);
-            self.roster.push(player.id);
-        }
-
-        // Left Defenders...
-        for _ in 0..4 {
-            let player = Player::build_and_save(Person::build_random(), rng.sample(range), PositionId::LeftDefender);
-            self.roster.push(player.id);
-        }
-
-        // Right Defenders...
-        for _ in 0..4 {
-            let player = Player::build_and_save(Person::build_random(), rng.sample(range), PositionId::RightDefender);
-            self.roster.push(player.id);
-        }
-
-        // Left Wingers...
-        for _ in 0..4 {
-            let player = Player::build_and_save(Person::build_random(), rng.sample(range), PositionId::LeftWinger);
-            self.roster.push(player.id);
-        }
-
-        // Centres...
-        for _ in 0..4 {
-            let player = Player::build_and_save(Person::build_random(), rng.sample(range), PositionId::Centre);
-            self.roster.push(player.id);
-        }
-
-        // Right Wingers...
-        for _ in 0..4 {
-            let player = Player::build_and_save(Person::build_random(), rng.sample(range), PositionId::RightWinger);
-            self.roster.push(player.id);
-        }
-    }
-
     // Delete the team's players.
     fn delete_players(&mut self) {
         for id in self.roster.iter() {
@@ -226,18 +194,35 @@ impl Team {
     }
 
     // Create a manager out of thin air.
-    fn create_manager(&mut self) {
-        let mut manager = Manager::build_and_save_random();
+    fn create_manager(&mut self, today: &Date, rng: &mut ThreadRng) {
+        let mut manager = Manager::build_and_save_random(today, rng);
         self.manager_id = manager.id;
-        manager.person.contract = Some(Contract::build(&date_to_db_string(&TODAY.lock().unwrap()), &date_to_db_string(&Date::MAX), self.id));
+        manager.person.contract = Some(Contract::build(&date_to_db_string(today), &date_to_db_string(&Date::MAX), self.id));
         manager.save();
     }
 
     // Set up the team when initialising a game.
-    pub fn setup(&mut self, min_ability: u8, max_ability: u8) {
-        self.create_manager();
-        // self.generate_roster(min_ability, max_ability);
+    pub fn setup(&mut self, today: &Date, rng: &mut ThreadRng) {
+        self.create_manager(today, rng);
         self.return_actions_to_full();
+        self.promote_junior_players(today, rng);
         self.save();
+    }
+
+    // Give a few junior players to the team at the end of the season.
+    fn promote_junior_players(&mut self, today: &Date, rng: &mut ThreadRng) {
+        for _ in 0..rng.random_range(1..=3) {
+            let mut player = Player::create(today, rng, 16, 19);
+            let contract = Contract::build_from_years(self, today, 4);
+            player.person.contract = Some(contract);
+            self.roster.push(player.id);
+            player.save();
+        }
+    }
+
+    pub fn season_end_checker(&mut self, today: &Date, rng: &mut ThreadRng) {
+        if self.is_season_end_date(today) {
+            self.promote_junior_players(today, rng);
+        }
     }
 }

@@ -1,5 +1,7 @@
 // Lineup cache stuff.
 
+use rand::rngs::ThreadRng;
+
 use crate::{match_event::event::PlayersOnIce, misc::random_with_weights, person::player::Player, team::lineup::{DefencePair, ForwardLine, LineUp}, types::PlayerId};
 
 #[derive(Debug)]
@@ -31,7 +33,7 @@ impl LineUpCache {
     }
 
     // Determine who should go on ice next.
-    pub fn change_players_on_ice(&mut self) {
+    pub fn change_players_on_ice(&mut self, rng: &mut ThreadRng) {
         self.players_on_ice = PlayersOnIceCache::default();
 
         // The better goalkeeper is always on ice (for now).
@@ -40,7 +42,7 @@ impl LineUpCache {
         // Simple randomness to determine which line is playing.
         // This should be player-editable in the future.
         // 1st line: 40%, 2nd line: 30%, 3rd line: 20%, 4th line: 10%
-        let index = random_with_weights(&[4, 3, 2, 1], None, None);
+        let index = random_with_weights(&[4, 3, 2, 1], None, rng);
 
         self.players_on_ice.ld = self.defence_pairs[index].ld.clone();
         self.players_on_ice.rd = self.defence_pairs[index].rd.clone();

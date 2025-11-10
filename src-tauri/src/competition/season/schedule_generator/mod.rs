@@ -3,7 +3,7 @@
 mod sorting;
 
 use std::{collections::{HashMap, HashSet}, iter::zip};
-use rand::{rng, rngs::ThreadRng, seq::SliceRandom, Rng};
+use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use ::time::Date;
 
 use crate::{
@@ -12,14 +12,14 @@ use crate::{
 
 impl Season {
     // Generate a match schedule for round robin stages.
-    pub fn generate_schedule(&mut self, comp: &Competition) {
-        let mut match_pool = self.generate_match_pool(comp);
-        let matchdays = generate_matchdays(&mut match_pool);
-        self.upcoming_games = assign_dates(matchdays, &db_string_to_date(&self.start_date), &db_string_to_date(&self.end_date), comp, true);
+    pub fn generate_schedule(&mut self, comp: &Competition, rng: &mut ThreadRng) {
+        let mut match_pool = self.generate_match_pool(comp, rng);
+        let matchdays = generate_matchdays(&mut match_pool, rng);
+        self.upcoming_games = assign_dates(matchdays, &db_string_to_date(&self.start_date), &db_string_to_date(&self.end_date), comp, true, rng);
     }
 
     // Generate matches for a round robin stage.
-    fn generate_match_pool(&self, comp: &Competition) -> Vec<[TeamId; 2]> {
+    fn generate_match_pool(&self, comp: &Competition, rng: &mut ThreadRng) -> Vec<[TeamId; 2]> {
         // How many times should uncertain generations be attempted before giving up.
         const ATTEMPTS: u8 = u8::MAX;
         let round_robin = comp.format.as_ref().unwrap().round_robin.as_ref().unwrap();
@@ -38,7 +38,7 @@ impl Season {
         // Half rounds.
         let mut prev_schedule_data = Vec::new();
         if matches >= matches_in_round {
-            prev_schedule_data = self.attempt_irregular_generation(matches_in_round, &mut match_pool, prev_schedule_data, ATTEMPTS);
+            prev_schedule_data = self.attempt_irregular_generation(matches_in_round, &mut match_pool, prev_schedule_data, ATTEMPTS, rng);
 
             // If unsuccessful, move on to the next part with one match less.
             if prev_schedule_data.len() == 0 {
@@ -58,7 +58,7 @@ impl Season {
 
         // Handle the leftover matches.
         while matches > 0 {
-            prev_schedule_data = self.attempt_irregular_generation(matches, &mut match_pool, prev_schedule_data, ATTEMPTS);
+            prev_schedule_data = self.attempt_irregular_generation(matches, &mut match_pool, prev_schedule_data, ATTEMPTS, rng);
 
             // If unsuccessful, try again with one match less.
             if prev_schedule_data.len() == 0 {
@@ -96,7 +96,7 @@ impl Season {
         &self, matches_per_team: u8,
         match_pool: &mut Vec<[TeamId; 2]>,
         prev_schedule_data: Vec<TeamScheduleData>,
-        attempts: u8
+        attempts: u8, rng: &mut ThreadRng
     ) -> Vec<TeamScheduleData> {
         let prev_schedule_map = TeamScheduleData::vector_to_hashmap(prev_schedule_data);
 
@@ -130,7 +130,7 @@ impl Season {
             // self.round_robin_rules.sort_team1 = team1_sorts[team1_index].clone();
             // self.round_robin_rules.sort_team2 = team2_sorts[team2_index].clone();
 
-            data = self.generate_irregular_matches(matches_per_team, match_pool, &prev_schedule_map);
+            data = self.generate_irregular_matches(matches_per_team, match_pool, &prev_schedule_map, rng);
             if data.len() > 0 {
                 break;
             }
@@ -146,14 +146,13 @@ impl Season {
     // Generate a match schedule with arbitrary number of games.
     // Add to an existing match pool vector if successful.
     // Return the schedule data. If unsuccessful, return empty vector.
-    fn generate_irregular_matches(&self, matches_per_team: u8, match_pool: &mut Vec<[TeamId; 2]>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>) -> Vec<TeamScheduleData> {
+    fn generate_irregular_matches(&self, matches_per_team: u8, match_pool: &mut Vec<[TeamId; 2]>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>, rng: &mut ThreadRng) -> Vec<TeamScheduleData> {
         let mut schedule_data = TeamScheduleData::generate(&self.teams);
         let mut completed_schedule_data = Vec::new();
         let mut created_matches = Vec::new();
 
-        let mut rng = rng();
         while schedule_data.len() > 0 {
-            if !self.generate_irregular_match(&mut schedule_data, prev_schedule_map, &mut rng, &mut created_matches, &mut completed_schedule_data, matches_per_team) {
+            if !self.generate_irregular_match(&mut schedule_data, prev_schedule_map, rng, &mut created_matches, &mut completed_schedule_data, matches_per_team) {
                 return Vec::new();
             }
         }
@@ -235,9 +234,8 @@ impl Season {
 }
 
 // Give each matchday a date, build the games and return them.
-pub fn assign_dates(matchdays: Vec<Vec<[TeamId; 2]>>, start_date: &Date, end_date: &Date, comp: &Competition, randomise_order: bool) -> Vec<Game> {
+pub fn assign_dates(matchdays: Vec<Vec<[TeamId; 2]>>, start_date: &Date, end_date: &Date, comp: &Competition, randomise_order: bool, rng: &mut ThreadRng) -> Vec<Game> {
 let mut dates = get_dates(start_date, end_date);
-    let mut rng = rng();
     let mut game_dates = Vec::new();
 
     for _ in 0..matchdays.len() {
@@ -294,11 +292,10 @@ fn generate_matchday(match_pool: &mut Vec<[TeamId; 2]>, rng: &mut ThreadRng) -> 
 }
 
 // Generate individual matchdays from the given list of games.
-pub fn generate_matchdays(match_pool: &mut Vec<[TeamId; 2]>) -> Vec<Vec<[TeamId; 2]>> {
+pub fn generate_matchdays(match_pool: &mut Vec<[TeamId; 2]>, rng: &mut ThreadRng) -> Vec<Vec<[TeamId; 2]>> {
     let mut matchdays = Vec::new();
-    let mut rng = rand::rng();
     while match_pool.len() > 0 {
-        matchdays.push(generate_matchday(match_pool, &mut rng));
+        matchdays.push(generate_matchday(match_pool, rng));
     }
     return matchdays;
 }

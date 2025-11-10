@@ -1,4 +1,6 @@
-use crate::types::AttributeValue;
+use rand::{Rng, rngs::ThreadRng};
+
+use crate::{database::ATTRIBUTES, time::years_to_days, types::AttributeValue};
 
 
 // Attribute data.
@@ -20,9 +22,13 @@ pub enum AttributeId {
 // How quickly does it improve?
 // When does it peak on average?
 // Etc.
+#[derive(Clone)]
 pub struct Attribute {
     id: AttributeId,
+
+    // The age when this attribute is usually at its peak.
     peak: u8,
+    peak_days: u16
 }
 
 impl Attribute {
@@ -30,15 +36,29 @@ impl Attribute {
         Self {
             id: id,
             peak: peak,
+            peak_days: years_to_days(peak),
         }
+    }
+
+    fn fetch_from_db(id: &AttributeId) -> Self {
+        ATTRIBUTES.get(id).unwrap().clone()
     }
 }
 
 #[derive(Debug)]
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct PersonAttribute {
     id: AttributeId,
     value: AttributeValue,
+}
+
+impl Default for PersonAttribute {
+    fn default() -> Self {
+        Self {
+            id: AttributeId::default(),
+            value: Self::set_static(AttributeValue::default()),
+        }
+    }
 }
 
 impl PersonAttribute {
@@ -47,18 +67,18 @@ impl PersonAttribute {
     const MAX: AttributeValue = AttributeValue::MAX;
 
     // Multiply by this amount when doing logarithmic stuff.
-    // Currently 275 / 16. ((u8::MAX + 1 + MIN) / AttributeValue::BITS)
-    const DISPLAY_MULTIPLIER: f64 = 17.1875;
+    const DISPLAY_MULTIPLIER: f64 = ((u8::MAX as AttributeValue + 1 + Self::MIN) / AttributeValue::BITS as AttributeValue) as f64;
 
     // Subtract by this amount when doing logarithmic stuff.
     // log2(MIN) * DISPLAY_MULTIPLIER
-    const DISPLAY_SUBTRACTOR: f64 = 73.01125413731162;
+    const DISPLAY_SUBTRACTOR: f64 = 4.247927513443585 * Self::DISPLAY_MULTIPLIER;
+    // const DISPLAY_SUBTRACTOR: f64 = 73.01125413731162;
 
     pub fn build(id: AttributeId, value: AttributeValue) -> Self {
-        let mut attribute = Self::default();
-        attribute.id = id;
-        attribute.set(value);
-        return attribute;
+        Self {
+            id: id,
+            value: Self::set_static(value),
+        }
     }
 
     // Get a display value of the attribute.
@@ -82,6 +102,31 @@ impl PersonAttribute {
 
     // Set the attribute.
     fn set(&mut self, value: AttributeValue) {
-        self.value = value.clamp(Self::MIN, Self::MAX);
+        self.value = Self::set_static(value);
+    }
+
+    fn set_static(value: AttributeValue) -> AttributeValue {
+        return value.clamp(Self::MIN, Self::MAX);
+    }
+
+    // Change the attribute with the given value.
+    fn change(&mut self, value: i32) {
+        let changed_value = (self.value as i32) + value;
+        self.set(changed_value as u16);
+    }
+
+    // The daily update check on the attribute.
+    pub fn update(&mut self, age_days: u16, rng: &mut ThreadRng) {
+        let attribute = Attribute::fetch_from_db(&self.id);
+
+        let regress_likelihood = (age_days as f64) / ((attribute.peak_days * 2) as f64);
+        let attribute_regresses = rng.random_bool(regress_likelihood);
+
+        if attribute_regresses {
+            self.change(-1);
+        }
+        else {
+            self.change(1);
+        }
     }
 }

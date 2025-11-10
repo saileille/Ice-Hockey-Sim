@@ -1,6 +1,6 @@
 // Knockout season parametres.
 
-use rand::{rng, rngs::ThreadRng, Rng};
+use rand::{rngs::ThreadRng, Rng};
 use serde_json::json;
 
 use crate::{competition::{season::{schedule_generator::assign_dates, team::TeamCompData}, Competition}, match_event::Game, time::db_string_to_date, types::TeamId};
@@ -29,17 +29,16 @@ impl KnockoutRound {
 
     // Set up a knockout round.
     // Return the games.
-    pub fn setup(&mut self, teams: &[TeamCompData], start: &str, end: &str, comp: &Competition) -> Vec<Game> {
-        self.draw_teams(teams);
+    pub fn setup(&mut self, teams: &[TeamCompData], start: &str, end: &str, comp: &Competition, rng: &mut ThreadRng) -> Vec<Game> {
+        self.draw_teams(teams, rng);
         let matchdays = self.generate_matchdays(comp);
-        return assign_dates(matchdays, &db_string_to_date(start), &db_string_to_date(end), comp, false);
+        return assign_dates(matchdays, &db_string_to_date(start), &db_string_to_date(end), comp, false, rng);
     }
 
     // Draw the pairs for the round.
-    fn draw_teams(&mut self, teams: &[TeamCompData]) {
+    fn draw_teams(&mut self, teams: &[TeamCompData], rng: &mut ThreadRng) {
         let mut pots = self.create_pots_and_pairs(teams);
 
-        let mut rng = rng();
         for pair in self.pairs.iter_mut() {
             let last_index = pots.len() - 1;
 
@@ -51,8 +50,8 @@ impl KnockoutRound {
             };
 
             // Draw the teams for the pair.
-            let home_id = Self::draw_team(&mut draw_pots.first_mut().unwrap().1, &mut rng);
-            let away_id = Self::draw_team(&mut draw_pots.last_mut().unwrap().1, &mut rng);
+            let home_id = Self::draw_team(&mut draw_pots.first_mut().unwrap().1, rng);
+            let away_id = Self::draw_team(&mut draw_pots.last_mut().unwrap().1, rng);
 
             pair.home = TeamCompData::build(home_id, draw_pots.first().unwrap().0);
             pair.away = TeamCompData::build(away_id, draw_pots.last().unwrap().0);
@@ -144,11 +143,11 @@ pub struct KnockoutPair {
 impl KnockoutPair {
     // Build the element.
     fn build(home: TeamCompData, away: TeamCompData) -> Self {
-        let mut pair = Self::default();
-        pair.home = home;
-        pair.away = away;
-
-        return pair;
+        Self {
+            home: home,
+            away: away,
+            ..Default::default()
+        }
     }
 
     // Get nice JSON for comp screen.

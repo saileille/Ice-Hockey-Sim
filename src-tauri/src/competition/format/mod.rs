@@ -29,10 +29,12 @@ pub struct Format {
 impl Format {
     // Build a Format element.
     pub fn build(round_robin: Option<RoundRobinFormat>, knockout_round: Option<KnockoutRoundFormat>, match_rules: MatchRules) -> Option<Self> {
-        let mut format = Self::default();
-        format.round_robin = round_robin;
-        format.knockout_round = knockout_round;
-        format.match_rules = match_rules;
+        let mut format = Self {
+            round_robin: round_robin,
+            knockout_round: knockout_round,
+            match_rules: match_rules,
+            ..Default::default()
+        };
 
         // Set the stage type. Only one of round_robin and knockout can be defined.
         if format.round_robin.is_some() {

@@ -52,11 +52,11 @@ pub struct Position {
 
 impl Position {
     pub fn build(id: PositionId, abbreviation: &str, offensive_value: u8) -> Self {
-        let mut position = Position::default();
-        position.id = id;
-        position.abbreviation = abbreviation.to_string();
-        position.offensive_value = offensive_value;
-        return position;
+        Self {
+            id: id,
+            abbreviation: abbreviation.to_string(),
+            offensive_value: offensive_value,
+        }
     }
 
     pub fn fetch_from_db(id: &PositionId) -> Self {

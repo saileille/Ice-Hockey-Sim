@@ -1,5 +1,5 @@
 // Events used for game logic, with likelihoods of something happening or not.
-use rand::Rng;
+use rand::{Rng, rngs::ThreadRng};
 
 use crate::database;
 
@@ -20,12 +20,11 @@ pub struct Type {
 
 impl Type {    // Basics.
     pub fn build(min_boundary: f64, equilibrium: f64, max_boundary: f64) -> Self {
-        let mut event = Type::default();
-        event.min_boundary = min_boundary;
-        event.equilibrium = equilibrium;
-        event.max_boundary = max_boundary;
-
-        return event;
+        Self {
+            min_boundary: min_boundary,
+            equilibrium: equilibrium,
+            max_boundary: max_boundary,
+        }
     }
 
     // Fetch the EventType from the database.
@@ -62,8 +61,7 @@ impl Type {
     }
 
     // Get an outcome of the event that is either true or false.
-    pub fn get_outcome(&mut self, modifier: f64) -> bool {
-        let mut rng = rand::rng();
+    pub fn get_outcome(&mut self, modifier: f64, rng: &mut ThreadRng) -> bool {
         return rng.random_bool(self.calculate_likelihood(modifier))
     }
 }

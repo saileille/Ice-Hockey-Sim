@@ -2,9 +2,9 @@
 
 use std::{cmp::Ordering, collections::HashMap};
 
-use rand::{rng, seq::IndexedRandom};
+use rand::{rngs::ThreadRng, seq::IndexedRandom};
 
-use crate::{competition::{format, season::{team::TeamCompData, Season}, Competition}, team::Team};
+use crate::{competition::{format, season::{team::TeamCompData, Season}, Competition}};
 
 // What ranking criteria a competition has.
 #[derive(Debug, serde::Serialize)]
@@ -31,66 +31,65 @@ pub enum RankCriteria {
     Random,
 }
 
-type CmpFunc = fn (&TeamCompData, &TeamCompData, &Option<format::round_robin::RoundRobin>) -> Ordering;
+type CmpFunc = fn (&TeamCompData, &TeamCompData, &Option<format::round_robin::RoundRobin>, &mut ThreadRng) -> Ordering;
 
 // Compare functions here.
 
-fn compare_seed(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
+fn compare_seed(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>, _rng: &mut ThreadRng) -> Ordering {
     a.seed.cmp(&b.seed)
 }
 
-fn compare_points(a: &TeamCompData, b: &TeamCompData, rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
+fn compare_points(a: &TeamCompData, b: &TeamCompData, rr: &Option<format::round_robin::RoundRobin>, _rng: &mut ThreadRng) -> Ordering {
     b.get_points(rr).cmp(&a.get_points(rr))
 }
 
-fn compare_goal_difference(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
+fn compare_goal_difference(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>, _rng: &mut ThreadRng) -> Ordering {
     b.get_goal_difference().cmp(&a.get_goal_difference())
 }
 
-fn compare_goals_scored(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
+fn compare_goals_scored(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>, _rng: &mut ThreadRng) -> Ordering {
     b.goals_scored.cmp(&a.goals_scored)
 }
 
-fn compare_goals_conceded(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
+fn compare_goals_conceded(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>, _rng: &mut ThreadRng) -> Ordering {
     a.goals_conceded.cmp(&b.goals_conceded)
 }
 
-fn compare_regular_wins(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
+fn compare_regular_wins(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>, _rng: &mut ThreadRng) -> Ordering {
     b.regular_wins.cmp(&a.regular_wins)
 }
 
-fn compare_total_wins(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
+fn compare_total_wins(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>, _rng: &mut ThreadRng) -> Ordering {
     b.get_wins().cmp(&a.get_wins())
 }
 
-fn compare_overtime_wins(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
+fn compare_overtime_wins(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>, _rng: &mut ThreadRng) -> Ordering {
     b.ot_wins.cmp(&a.ot_wins)
 }
 
-fn compare_draws(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
+fn compare_draws(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>, _rng: &mut ThreadRng) -> Ordering {
     b.draws.cmp(&a.draws)
 }
 
-fn compare_overtime_losses(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
+fn compare_overtime_losses(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>, _rng: &mut ThreadRng) -> Ordering {
     b.ot_losses.cmp(&a.ot_losses)
 }
 
-fn compare_regular_losses(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
+fn compare_regular_losses(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>, _rng: &mut ThreadRng) -> Ordering {
     a.regular_losses.cmp(&b.regular_losses)
 }
 
-fn compare_total_losses(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
+fn compare_total_losses(a: &TeamCompData, b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>, _rng: &mut ThreadRng) -> Ordering {
     a.get_losses().cmp(&b.get_losses())
 }
 
-fn compare_child_comp_ranking(_a: &TeamCompData, _b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
+fn compare_child_comp_ranking(_a: &TeamCompData, _b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>, _rng: &mut ThreadRng) -> Ordering {
     // TODO... maybe
     Ordering::Equal
 }
 
-fn compare_random(_a: &TeamCompData, _b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>) -> Ordering {
-    let mut rng = rng();
-    *[Ordering::Greater, Ordering::Less].choose(&mut rng).unwrap()
+fn compare_random(_a: &TeamCompData, _b: &TeamCompData, _rr: &Option<format::round_robin::RoundRobin>, rng: &mut ThreadRng) -> Ordering {
+    *[Ordering::Greater, Ordering::Less].choose(rng).unwrap()
 }
 
 // Get the available sort functions.
@@ -116,29 +115,29 @@ pub fn get_sort_functions() -> HashMap<RankCriteria, CmpFunc> {
 impl Season {
     // Get the teams in the order of betterhood.
     // Return a boolean for whether any sorting was done.
-    pub fn rank_teams(&mut self, comp: &Competition) -> bool {
+    pub fn rank_teams(&mut self, comp: &Competition, rng: &mut ThreadRng) -> bool {
         if self.round_robin.is_some() {
-            comp.sort_some_teams(&mut self.teams);
+            comp.sort_some_teams(&mut self.teams, rng);
             return true;
         }
         else if self.knockout_round.is_some() {
-            return self.sort_knockout_round(comp);
+            return self.sort_knockout_round(comp, rng);
         }
 
         // Parent competition stuff here...
         // For now, it only does ChildCompRanking.
         else {
-            return self.sort_child_competitions(comp);
+            return self.sort_child_competitions(comp, rng);
         }
     }
 
     // Sort a knockout round.
-    fn sort_knockout_round(&mut self, comp: &Competition) -> bool {
+    fn sort_knockout_round(&mut self, comp: &Competition, rng: &mut ThreadRng) -> bool {
         let mut sorted_teams = self.knockout_round.as_ref().unwrap().advanced_teams.clone();
         let mut eliminated_teams = self.knockout_round.as_ref().unwrap().eliminated_teams.clone();
 
-        comp.sort_some_teams(&mut sorted_teams);
-        comp.sort_some_teams(&mut eliminated_teams);
+        comp.sort_some_teams(&mut sorted_teams, rng);
+        comp.sort_some_teams(&mut eliminated_teams, rng);
 
         sorted_teams.append(&mut eliminated_teams);
         if sorted_teams.len() >= self.teams.len() {
@@ -149,13 +148,13 @@ impl Season {
     }
 
     // Sort child competitions and determine the ranking based on them.
-    fn sort_child_competitions(&mut self, comp: &Competition) -> bool {
+    fn sort_child_competitions(&mut self, comp: &Competition, rng: &mut ThreadRng) -> bool {
         let mut ranks = Vec::new();
         for id in comp.child_comp_ids.iter() {
             let child_comp = Competition::fetch_from_db(id);
             let mut season = Season::fetch_from_db(id, self.index);
 
-            let sorted = season.rank_teams(&child_comp);
+            let sorted = season.rank_teams(&child_comp, rng);
             if sorted {
                 ranks.push(season.teams.clone());
             }

@@ -3,9 +3,10 @@ mod ai;
 
 use rand::{rngs::ThreadRng, Rng};
 use serde_json::json;
+use time::Date;
 
 use crate::{
-    database::PLAYERS, person::attribute::PersonAttribute, types::{AttributeValue, PlayerId, TeamId}
+    database::PLAYERS, person::{Gender, attribute::{AttributeId, PersonAttribute}}, time::date_to_db_string, types::{AttributeValue, PlayerId, TeamId}
 };
 use super::Person;
 use self::position::{Position, PositionId};
@@ -29,31 +30,41 @@ impl Player {
         };
     }
 
-    fn build(person: Person, ability: AttributeValue, position_id: PositionId) -> Self {
-        let mut player = Self::default();
-        player.person = person;
-        player.ability = PersonAttribute::build(super::attribute::AttributeId::General, ability);
-        player.position_id = position_id;
-
-        return player;
+    fn build(person: Person, position_id: PositionId) -> Self {
+        Self {
+            person: person,
+            ability: PersonAttribute::build(AttributeId::General, 0),
+            position_id: position_id,
+            ..Default::default()
+        }
     }
 
     // Create a player and store it in the database. Return a clone of the Player.
-    pub fn build_and_save(person: Person, ability: AttributeValue, position_id: PositionId) -> Self {
-        let mut player = Self::build(person, ability, position_id);
-        player.create_id(PLAYERS.lock().unwrap().len() + 1);
+    pub fn build_and_save(today: &Date, rng: &mut ThreadRng, min_age: u8, max_age: u8) -> Self {
+        let player = Self::create(today, rng, min_age, max_age);
         player.save();
         return player;
     }
 
-    // Just like build and save, but no arguments.
-    pub fn build_and_save_random(rng: &mut ThreadRng) -> Self {
-        let person = Person::build_random();
-
-        let ability = rng.random_range(0..=u16::MAX);
+    // Just like build and save, but minimal arguments.
+    pub fn create(today: &Date, rng: &mut ThreadRng, min_age: u8, max_age: u8) -> Self {
+        let person = Person::create(today, rng, min_age, max_age, Gender::Male);
         let position_id = PositionId::get_random(rng);
 
-        return Self::build_and_save(person, ability, position_id);
+        let mut player = Self::build(person, position_id);
+        player.create_ability(today, rng);
+        player.create_id(PLAYERS.lock().unwrap().len() + 1);
+
+        return player;
+    }
+
+    // Create the ability of a player during its generation.
+    // Simulate the player's training for every day of their life so far.
+    fn create_ability(&mut self, today: &Date, rng: &mut ThreadRng) {
+        let days = self.person.get_age_days(today);
+        for i in 0..days {
+            self.train(rng, i);
+        }
     }
 
     // Get a player from the database.
@@ -71,13 +82,6 @@ impl Player {
         PLAYERS.lock().unwrap().remove(&self.id);
     }
 
-    // Check if the player in question is not the default placeholder.
-    pub fn is_valid(&self) -> bool {
-        self.id != 0 &&
-        self.person.is_valid() &&
-        self.position_id != PositionId::default()
-    }
-
     // Get a clone of the player's position.
     fn get_position(&self) -> Position {
         Position::fetch_from_db(&self.position_id)
@@ -86,7 +90,7 @@ impl Player {
     // Get all free agents from the database with given positions, which the given team has not approached yet.
     pub fn get_free_agents_for_team(positions: Vec<&PositionId>, team_id: TeamId) -> Vec<Self> {
         PLAYERS.lock().unwrap().iter().filter_map(|(_, a)| {
-            match a.person.contract.is_none() && positions.contains(&&a.position_id) {
+            match a.person.contract.is_none() && a.person.is_active && positions.contains(&&a.position_id) {
                 true => {
                     let mut team_has_offer = false;
                     for offer in a.person.contract_offers.iter() {
@@ -108,9 +112,9 @@ impl Player {
     }
 
     // Get all free agents in the game.
-    pub fn get_all_free_agents_package() -> serde_json::Value {
+    pub fn get_all_free_agents_package(today: &Date) -> serde_json::Value {
         let mut players: Vec<Self> = PLAYERS.lock().unwrap().iter().filter_map(|(_, a)| {
-            match a.person.contract.is_none() {
+            match a.person.contract.is_none() && a.person.is_active {
                 true => Some(a.clone()),
                 _ => None
             }
@@ -123,53 +127,28 @@ impl Player {
             .then(a.person.forename.cmp(&b.person.forename))
         );
 
-        players.iter().map(|a| a.get_player_search_package()).collect()
+        players.iter().map(|a| a.get_package(today)).collect()
     }
 
-    // Get relevant information of the player for team screen.
-    pub fn get_team_screen_package(&self) -> serde_json::Value {
-        let seasons_left = match self.person.contract.as_ref() {
-            Some(contract) => contract.get_seasons_left(),
-            _ => 0
-        };
-
-        json!({
-            "id": self.id,
-            "name": self.person.get_full_name(),
-            "country": self.person.get_country().name,
-            "position": self.get_position().abbreviation,
-            "ability": self.ability.get_display(),
-            "seasons_left": seasons_left,
-        })
-    }
-
-    // Get relevant information of the player for the player screen.
-    pub fn get_player_screen_package(&self) -> serde_json::Value {
+    // Get relevant information of the player.
+    pub fn get_package(&self, today: &Date) -> serde_json::Value {
         let contract = match self.person.contract.as_ref() {
-            Some(contract) => Some(contract.get_person_screen_json()),
+            Some(contract) => Some(contract.get_package(today)),
             _ => None
         };
 
-        let contract_offers: Vec<serde_json::Value> = self.person.contract_offers.iter().map(|a| a.get_person_screen_json()).collect();
+        let contract_offers: Vec<serde_json::Value> = self.person.contract_offers.iter().map(|a| a.get_package(today)).collect();
 
-        json!({
-            "name": self.person.get_full_name(),
-            "country": self.person.get_country().name,
-            "position": self.get_position().abbreviation,
-            "ability": self.ability.get_display(),
-            "contract": contract,
-            "offers": contract_offers
-        })
-    }
-
-    pub fn get_player_search_package(&self) -> serde_json::Value {
-        let contract_offers: Vec<serde_json::Value> = self.person.contract_offers.iter().map(|a| a.get_person_screen_json()).collect();
         json!({
             "id": self.id,
             "name": self.person.get_full_name(),
             "country": self.person.get_country().name,
             "position": self.get_position().abbreviation,
+            "age": self.person.get_age_years(today),
+            "birthday": date_to_db_string(&self.person.birthday),
             "ability": self.ability.get_display(),
+            "real_ability": self.ability.get(),
+            "contract": contract,
             "offers": contract_offers
         })
     }
@@ -181,5 +160,15 @@ impl Player {
             "id": self.id,
             "in_roster": in_roster,
         })
+    }
+
+    // The daily training of the player.
+    pub fn daily_training(&mut self, today: &Date, rng: &mut ThreadRng) {
+        self.train(rng, self.person.get_age_days(today));
+    }
+
+    // Do the training (also used in player generation).
+    fn train(&mut self, rng: &mut ThreadRng, age_days: u16) {
+        self.ability.update(age_days, rng);
     }
 }

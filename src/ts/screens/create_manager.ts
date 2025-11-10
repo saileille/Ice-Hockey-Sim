@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { createTopLevelCompSelect, initialiseContentScreen, updateTopBar} from "./basics";
 import { createElement, createEventListener, linkListener } from "../helpers";
 import { drawScreen as drawHomeScreen } from "./home";
-import { Listener } from "../types";
+import { Listener } from "../types/dom";
 
 // Draw the thing.
 const drawScreen = async () => {

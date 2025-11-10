@@ -2,6 +2,7 @@ pub mod event;
 pub mod team;
 mod cache;
 
+use rand::rngs::ThreadRng;
 use serde_json::json;
 
 use crate::{
@@ -38,14 +39,13 @@ pub struct Game {
 // Basics.
 impl Game {
     pub fn build(home: &TeamCompData, away: &TeamCompData, comp_id: CompetitionId, date: &str) -> Self {
-        let mut game = Game::default();
-        game.home = TeamGameData::build(home);
-        game.away = TeamGameData::build(away);
-        game.clock = Clock::default();
-        game.comp_id = comp_id;
-        game.date = date.to_string();
-
-        return game;
+        Self {
+            home: TeamGameData::build(home),
+            away: TeamGameData::build(away),
+            comp_id: comp_id,
+            date: date.to_string(),
+            ..Default::default()
+        }
     }
 
     // Make sure the game does not contain illegal values.
@@ -124,64 +124,64 @@ impl Game {
     }
 
     // Play the game.
-    pub fn play(&mut self) {
+    pub fn play(&mut self, rng: &mut ThreadRng) {
         self.do_pre_game_tasks();
-        self.simulate();    // The actual game is played here.
+        self.simulate(rng);    // The actual game is played here.
         self.do_post_game_tasks();
     }
 
     // Simulate a game of ice hockey.
-    fn simulate(&mut self) {
+    fn simulate(&mut self, rng: &mut ThreadRng) {
         // Regular time.
         while !self.is_regular_time_over() {
-            self.simulate_regular_period();
+            self.simulate_regular_period(rng);
         }
 
         // Overtime.
         while !self.is_overtime_over() {
-            self.simulate_overtime_period();
+            self.simulate_overtime_period(rng);
         }
     }
 
     // Simulate a period of ice hockey.
-    fn simulate_regular_period(&mut self) {
+    fn simulate_regular_period(&mut self, rng: &mut ThreadRng) {
         while !self.is_period_over() {
-            self.simulate_second();
+            self.simulate_second(rng);
         }
 
         self.clock.next_period();
     }
 
-    fn simulate_overtime_period(&mut self) {
+    fn simulate_overtime_period(&mut self, rng: &mut ThreadRng) {
         while !self.is_overtime_period_over() {
-            self.simulate_second();
+            self.simulate_second(rng);
         }
 
         self.clock.next_period();
     }
 
     // Simulate a second of ice hockey.
-    fn simulate_second(&mut self) {
-        self.change_players_on_ice();
-        self.change_puck_possession();
-        Self::attempt_shot(&mut self.home, &mut self.away, &self.clock, self.cache.as_ref().unwrap(), &self.attacker);
+    fn simulate_second(&mut self, rng: &mut ThreadRng) {
+        self.change_players_on_ice(rng);
+        self.change_puck_possession(rng);
+        Self::attempt_shot(&mut self.home, &mut self.away, &self.clock, self.cache.as_ref().unwrap(), &self.attacker, rng);
 
         self.clock.advance();
     }
 
     // Change the players on ice for home and away teams.
-    fn change_players_on_ice(&mut self) {
-        self.cache.as_mut().unwrap().home.lineup.change_players_on_ice();
-        self.cache.as_mut().unwrap().away.lineup.change_players_on_ice();
+    fn change_players_on_ice(&mut self, rng: &mut ThreadRng) {
+        self.cache.as_mut().unwrap().home.lineup.change_players_on_ice(rng);
+        self.cache.as_mut().unwrap().away.lineup.change_players_on_ice(rng);
     }
 
     // Change which team has the puck.
-    fn change_puck_possession(&mut self) {
+    fn change_puck_possession(&mut self, rng: &mut ThreadRng) {
         let modifier = self.cache.as_ref().unwrap().home.lineup.players_on_ice.get_skaters_ability_ratio(
             &self.cache.as_ref().unwrap().away.lineup.players_on_ice
         );
 
-        if logic_event::Type::fetch_from_db(&logic_event::Id::PuckPossessionChange).get_outcome(modifier) {
+        if logic_event::Type::fetch_from_db(&logic_event::Id::PuckPossessionChange).get_outcome(modifier, rng) {
             self.attacker = Attacker::Home;
         }
         else {
@@ -190,8 +190,7 @@ impl Game {
     }
 
     // The attacking team attempts to shoot the puck.
-    // fn attempt_shot(&mut self) {
-    fn attempt_shot(home: &mut TeamGameData, away: &mut TeamGameData, clock: &Clock, cache: &GameCache, attacker: &Attacker) {
+    fn attempt_shot(home: &mut TeamGameData, away: &mut TeamGameData, clock: &Clock, cache: &GameCache, attacker: &Attacker, rng: &mut ThreadRng) {
         let (attacker, defender) = match attacker {
             Attacker::Home => (&cache.home, &cache.away),
             Attacker::Away => (&cache.away, &cache.home),
@@ -202,10 +201,10 @@ impl Game {
             &defender.lineup.players_on_ice
         );
 
-        let success = logic_event::Type::fetch_from_db(&logic_event::Id::ShotAtGoal).get_outcome(modifier);
+        let success = logic_event::Type::fetch_from_db(&logic_event::Id::ShotAtGoal).get_outcome(modifier, rng);
 
         if success {
-            let shot = Shot::simulate(clock.clone(), &attacker.lineup.players_on_ice, &defender.lineup.players_on_ice);
+            let shot = Shot::simulate(clock.clone(), &attacker.lineup.players_on_ice, &defender.lineup.players_on_ice, rng);
 
             if home.team_id == attacker.team.id {
                 home.shots.push(shot);
@@ -397,7 +396,7 @@ pub struct Rules {
 // Basics.
 impl Rules {
     pub fn build(periods: u8, period_length: u16, overtime_length: u16, continous_overtime: bool) -> Self {
-        Rules {
+        Self {
             periods: periods,
             period_length: period_length,
             overtime_length: overtime_length,
@@ -429,7 +428,7 @@ pub struct Clock {
 // Basics.
 impl Clock {
     fn build(periods_completed: u8, seconds: u16) -> Self {
-        Clock {
+        Self {
             periods_completed: periods_completed,
             period_total_seconds: seconds,
         }

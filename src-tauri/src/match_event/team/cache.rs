@@ -11,9 +11,10 @@ pub struct TeamGameDataCache {
 
 impl TeamGameDataCache {
     pub fn build(team_game_data: &TeamGameData) -> Self {
-        let mut cache = Self::default();
-        cache.team = Team::fetch_from_db(&team_game_data.team_id);
-        return cache;
+        Self {
+            team: Team::fetch_from_db(&team_game_data.team_id),
+            ..Default::default()
+        }
     }
 
     pub fn build_lineup(&mut self, lineup: &LineUp) {

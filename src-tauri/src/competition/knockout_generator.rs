@@ -1,8 +1,8 @@
 // Functions for generating knockout competitions.
 
 use ordinal::ToOrdinal as _;
-use rand::{rng, Rng};
-use time::Duration;
+use rand::{Rng, rngs::ThreadRng};
+use time::{Date, Duration};
 
 use crate::{competition::{self, CompConnection, Competition, Seed, format::{self, knockout_round::KnockoutRound as KnockoutRoundFormat}, season::ranking::RankCriteria}, match_event, time::{AnnualDate, AnnualWindow, get_dates}, types::{CompetitionId, convert}};
 
@@ -16,16 +16,16 @@ pub fn build(
     mut teams_in_rounds: Vec<u8>,   // Number of teams the knockout competition has on each round.
     teams_at_end: u8,   // Number of teams the knockout competition ends with.
     connections: Vec<CompConnection>,    // Connections to other competitions; where to move which teams after the knockout is over.
-    rank_criteria: Vec<RankCriteria>
+    rank_criteria: Vec<RankCriteria>, today: &Date, rng: &mut ThreadRng
 ) {
-    let mut parent_comp = Competition::build_and_save(name, Vec::new(), season_window, connections, teams_in_rounds[0], None, Vec::new(), Vec::new());
+    let mut parent_comp = Competition::build_and_save(name, Vec::new(), season_window, connections, teams_in_rounds[0], None, Vec::new(), Vec::new(), today);
     parent_comp.competition_type = competition::Type::Tournament;
 
     get_teams_in_rounds(&mut teams_in_rounds, teams_at_end);
     let mut rounds = create_rounds(round_names, match_rules, wins_required, teams_in_rounds, rank_criteria, parent_comp.id);
 
-    set_date_boundaries(&mut rounds, &parent_comp.season_window);
-    finalise_rounds(&mut parent_comp, &mut rounds);
+    set_date_boundaries(&mut rounds, &parent_comp.season_window, rng);
+    finalise_rounds(&mut parent_comp, &mut rounds, today);
 }
 
 // Get how many teams each round should actually have.
@@ -96,12 +96,12 @@ fn assign_default_name(round: &mut Competition, round_index: usize, total_rounds
 }
 
 // Give each round's games a proportionate time window.
-fn set_date_boundaries(rounds: &mut Vec<Competition>, season_duration: &AnnualWindow) {
+fn set_date_boundaries(rounds: &mut Vec<Competition>, season_duration: &AnnualWindow, rng: &mut ThreadRng) {
     // Let's get our example dates from a year that was not a leap year.
     let (start_date, end_date) = season_duration.get_dates_from_start_year(1900);
     let available_days = get_dates(&start_date, &end_date);
 
-    let round_durations = get_round_durations(rounds, convert::usize_to_u8(available_days.len()));
+    let round_durations = get_round_durations(rounds, convert::usize_to_u8(available_days.len()), rng);
 
     // Starting from one day backwards.
     let mut last_date = available_days[0].checked_sub(Duration::days(1)).unwrap();
@@ -119,7 +119,7 @@ fn set_date_boundaries(rounds: &mut Vec<Competition>, season_duration: &AnnualWi
 }
 
 // Get a duration for each round in the knockout stage.
-fn get_round_durations(rounds: &[Competition], days: u8) -> Vec<u8> {
+fn get_round_durations(rounds: &[Competition], days: u8, rng: &mut ThreadRng) -> Vec<u8> {
     let matches_in_rounds: Vec<f64> = rounds.iter().map(|round| round.format.as_ref().unwrap().knockout_round.as_ref().unwrap().get_maximum_matches_in_pair() as f64).collect();
     let total_matches: f64 = matches_in_rounds.iter().sum();
 
@@ -132,7 +132,6 @@ fn get_round_durations(rounds: &[Competition], days: u8) -> Vec<u8> {
 
     // Assign the leftovers randomly.
     let mut round_indexes: Vec<usize> = (0..rounds.len()).collect();
-    let mut rng = rng();
     while leftover_dates > 0 {
         let index = round_indexes.swap_remove(rng.random_range(0..round_indexes.len()));
         round_durations[index] += 1;
@@ -151,13 +150,13 @@ fn get_from_index_or_last<T: Clone>(vector: &[T], index: usize) -> T {
 }
 
 // Finalise the rounds.
-fn finalise_rounds(parent_comp: &mut Competition, rounds: &mut Vec<Competition>) {
+fn finalise_rounds(parent_comp: &mut Competition, rounds: &mut Vec<Competition>, today: &Date) {
     let rounds_clone = rounds.clone();
     let mut connections = vec![0; rounds.len()];
 
     let teams = Vec::new();
     for (i, round) in rounds.iter_mut().enumerate() {
-        round.save_new(&teams);
+        round.save_new(&teams, today);
         parent_comp.child_comp_ids.push(round.id);
 
         if i == rounds_clone.len() - 1 { continue; }

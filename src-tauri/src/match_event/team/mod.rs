@@ -16,10 +16,11 @@ pub struct TeamGameData {
 
 impl TeamGameData { // Basics.
     pub fn build(team: &TeamCompData) -> Self {
-        let mut team_data = TeamGameData::default();
-        team_data.team_id = team.team_id;
-        team_data.team_seed = team.seed;
-        return team_data;
+        Self {
+            team_id: team.team_id,
+            team_seed: team.seed,
+            ..Default::default()
+        }
     }
 
     // Make sure the TeamData does not contain illegal values.

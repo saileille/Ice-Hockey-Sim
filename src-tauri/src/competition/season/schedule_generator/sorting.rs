@@ -1,16 +1,8 @@
 // Functions and methods for sorting and comparing teams when generating matches.
-use std::{
-    collections::HashMap,
-    cmp::Ordering
-};
-use rand::{
-    rngs::ThreadRng,
-    seq::SliceRandom
-};
+use std::{collections::HashMap, cmp::Ordering};
+use rand::{rngs::ThreadRng, seq::SliceRandom};
 
-use crate::{
-    competition::{format::round_robin::MatchGenType, season::schedule_generator::TeamScheduleData}, types::{convert, TeamId}
-};
+use crate::{competition::{format::round_robin::MatchGenType, season::schedule_generator::TeamScheduleData}, types::{convert, TeamId}};
 
 // The type that pieces of sort functions use.
 type CmpFunc = fn (&TeamScheduleData, &TeamScheduleData, &TeamScheduleData, &TeamScheduleData) -> Ordering;

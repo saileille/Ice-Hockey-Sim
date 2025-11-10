@@ -1,9 +1,6 @@
 // The game database.
-use std::{
-    collections::HashMap,
-    sync::{LazyLock, Mutex}
-};
-use rand::rng;
+use std::{collections::HashMap, sync::{LazyLock, Mutex}};
+use rand::rngs::ThreadRng;
 use time::{macros::date, Date};
 use lazy_static::lazy_static;
 
@@ -67,7 +64,7 @@ lazy_static! {
                 AttributeId::Faceoffs, 0
             )),
             (AttributeId::General, Attribute::build(
-                AttributeId::General, 0
+                AttributeId::General, 26
             )),
         ])
     };
@@ -91,7 +88,9 @@ lazy_static! {
 
 // Initialise the database.
 pub fn initialise() {
-    add_competition_data();
+    let today = TODAY.lock().unwrap().clone();
+    let mut rng = rand::rng();
+    add_competition_data(&today, &mut rng);
 
     let comps = COMPETITIONS.lock().unwrap().clone();
     for comp in comps.values() {
@@ -100,7 +99,7 @@ pub fn initialise() {
 
         // Set up seasons, starting from the top level.
         if comp.parent_comp_id == 0 {
-            comp.setup_season(&mut Vec::new());
+            comp.setup_season(&mut Vec::new(), & mut rng);
         }
     }
 
@@ -111,22 +110,21 @@ pub fn initialise() {
     }
 
     // Generate 50 players per team.
-    let mut rng = rng();
     for _ in 0..TEAMS.lock().unwrap().len() * 50 {
-        Player::build_and_save_random(&mut rng);
+        Player::build_and_save(&today, &mut rng, 16, 40);
     }
 
     // Set up the teams.
     let mut teams = TEAMS.lock().unwrap().clone();
     for team in teams.values_mut() {
-        team.setup(0, 0);
+        team.setup(&today, &mut rng);
     }
 }
 
 // Add competitions.
 // NOTE: Season window of the parent competition MUST go at least one day past the last day of the last stage.
 // Otherwise some contracts might expire before the last match day is played.
-fn add_competition_data() {
+fn add_competition_data(today: &Date, rng: &mut ThreadRng) {
     // 1: Liiga
     Competition::build_and_save(
         "PHL",
@@ -154,7 +152,8 @@ fn add_competition_data() {
         0,
         None,
         vec![RankCriteria::ChildCompRanking],
-        vec![2, 3]
+        vec![2, 3],
+        today
     );
     // 2: Liiga Regular Season.
     Competition::build_and_save(
@@ -181,7 +180,8 @@ fn add_competition_data() {
             RankCriteria::Draws,
             RankCriteria::RegularLosses,
         ],
-        Vec::new()
+        Vec::new(),
+        today
     );
     // 3: Liiga Playoffs.
     knockout_generator::build(
@@ -196,6 +196,8 @@ fn add_competition_data() {
         vec![10],
         1,
         Vec::new(),
-        vec![RankCriteria::Seed]
+        vec![RankCriteria::Seed],
+        today,
+        rng
     );
 }

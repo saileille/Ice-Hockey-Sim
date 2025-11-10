@@ -27,10 +27,11 @@ pub struct TeamCompData {
 // Basics.
 impl TeamCompData {
     pub fn build(team_id: TeamId, seed: u8) -> Self {
-        let mut teamdata = Self::default();
-        teamdata.team_id = team_id;
-        teamdata.seed = seed;
-        return teamdata;
+        Self {
+            team_id: team_id,
+            seed: seed,
+            ..Default::default()
+        }
     }
 
     // Get the team element tied to this TeamData.

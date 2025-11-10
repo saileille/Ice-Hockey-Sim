@@ -1,8 +1,9 @@
 // Player-related AI.
 
+use rand::{Rng, rngs::ThreadRng};
 use time::Date;
 
-use crate::{person::{player::Player, Contract}, team::{lineup::cache::LineUpCache, Team}, time::date_to_db_string};
+use crate::{person::{Contract, player::Player}, team::{Team, lineup::cache::LineUpCache}, time::date_to_db_string, types::TeamId};
 
 impl Player {
     // Sign a given contract.
@@ -16,35 +17,54 @@ impl Player {
         team.approached_players.retain(|id| *id != self.id);
         team.save();
 
+        self.reject_contracts();
+        self.person.contract_offers.clear();
+    }
+
+    // Remove the player from all approached teams' player lists.
+    pub fn reject_contracts(&self) {
         for offer in self.person.contract_offers.iter() {
             self.reject_contract(offer);
         }
-
-        self.person.contract_offers.clear();
     }
 
     // Choose a contract to sign, if any.
     // This method assumes there are existing contract offers.
-    pub fn choose_contract(&mut self, today: &Date) {
+    pub fn choose_contract(&mut self, today: &Date, rng: &mut ThreadRng) {
         let mut offers: Vec<(f64, &Contract)> = self.person.contract_offers.iter().map(|a| (self.evaluate_offer(a), a)).collect();
         offers.sort_by(|a, b| b.0.total_cmp(&a.0));
 
         // If even the best offer is unacceptable, all should be rejected.
         if offers[0].0 <= 0.0 {
-            let mut rejected = Vec::new();
-            for offer in self.person.contract_offers.iter() {
-                self.reject_contract(offer);
-                rejected.push(offer.get_team());
-            }
+            self.reject_contracts();
             self.person.contract_offers.clear();
             return;
         }
 
-        let team_id = offers[0].1.team_id;
+        let team_id = Self::get_best_offer(&offers, rng);
         let index = self.person.contract_offers.iter().position(|a| a.team_id == team_id).unwrap();
 
         let contract = self.person.contract_offers.swap_remove(index);
         self.sign_contract(contract, today);
+    }
+
+    // Return the ID of the team whose offer was most pleasing to the player.
+    fn get_best_offer(offers: &[(f64, &Contract)], rng: &mut ThreadRng) -> TeamId {
+        let mut best_offers = Vec::new();
+
+        let mut best_attraction = 0.0;
+        for (attraction, offer) in offers.iter() {
+            if best_offers.is_empty() {
+                best_attraction = *attraction;
+                best_offers.push(offer.team_id);
+            }
+            else if best_attraction == *attraction {
+                best_offers.push(offer.team_id);
+            }
+        }
+
+        let i = rng.random_range(0..best_offers.len());
+        return best_offers[i];
     }
 
     // Evaluate a contract offer.
@@ -94,23 +114,31 @@ impl Player {
 
     // Check if any contract offers for the player have expired.
     // Return if there are changes to the player.
-    pub fn check_expired_offers(&mut self) -> bool {
-        let mut expired = false;
+    pub fn check_expired_offers(&mut self, today: &Date) {
         let mut expired_indexes = Vec::new();
         for (i, offer) in self.person.contract_offers.iter().enumerate() {
-            if offer.check_if_expired() {
+            if offer.check_if_expired(today) {
                 self.reject_contract(offer);
                 expired_indexes.push(i);
             }
         }
 
         if !expired_indexes.is_empty() {
-            expired = true;
             for index in expired_indexes.iter().rev() {
                 self.person.contract_offers.remove(*index);
             }
         }
+    }
 
-        return expired;
+    // The player checks if they are going to retire.
+    pub fn retires(&self, rng: &mut ThreadRng) -> bool {
+        // A player under contract or receiving offers will never retire.
+        if self.person.contract.is_some() ||
+        !self.person.contract_offers.is_empty() {
+            return false;
+        }
+
+        // 1 in 2000 chance to retire.
+        return rng.random_bool(0.0005);
     }
 }

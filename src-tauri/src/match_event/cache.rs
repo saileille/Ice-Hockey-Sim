@@ -12,12 +12,11 @@ pub struct GameCache {
 
 impl GameCache {
     pub fn build(home: &TeamGameData, away: &TeamGameData, rules: &match_event::Rules) -> Self {
-        let mut cache = Self::default();
-        cache.home = TeamGameDataCache::build(home);
-        cache.away = TeamGameDataCache::build(away);
-        cache.rules = rules.clone();
-
-        return cache;
+        Self {
+            home: TeamGameDataCache::build(home),
+            away: TeamGameDataCache::build(away),
+            rules: rules.clone(),
+        }
     }
 
     pub fn build_lineups(&mut self, home: &LineUp, away: &LineUp) {

@@ -5,6 +5,7 @@ pub mod knockout_round;
 pub mod ranking;
 mod schedule_generator;
 
+use rand::rngs::ThreadRng;
 use serde_json::json;
 use time::Date;
 
@@ -31,13 +32,15 @@ pub struct Season {
 
 impl Season {
     // Build an element.
-    fn build(comp: &Competition, teams: &[TeamId]) -> Self {
-        let mut season = Self::default();
-        season.comp_id = comp.id;
-        season.teams = teams.iter().map(|id | TeamCompData::build(*id, 0)).collect();
+    fn build(comp: &Competition, teams: &[TeamId], today: &Date) -> Self {
+        let mut season = Self {
+            comp_id: comp.id,
+            teams: teams.iter().map(|id | TeamCompData::build(*id, 0)).collect(),
+            ..Default::default()
+        };
 
-        let start_date = comp.season_window.get_next_start_date();
-        let end_date = comp.season_window.get_next_end_date();
+        let start_date = comp.season_window.get_next_start_date(today);
+        let end_date = comp.season_window.get_next_end_date(today);
 
         season.start_date = date_to_db_string(&start_date);
         season.end_date = date_to_db_string(&end_date);
@@ -68,8 +71,8 @@ impl Season {
 
     // Build a season and save it to the database.
     // Also build seasons for all possible child competitions.
-    pub fn build_and_save(comp: &Competition, teams: &[TeamId]) -> Self {
-        let mut season = Self::build(comp, teams);
+    pub fn build_and_save(comp: &Competition, teams: &[TeamId], today: &Date) -> Self {
+        let mut season = Self::build(comp, teams, today);
 
         season.save_new();
         return season;
@@ -137,7 +140,7 @@ impl Season {
     }
 
     // Finalise the creation of a season for a particular competition.
-    pub fn setup(&mut self, comp: &Competition) {
+    pub fn setup(&mut self, comp: &Competition, rng: &mut ThreadRng) {
         // The order of the teams becomes correct by reversing.
         self.teams.reverse();
 
@@ -146,10 +149,10 @@ impl Season {
         self.save();
 
         if self.round_robin.is_some() {
-            self.setup_round_robin(comp);
+            self.setup_round_robin(comp, rng);
         }
         else if self.knockout_round.is_some() {
-            self.setup_knockout(comp);
+            self.setup_knockout(comp, rng);
         }
 
         // In this case the competition must have child competitions, so set them up instead.
@@ -162,27 +165,27 @@ impl Season {
                     // Does not support group competitions yet.
                     teams = self.teams.clone();
                 }
-                Competition::fetch_from_db(id).setup_season(&mut teams);
+                Competition::fetch_from_db(id).setup_season(&mut teams, rng);
             }
         }
     }
 
     // Set up a round robin season.
-    fn setup_round_robin(&mut self, comp: &Competition) {
-        self.generate_schedule(comp);
+    fn setup_round_robin(&mut self, comp: &Competition, rng: &mut ThreadRng) {
+        self.generate_schedule(comp, rng);
     }
 
     // Set up a knockout season.
-    fn setup_knockout(&mut self, comp: &Competition) {
+    fn setup_knockout(&mut self, comp: &Competition, rng: &mut ThreadRng) {
         let teams = &self.teams;
         let start = &self.start_date;
         let end = &self.end_date;
 
-        self.upcoming_games = self.knockout_round.as_mut().unwrap().setup(teams, start, end, comp);
+        self.upcoming_games = self.knockout_round.as_mut().unwrap().setup(teams, start, end, comp, rng);
     }
 
     // Update the teamdata to this season and all parent competition seasons.
-    pub fn update_teamdata(&mut self, comp: &Competition, games: &[Game]) {
+    pub fn update_teamdata(&mut self, comp: &Competition, games: &[Game], rng: &mut ThreadRng) {
         for team in self.teams.iter_mut() {
             for game in games.iter() {
                 if team.team_id == game.home.team_id {
@@ -199,8 +202,8 @@ impl Season {
             self.knockout_round.as_mut().unwrap().update_teamdata(games);
         }
 
-        self.check_if_over(comp);
-        self.rank_teams(comp);
+        self.check_if_over(comp, rng);
+        self.rank_teams(comp, rng);
 
         // We are not saving the season here, because we are doing it after updating the played_games vector.
         // self.save();
@@ -210,7 +213,7 @@ impl Season {
             let parent_comp = Competition::fetch_from_db(&comp.parent_comp_id);
 
             let mut season = Season::fetch_from_db(&parent_comp.id, parent_comp.get_seasons_amount() - 1);
-            season.update_teamdata(&parent_comp, games);
+            season.update_teamdata(&parent_comp, games, rng);
             season.save();
         }
     }
@@ -228,7 +231,7 @@ impl Season {
     }
 
     // Simulate the games for this day.
-    pub fn simulate_day(&mut self, comp: &Competition, today: &Date) {
+    pub fn simulate_day(&mut self, comp: &Competition, today: &Date, rng: &mut ThreadRng) {
         let mut games = Vec::new();
 
         while !self.upcoming_games.is_empty() {
@@ -236,7 +239,7 @@ impl Season {
 
             // Play the game if it happens today.
             if db_string_to_date(&game.date) == *today {
-                game.play();
+                game.play(rng);
                 games.push(game);
             }
 
@@ -249,14 +252,14 @@ impl Season {
 
         if games.is_empty() { return; }
 
-        self.update_teamdata(comp, &games);
+        self.update_teamdata(comp, &games, rng);
         self.played_games.append(&mut games);
         self.save();
     }
 
     // Check if the season has ended, and react appropriately.
     // Return whether over or not.
-    pub fn check_if_over(&mut self, comp: &Competition) -> bool {
+    pub fn check_if_over(&mut self, comp: &Competition, rng: &mut ThreadRng) -> bool {
         // No need to do more.
         if self.is_over { return true; }
 
@@ -275,7 +278,7 @@ impl Season {
             for id in comp.child_comp_ids.iter() {
                 let child_comp = Competition::fetch_from_db(id);
                 let mut season = Season::fetch_from_db(&child_comp.id, child_comp.get_seasons_amount() - 1);
-                if !season.check_if_over(&child_comp) {
+                if !season.check_if_over(&child_comp, rng) {
                     return false;
                 }
             }
@@ -283,7 +286,7 @@ impl Season {
         }
 
         self.is_over = true;
-        self.do_post_season_tasks(comp);
+        self.do_post_season_tasks(comp, rng);
 
         self.save();
 
@@ -291,10 +294,10 @@ impl Season {
     }
 
     // Do post-season tasks for any kind of competition.
-    fn do_post_season_tasks(&mut self, comp: &Competition) {
-        self.rank_teams(comp);
+    fn do_post_season_tasks(&mut self, comp: &Competition, rng: &mut ThreadRng) {
+        self.rank_teams(comp, rng);
         for connection in comp.connections.iter() {
-            connection.send_teams(&self.teams);
+            connection.send_teams(&self.teams, rng);
         }
     }
 }

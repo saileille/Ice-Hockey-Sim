@@ -2,18 +2,10 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen } from "./basics";
-import { Contract } from "./player";
 import { createElement, createLink, extractIdFromElement } from "../helpers";
-import { HumanPackage as HumanPackage, Listener } from "../types";
-
-type Player = {
-    id: number,
-    name: string,
-    country: string,
-    position: string,
-    ability: number,
-    offers: Array<Contract>
-};
+import { Listener } from "../types/dom";
+import { Player } from "../types/player";
+import { HumanPackage } from "../types/team";
 
 type PlayerFilter = "all" | "not-approached";
 
@@ -40,6 +32,7 @@ export const drawScreen: Listener = async (_e: Event) => {
                     createElement("th", { "textContent": "Free Agents" }, []),
                     createElement("th", { "textContent": "Country" }, []),
                     createElement("th", { "textContent": "Position" }, []),
+                    createElement("th", { "textContent": "Age" }, []),
                     createElement("th", { "textContent": "Ability" }, []),
                     createElement("th", { "textContent": "No. of Offers" }, []),
                 ])
@@ -57,6 +50,7 @@ const drawPlayer = (player: Player): HTMLTableRowElement => {
         createElement("td", {}, [createLink("span", "player", player.id, player.name)]),
         createElement("td", { "textContent": player.country }, []),
         createElement("td", { "textContent": player.position }, []),
+        createElement("td", { "textContent": player.age }, []),
         createElement("td", { "textContent": player.ability }, []),
         createElement("td", { "textContent": player.offers.length }, []),
     ]);

@@ -1,9 +1,9 @@
 // Generic helper functions to alleviate the tedious verbosity.
 
-import { Query, Listener, EventType, TagName, LinkType } from "./types";
 import { drawScreen as drawTeamScreen } from "./screens/team";
 import { drawScreen as drawPlayerScreen } from "./screens/player";
 import { drawScreen as drawCompScreen } from "./screens/competition";
+import { EventType, LinkType, Listener, Query, TagName } from "./types/dom";
 
 // Do not touch anything, It Just Works™.
 export const createEventListener = (query: Query, event: EventType, listener: Listener) => {
