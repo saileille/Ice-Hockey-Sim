@@ -30,8 +30,8 @@ fn compare_home_away_abs(a: &TeamScheduleData, b: &TeamScheduleData, prev_a: &Te
 
 // Compare the match count.
 fn compare_match_count(a: &TeamScheduleData, b: &TeamScheduleData, prev_a: &TeamScheduleData, prev_b: &TeamScheduleData) -> Ordering {
-    let a_total = convert::u8_to_i8(a.get_match_count(prev_a));
-    let b_total = convert::u8_to_i8(b.get_match_count(prev_b));
+    let a_total = convert::int::<u8, i8>(a.get_match_count(prev_a));
+    let b_total = convert::int::<u8, i8>(b.get_match_count(prev_b));
 
     return a_total.cmp(&b_total);
 }

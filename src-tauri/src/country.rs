@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 use rand::{Rng, rngs::ThreadRng};
 
-use crate::{database::COUNTRIES, io::load_country_names, person::Gender, types::{CountryId, CountryNamePool}};
+use crate::{database::COUNTRIES, io::load_country_names, person::Gender, types::{CountryId, CountryNamePool, convert}};
 
 #[derive(Default, Clone)]
 pub struct Country {
@@ -11,18 +11,12 @@ pub struct Country {
     names: CountryNamePool,
 }
 
-impl Country {  // Basics.
-    // Validate an ID.
-    fn create_id(&mut self, id: usize) {
-        self.id = match id.try_into() {
-            Ok(n) => n,
-            Err(e) => panic!("{e}"),
-        };
-    }
-
+// Basics.
+impl Country {
     // Build a country element.
     fn build(name: &str) -> Self {
         let mut country = Self {
+            id: convert::int::<usize, CountryId>(COUNTRIES.lock().unwrap().len() + 1),
             name: name.to_string(),
             ..Default::default()
         };
@@ -33,9 +27,7 @@ impl Country {  // Basics.
 
     // Build a Country element and store it in the database. Return the created element.
     pub fn build_and_save(name: &str) -> Self {
-        let mut country = Self::build(name);
-        country.create_id(COUNTRIES.lock().unwrap().len() + 1);
-
+        let country = Self::build(name);
         country.save();
         return country;
     }

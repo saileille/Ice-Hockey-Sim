@@ -40,18 +40,11 @@ pub struct Competition {
 
 // Basics.
 impl Competition {
-    // Create a new ID.
-    fn create_id(&mut self, id: usize) {
-        self.id = match id.try_into() {
-            Ok(n) => n,
-            Err(e) => panic!("{e}")
-        };
-    }
-
     // Build a Competition element.
     fn build(name: &str, teams: &[Team], season_window: AnnualWindow, connections: Vec<CompConnection>,
     min_no_of_teams: u8, format: Option<Format>, rank_criteria: Vec<RankCriteria>, child_comp_ids: Vec<CompetitionId>) -> Self {
         Self {
+            id: convert::int::<usize, CompetitionId>(COMPETITIONS.lock().unwrap().len() + 1),
             name: name.to_string(),
             season_window: season_window,
             connections: connections,
@@ -92,7 +85,6 @@ impl Competition {
 
     // Save a competition to the database for the first time.
     fn save_new(&mut self, teams: &[Team], today: &Date) {
-        self.create_id(COMPETITIONS.lock().unwrap().len() + 1);
         self.save();
 
         // Let's create a seasons entry for this competition so we never have to check for its existence.

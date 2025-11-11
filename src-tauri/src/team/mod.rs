@@ -1,14 +1,14 @@
 pub mod lineup;
 pub mod ai;
 
-use rand::{Rng, distr::Uniform, rngs::ThreadRng};
+use rand::{Rng, rngs::ThreadRng};
 use serde_json::json;
 use time::Date;
 use crate::{
-    competition::Competition, database::{TEAMS, TODAY}, person::{Contract, Gender, Person, manager::Manager, player::{
-        Player, position::PositionId
-    }}, team::ai::PlayerNeed, time::date_to_db_string, types::{
-        AttributeValue, CompetitionId, ManagerId, PlayerId, TeamId
+    competition::Competition, database::TEAMS, person::{Contract, manager::Manager, player::
+        Player
+    }, team::ai::PlayerNeed, time::date_to_db_string, types::{
+        CompetitionId, ManagerId, PlayerId, TeamId, convert
     }
 };
 use self::lineup::LineUp;
@@ -33,16 +33,9 @@ pub struct Team {
 
 // Basics.
 impl Team {
-    // Create a new ID.
-    fn create_id(&mut self, id: usize) {
-        self.id = match id.try_into() {
-            Ok(n) => n,
-            Err(e) => panic!("{e}")
-        };
-    }
-
     fn build(name: &str) -> Self {
         Self {
+            id: convert::int::<usize, TeamId>(TEAMS.lock().unwrap().len() + 1),
             name: name.to_string(),
             ..Default::default()
         }
@@ -50,8 +43,7 @@ impl Team {
 
     // Create a team and store it in the database. Return a clone of the Team.
     pub fn build_and_save(name: &str) -> Self {
-        let mut team = Self::build(name);
-        team.create_id(TEAMS.lock().unwrap().len() + 1);
+        let team = Self::build(name);
         team.save();
         return team;
     }

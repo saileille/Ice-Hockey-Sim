@@ -111,7 +111,7 @@ pub fn initialise() {
 
     // Generate 50 players per team.
     for _ in 0..TEAMS.lock().unwrap().len() * 50 {
-        Player::build_and_save(&today, &mut rng, 16, 40);
+        Player::build_and_save(&today, &mut rng, 16, 37);
     }
 
     // Set up the teams.

@@ -42,28 +42,4 @@ pub mod convert {
         }
         panic!("{num} is bigger than {}", u8::MAX);
     }
-
-    // Convert u16 to i16.
-    pub fn u16_to_i16(num: u16) -> i16 {
-        match num.try_into() {
-            Ok(n) => n,
-            Err(e) => panic!("{e}")
-        }
-    }
-
-    // Convert u8 to i8.
-    pub fn u8_to_i8(num: u8) -> i8 {
-        match num.try_into() {
-            Ok(n) => n,
-            Err(e) => panic!("{e}")
-        }
-    }
-
-    // Convert i16 to i8.
-    pub fn i16_to_i8(num: i16) -> i8 {
-        match num.try_into() {
-            Ok(n) => n,
-            Err(e) => panic!("{e}")
-        }
-    }
 }

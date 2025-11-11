@@ -1,12 +1,12 @@
 pub mod position;
 mod ai;
 
-use rand::{rngs::ThreadRng, Rng};
+use rand::rngs::ThreadRng;
 use serde_json::json;
 use time::Date;
 
 use crate::{
-    database::PLAYERS, person::{Gender, attribute::{AttributeId, PersonAttribute}}, time::date_to_db_string, types::{AttributeValue, PlayerId, TeamId}
+    database::PLAYERS, person::{Gender, attribute::{AttributeId, PersonAttribute}}, time::date_to_db_string, types::{PlayerId, TeamId, convert}
 };
 use super::Person;
 use self::position::{Position, PositionId};
@@ -22,16 +22,9 @@ pub struct Player {
 
 // Basics.
 impl Player {
-    // Create a new ID.
-    fn create_id(&mut self, id: usize) {
-        self.id = match id.try_into() {
-            Ok(n) => n,
-            Err(e) => panic!("{e}")
-        };
-    }
-
     fn build(person: Person, position_id: PositionId) -> Self {
         Self {
+            id: convert::int::<usize, PlayerId>(PLAYERS.lock().unwrap().len() + 1),
             person: person,
             ability: PersonAttribute::build(AttributeId::General, 0),
             position_id: position_id,
@@ -53,7 +46,6 @@ impl Player {
 
         let mut player = Self::build(person, position_id);
         player.create_ability(today, rng);
-        player.create_id(PLAYERS.lock().unwrap().len() + 1);
 
         return player;
     }

@@ -375,16 +375,16 @@ impl TeamScheduleData {
     // Positive values indicate there are more home matches.
     // Negative values indicate there are more away matches.
     pub fn get_home_away_difference(&self, prev: &Self) -> i8 {
-        let home_matches = convert::u8_to_i8(self.get_home_match_count(prev));
-        let away_matches = convert::u8_to_i8(self.get_away_match_count(prev));
+        let home_matches = convert::int::<u8, i8>(self.get_home_match_count(prev));
+        let away_matches = convert::int::<u8, i8>(self.get_away_match_count(prev));
 
         return home_matches - away_matches;
     }
 
     // Check that the team has enough matches, and that home and away matches are balanced.
     fn is_valid_schedule(&self, matches: u8) -> bool {
-        let home_count = convert::u8_to_i8(self.get_home_match_count(&Self::default()));
-        let away_count = convert::u8_to_i8(self.get_away_match_count(&Self::default()));
+        let home_count = convert::int::<u8, i8>(self.get_home_match_count(&Self::default()));
+        let away_count = convert::int::<u8, i8>(self.get_away_match_count(&Self::default()));
         let total_count = (home_count + away_count) as u8;
 
         total_count == matches &&

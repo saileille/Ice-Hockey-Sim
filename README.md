@@ -9,6 +9,9 @@ Some notes about the game:
  - I am aware the game is very barebones still, and there is plenty I plan to do still. It is an alpha version for a reason.
 
  Changelist:
+  - Changed generated players' maximum age from 40 to 37.
+
+ 0.1.1-A:
   - Players grow older.
   - Players' ability changes.
   - Players retire (pretty randomly).
@@ -17,6 +20,7 @@ Some notes about the game:
   - Added player birthday to player screen.
   - Made the name database not compile with the source code (Cannot be user-edited yet though).
   - Gave up on the idea of an iOS release for now.
+  - Webview2 comes with the installer now, so Internet connection is not required for Windows users.
   - Fixed a visual bug where playoff wins were not visible.
   - Fixed a visual bug where latest results were showing the most recent ones and next games were showing the last scheduled games of the competition.
   - Fixed a visual bug where you could not see approached players in the team screen.

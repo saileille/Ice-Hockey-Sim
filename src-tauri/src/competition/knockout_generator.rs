@@ -171,7 +171,7 @@ fn finalise_rounds(parent_comp: &mut Competition, rounds: &mut Vec<Competition>,
 
 // Create connections between knockout rounds.
 fn create_connections(i: usize, round: &mut Competition, rounds: &[Competition], connections: &mut Vec<u8>) {
-    let mut advancing_teams = convert::u8_to_i8(round.min_no_of_teams / 2);
+    let mut advancing_teams = convert::int::<u8, i8>(round.min_no_of_teams / 2);
 
     let mut last;
     let mut first;
@@ -181,7 +181,7 @@ fn create_connections(i: usize, round: &mut Competition, rounds: &[Competition],
         let space_in_next_round = rounds[i].min_no_of_teams - connections[i];
 
         last = advancing_teams;
-        first = (advancing_teams - convert::u8_to_i8(space_in_next_round) + 1).clamp(1, i8::MAX);
+        first = (advancing_teams - convert::int::<u8, i8>(space_in_next_round) + 1).clamp(1, i8::MAX);
         let added_teams = last - first + 1;
 
         round.connections.push(CompConnection::build([first as u8, last as u8], round.id + iteration, Seed::Preserve, false));

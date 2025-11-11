@@ -4,7 +4,7 @@ use rand::rngs::ThreadRng;
 use serde_json::json;
 use time::Date;
 
-use crate::{database::MANAGERS, person::{Gender, Person}, types::ManagerId};
+use crate::{database::MANAGERS, person::{Gender, Person}, types::{ManagerId, convert}};
 
 #[derive(Default, Clone)]
 pub struct Manager {
@@ -14,17 +14,10 @@ pub struct Manager {
 }
 
 impl Manager {
-    // Create a new ID.
-    fn create_id(&mut self, id: usize) {
-        self.id = match id.try_into() {
-            Ok(n) => n,
-            Err(e) => panic!("{e}")
-        };
-    }
-
     // Build a manager.
     fn build(person: Person) -> Self {
         Self {
+            id: convert::int::<usize, ManagerId>(MANAGERS.lock().unwrap().len() + 1),
             person: person,
             ..Default::default()
         }
@@ -32,8 +25,7 @@ impl Manager {
 
     // Create a manager and store it in the database. Return a clone of the Manager.
     fn build_and_save(person: Person) -> Self {
-        let mut manager = Self::build(person);
-        manager.create_id(MANAGERS.lock().unwrap().len() + 1);
+        let manager = Self::build(person);
         manager.save();
         return manager;
     }
