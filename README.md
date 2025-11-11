@@ -9,12 +9,13 @@ Some notes about the game:
  - I am aware the game is very barebones still, and there is plenty I plan to do still. It is an alpha version for a reason.
 
  Changelist:
-  - Players age.
+  - Players grow older.
   - Players' ability changes.
   - Players retire (pretty randomly).
   - Teams get a few young players every year at the end of the season.
   - Added player age to team and scouting screen.
   - Added player birthday to player screen.
+  - Made the name database not compile with the source code.
   - Fixed a visual bug where playoff wins were not visible.
   - Fixed a visual bug where latest results were showing the most recent ones and next games were showing the last scheduled games of the competition.
   - Fixed a visual bug where you could not see approached players in the team screen.
