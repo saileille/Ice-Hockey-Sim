@@ -101,7 +101,7 @@ fn set_date_boundaries(rounds: &mut Vec<Competition>, season_duration: &AnnualWi
     let (start_date, end_date) = season_duration.get_dates_from_start_year(1900);
     let available_days = get_dates(&start_date, &end_date);
 
-    let round_durations = get_round_durations(rounds, convert::usize_to_u8(available_days.len()), rng);
+    let round_durations = get_round_durations(rounds, convert::int::<usize, u8>(available_days.len()), rng);
 
     // Starting from one day backwards.
     let mut last_date = available_days[0].checked_sub(Duration::days(1)).unwrap();

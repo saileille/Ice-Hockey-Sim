@@ -1,7 +1,7 @@
 // The round robin struct and methods for round-robin stages.
 mod schedule_validator;
 
-use crate::{competition::{season::{team::TeamCompData, Season}, Competition}, match_event::Game, team::Team, types::convert};
+use crate::{competition::{Competition, season::{Season, team::TeamCompData}}, match_event::Game, team::Team, types::{convert}};
 
 #[derive(Default, Clone, PartialEq, Debug)]
 pub enum MatchGenType {
@@ -70,12 +70,12 @@ impl RoundRobin {
 
     // Check if the match schedule went according to plan.
     pub fn had_successful_match_generation(&self, season: &Season) -> bool {
-        self.get_theoretical_total_matches(season) == convert::usize_to_u16(season.get_all_games().len())
+        self.get_theoretical_total_matches(season) == convert::int::<usize, u16>(season.get_all_games().len())
     }
 
     // Get how many matches each team has to play to face each team once.
     pub fn get_round_length(&self, season: &Season) -> u8 {
-        convert::usize_to_u8(season.teams.len() - 1)
+        convert::int::<usize, u8>(season.teams.len() - 1)
     }
 }
 
@@ -83,7 +83,7 @@ impl RoundRobin {
 impl RoundRobin {
     // Get how many matches there should be in the stage in total.
     pub fn get_theoretical_total_matches(&self, season: &Season) -> u16 {
-        return (self.get_theoretical_matches_per_team(season) as u16) * convert::usize_to_u16(season.teams.len()) / 2;
+        return (self.get_theoretical_matches_per_team(season) as u16) * convert::int::<usize, u16>(season.teams.len()) / 2;
     }
 
     // Check if the stage has a valid amount of matches.

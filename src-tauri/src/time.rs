@@ -185,7 +185,7 @@ pub fn db_string_to_date(date: &str) -> Date {
 // Get how many years there are in-between the two dates.
 // Gives positive values if date2 is later than date1.
 pub fn get_years_between(date1: &Date, date2: &Date) -> i8 {
-    let years = convert::i32_to_i8(date2.year() - date1.year());
+    let years = convert::int::<i32, i8>(date2.year() - date1.year());
 
     match date2.month() as i8 - date1.month() as i8 {
         1..=i8::MAX => years,

@@ -7,7 +7,7 @@ use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use ::time::Date;
 
 use crate::{
-    competition::{format::{round_robin::{MatchGenType, RoundRobin as RoundRobinFormat}}, season::{knockout_round::{KnockoutPair, KnockoutRound as KnockoutRoundSeason}, team::TeamCompData, Season}, Competition}, match_event::Game, time::{date_to_db_string, db_string_to_date, get_dates}, types::{convert, TeamId}
+    competition::{Competition, format::round_robin::{MatchGenType, RoundRobin as RoundRobinFormat}, season::{Season, knockout_round::{KnockoutPair, KnockoutRound as KnockoutRoundSeason}, team::TeamCompData}}, match_event::Game, time::{date_to_db_string, db_string_to_date, get_dates}, types::{TeamId, convert}
 };
 
 impl Season {
@@ -337,11 +337,11 @@ pub struct TeamScheduleData {
 // Methods
 impl TeamScheduleData {
     pub fn get_home_match_count(&self, prev: &Self) -> u8 {
-        convert::usize_to_u8(self.home_matches.len() + prev.home_matches.len())
+        convert::int::<usize, u8>(self.home_matches.len() + prev.home_matches.len())
     }
 
     pub fn get_away_match_count(&self, prev: &Self) -> u8 {
-        convert::usize_to_u8(self.away_matches.len() + prev.away_matches.len())
+        convert::int::<usize, u8>(self.away_matches.len() + prev.away_matches.len())
     }
 
     // Add home and away matches together.

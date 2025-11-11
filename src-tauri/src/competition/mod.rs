@@ -10,7 +10,7 @@ use serde::Serialize;
 use serde_json::json;
 use time::Date;
 
-use crate::{competition::season::{ranking::{get_sort_functions, RankCriteria}, team::TeamCompData, Season}, database::{COMPETITIONS, SEASONS}, team::Team, time::{db_string_to_date, AnnualWindow}, types::{convert, CompetitionId, TeamId}};
+use crate::{competition::season::{Season, ranking::{RankCriteria, get_sort_functions}, team::TeamCompData}, database::{COMPETITIONS, SEASONS}, team::Team, time::{AnnualWindow, db_string_to_date}, types::{CompetitionId, TeamId, convert}};
 
 use self::format::Format;
 
@@ -60,7 +60,7 @@ impl Competition {
             child_comp_ids: child_comp_ids,
 
             min_no_of_teams: match min_no_of_teams {
-                0 => convert::usize_to_u8(teams.len()),
+                0 => convert::int::<usize, u8>(teams.len()),
                 _ => min_no_of_teams
             },
             ..Default::default()

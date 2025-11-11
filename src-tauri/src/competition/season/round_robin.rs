@@ -1,6 +1,6 @@
 // Round robin specific seasonal stuff.
 
-use crate::{competition::season::Season, types::convert};
+use crate::{competition::season::Season, types::{convert}};
 
 #[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]

@@ -46,7 +46,7 @@ impl TeamGameData { // Basics.
 // Functional.
 impl TeamGameData {
     fn get_shot_amount(&self) -> u16 {
-        convert::usize_to_u16(self.shots.len())
+        convert::int::<usize, u16>(self.shots.len())
     }
 
     pub fn get_goal_amount(&self) -> u16 {

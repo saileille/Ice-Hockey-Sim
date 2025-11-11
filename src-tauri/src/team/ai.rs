@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use rand::{Rng, rngs::ThreadRng, seq::IndexedRandom};
 use time::Date;
 
-use crate::{person::{player::{position::PositionId, Player}, Contract}, team::Team, types::{convert, PlayerId}};
+use crate::{person::{Contract, player::{Player, position::PositionId}}, team::Team, types::{PlayerId, convert}};
 
 #[derive(Debug)]
 #[derive(Default, Clone)]
@@ -32,7 +32,7 @@ impl PlayerNeed {
 
     // Get how many players the team has that have to be left outside a match lineup.
     fn get_surplus(&self) -> i8 {
-        convert::usize_to_i8(self.abilities.len()) - self.get_lineup_places()
+        convert::int::<usize, i8>(self.abilities.len()) - self.get_lineup_places()
     }
 
     // Get the average ability of the players.

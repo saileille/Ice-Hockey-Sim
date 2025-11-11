@@ -266,7 +266,7 @@ impl Game {
 
     // Get the amount of seconds that have passed in the game, after full minutes have been taken out.
     fn get_game_seconds(&self) -> u8 {
-        convert::u32_to_u8(self.get_game_total_seconds() % 60)
+        convert::int::<u32, u8>(self.get_game_total_seconds() % 60)
     }
 
     // Check if the game is over.
@@ -317,7 +317,7 @@ impl Game {
             rules_ref = &self.cache.as_ref().unwrap().rules;
         }
 
-        convert::u32_to_i32(self.get_game_total_seconds()) - (rules_ref.get_regular_time() as i32)
+        convert::int::<u32, i32>(self.get_game_total_seconds()) - (rules_ref.get_regular_time() as i32)
     }
 
     // Check if the game has or had overtime.
@@ -448,12 +448,12 @@ impl Clock {
 
     // Get the amount of minutes that have passed in the period.
     fn get_period_minutes(&self) -> u8 {
-        convert::u16_to_u8(self.period_total_seconds / 60)
+        convert::int::<u16, u8>(self.period_total_seconds / 60)
     }
 
     // Get the amount of seconds that have passed in the period, after full minutes have been taken out.
     fn get_period_seconds(&self) -> u8 {
-        convert::u16_to_u8(self.period_total_seconds % 60)
+        convert::int::<u16, u8>(self.period_total_seconds % 60)
     }
 
     // Advance time by one second.

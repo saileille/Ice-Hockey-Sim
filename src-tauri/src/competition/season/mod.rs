@@ -9,7 +9,7 @@ use rand::rngs::ThreadRng;
 use serde_json::json;
 use time::Date;
 
-use crate::{competition::{season::{knockout_round::KnockoutRound as KnockoutRoundSeason, round_robin::RoundRobin as RoundRobinSeason, team::TeamCompData}, Competition}, database::SEASONS, match_event::Game, team::Team, time::{date_to_db_string, db_string_to_date}, types::{convert, CompetitionId, TeamId}};
+use crate::{competition::{Competition, season::{knockout_round::KnockoutRound as KnockoutRoundSeason, round_robin::RoundRobin as RoundRobinSeason, team::TeamCompData}}, database::SEASONS, match_event::Game, team::Team, time::{date_to_db_string, db_string_to_date}, types::{CompetitionId, TeamId, convert}};
 
 #[derive(Debug)]
 #[derive(Default, Clone)]
@@ -136,7 +136,7 @@ impl Season {
     // Check if the season has enough teams to begin.
     // min_no_of_teams must be the competition's min_no_of_teams field.
     pub fn has_enough_teams(&self, min_no_of_teams: u8) -> bool {
-        convert::usize_to_u8(self.teams.len()) >= min_no_of_teams
+        convert::int::<usize, u8>(self.teams.len()) >= min_no_of_teams
     }
 
     // Finalise the creation of a season for a particular competition.

@@ -99,8 +99,8 @@ impl TeamCompData {
     }
 
     pub fn get_goal_difference(&self) -> i16 {
-        let gf = convert::u16_to_i16(self.goals_scored);
-        let ga = convert::u16_to_i16(self.goals_conceded);
+        let gf = convert::int::<u16, i16>(self.goals_scored);
+        let ga = convert::int::<u16, i16>(self.goals_conceded);
         return gf - ga;
     }
 
