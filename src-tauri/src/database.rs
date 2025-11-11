@@ -52,19 +52,19 @@ lazy_static! {
     pub static ref ATTRIBUTES: HashMap<AttributeId, Attribute> = {
          HashMap::from([
              (AttributeId::Defending, Attribute::build(
-                AttributeId::Defending, 0
+                AttributeId::Defending, 0, 0
             )),
             (AttributeId::Shooting, Attribute::build(
-                AttributeId::Shooting, 0
+                AttributeId::Shooting, 0, 0
             )),
             (AttributeId::Passing, Attribute::build(
-                AttributeId::Passing, 0
+                AttributeId::Passing, 0, 0
             )),
             (AttributeId::Faceoffs, Attribute::build(
-                AttributeId::Faceoffs, 0
+                AttributeId::Faceoffs, 0, 0
             )),
             (AttributeId::General, Attribute::build(
-                AttributeId::General, 26
+                AttributeId::General, 6, 26
             )),
         ])
     };

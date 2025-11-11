@@ -26,17 +26,19 @@ pub enum AttributeId {
 pub struct Attribute {
     id: AttributeId,
 
+    // The age when the attribute starts to develop.
+    start_change: u16,
+
     // The age when this attribute is usually at its peak.
-    peak: u8,
-    peak_days: u16
+    peak: u16
 }
 
 impl Attribute {
-    pub fn build(id: AttributeId, peak: u8) -> Self {
+    pub fn build(id: AttributeId, start_change: u8, peak: u8) -> Self {
         Self {
             id: id,
-            peak: peak,
-            peak_days: years_to_days(peak),
+            start_change: years_to_days(start_change),
+            peak: years_to_days(peak),
         }
     }
 
@@ -118,8 +120,11 @@ impl PersonAttribute {
     // The daily update check on the attribute.
     pub fn update(&mut self, age_days: u16, rng: &mut ThreadRng) {
         let attribute = Attribute::fetch_from_db(&self.id);
+        if age_days < attribute.start_change {
+            return;
+        }
 
-        let regress_likelihood = (age_days as f64) / ((attribute.peak_days * 2) as f64);
+        let regress_likelihood = (age_days as f64) / ((attribute.peak * 2) as f64);
         let attribute_regresses = rng.random_bool(regress_likelihood);
 
         if attribute_regresses {

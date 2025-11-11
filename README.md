@@ -15,10 +15,12 @@ Some notes about the game:
   - Teams get a few young players every year at the end of the season.
   - Added player age to team and scouting screen.
   - Added player birthday to player screen.
-  - Made the name database not compile with the source code.
+  - Made the name database not compile with the source code (Cannot be user-edited yet though).
+  - Gave up on the idea of an iOS release for now.
   - Fixed a visual bug where playoff wins were not visible.
   - Fixed a visual bug where latest results were showing the most recent ones and next games were showing the last scheduled games of the competition.
   - Fixed a visual bug where you could not see approached players in the team screen.
+  - (Possibly) fixed $PATH variables not working correctly for Linux and iOS users.
 
 0.1.0-A:
  - First release.
