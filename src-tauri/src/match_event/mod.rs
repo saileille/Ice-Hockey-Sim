@@ -48,11 +48,6 @@ impl Game {
         }
     }
 
-    // Make sure the game does not contain illegal values.
-    fn is_valid(&self) -> bool {
-        self.home.is_valid() && self.away.is_valid() && self.get_rules().is_valid()
-    }
-
     // Get the game rules.
     fn get_rules(&self) -> Rules {
         COMPETITIONS.lock().unwrap().get(&self.comp_id).unwrap().format.as_ref().unwrap().match_rules.clone()
@@ -219,21 +214,6 @@ impl Game {
     pub fn get_name(&self) -> String {
         format!("{} - {}", self.home.get_team().name, self.away.get_team().name)
     }
-
-    // Get the score of the game.
-    fn get_score(&self) -> String {
-        let ot = match self.has_overtime() {
-            true => " OT",
-            _ => ""
-        };
-
-        format!("{} - {}{}", self.home.get_goal_amount(), self.away.get_goal_amount(), ot)
-    }
-
-    // Get the home and away team names, as well as the game score.
-    pub fn get_name_and_score(&self) -> String {
-        format!("{} {} {}", self.home.get_team().name, self.get_score(), self.away.get_team().name)
-    }
 }
 
 // Clock-related functions.
@@ -326,64 +306,6 @@ impl Game {
     }
 }
 
-// Tests.
-impl Game {
-    // Generate an ascetic infodump about which team scored and when.
-    pub fn get_simple_boxscore(&self) -> String {
-        let rules = self.get_rules();
-
-        struct BoxscoreGoal {
-            team: String,
-            score_info: String,
-            total_seconds: u32,
-        }
-
-        let home_name = self.home.get_team().name;
-        let away_name = self.away.get_team().name;
-
-        let mut events = Vec::new();
-        for goal in self.home.shots.iter() {
-            if goal.is_goal {
-                events.push(BoxscoreGoal {
-                    team: home_name.clone(),
-                    score_info: goal.scorer_and_assists_to_string(),
-                    total_seconds: (goal.event.time.periods_completed as u32) *
-                        (rules.period_length as u32) + (goal.event.time.period_total_seconds as u32),
-                });
-            }
-        }
-
-        for goal in self.away.shots.iter() {
-            if goal.is_goal {
-                events.push(BoxscoreGoal {
-                    team: away_name.clone(),
-                    score_info: goal.scorer_and_assists_to_string(),
-                    total_seconds: (goal.event.time.periods_completed as u32) *
-                        (rules.period_length as u32) + (goal.event.time.period_total_seconds as u32),
-                });
-            }
-        }
-
-        events.sort_by(|a: &BoxscoreGoal, b: &BoxscoreGoal| a.total_seconds.cmp(&b.total_seconds));
-
-        let mut boxscore = String::new();
-        let mut home_goal_counter: u16 = 0;
-        let mut away_goal_counter: u16 = 0;
-        for event in events.iter() {
-            if event.team == home_name {
-                home_goal_counter += 1;
-            }
-            else {
-                away_goal_counter += 1;
-            }
-
-            boxscore += &format!("{}: {} - {} {} - {}\n", Clock::time_to_string(event.total_seconds), home_goal_counter, away_goal_counter, event.team, event.score_info);
-        }
-
-        return boxscore;
-    }
-}
-
 #[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
 pub struct Rules {
@@ -402,11 +324,6 @@ impl Rules {
             overtime_length: overtime_length,
             continuous_overtime: continous_overtime,
         }
-    }
-
-    // Make sure the rules do not contain illegal values.
-    pub fn is_valid(&self) -> bool {
-        self.periods != 0 && self.period_length != 0
     }
 }
 

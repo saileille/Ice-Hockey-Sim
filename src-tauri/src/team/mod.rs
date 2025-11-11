@@ -63,13 +63,6 @@ impl Team {
         TEAMS.lock().unwrap().remove(&self.id);
     }
 
-    // Check that the team does not have illegal values.
-    fn is_valid(&self) -> bool {
-        self.id != 0 &&
-        self.name != String::default() &&
-        !self.roster.contains(&0)
-    }
-
     // Get the team's manager.
     pub fn get_manager(&self) -> Option<Manager> {
         Manager::fetch_from_db(&self.manager_id)
@@ -176,15 +169,6 @@ impl Team {
 }
 
 impl Team {
-    // Delete the team's players.
-    fn delete_players(&mut self) {
-        for id in self.roster.iter() {
-            Player::fetch_from_db(id).unwrap().delete_from_db();
-        }
-
-        self.roster.clear();
-    }
-
     // Create a manager out of thin air.
     fn create_manager(&mut self, today: &Date, rng: &mut ThreadRng) {
         let mut manager = Manager::build_and_save_random(today, rng);

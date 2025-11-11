@@ -1,7 +1,7 @@
 // The round robin struct and methods for round-robin stages.
 mod schedule_validator;
 
-use crate::{competition::{Competition, season::{Season, team::TeamCompData}}, match_event::Game, team::Team, types::{convert}};
+use crate::{competition::season::Season, types::{convert}};
 
 #[derive(Default, Clone, PartialEq, Debug)]
 pub enum MatchGenType {

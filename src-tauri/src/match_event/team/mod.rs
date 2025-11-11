@@ -23,11 +23,6 @@ impl TeamGameData { // Basics.
         }
     }
 
-    // Make sure the TeamData does not contain illegal values.
-    pub fn is_valid(&self) -> bool {
-        self.team_id != 0
-    }
-
     // Get a clone of the team.
     pub fn get_team(&self) -> Team {
         Team::fetch_from_db(&self.team_id)

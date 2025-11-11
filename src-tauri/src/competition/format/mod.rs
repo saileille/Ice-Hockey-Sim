@@ -47,12 +47,6 @@ impl Format {
         return Some(format);
     }
 
-    // Make sure Stage does not have illegal values.
-    fn is_valid(&self) -> bool {
-        self.match_rules.is_valid() &&
-        self.format_type != Type::Null
-    }
-
     // Get JSON for a competition screen.
     pub fn get_comp_screen_json(&self) -> serde_json::Value {
         json!({

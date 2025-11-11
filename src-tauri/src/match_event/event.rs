@@ -149,23 +149,3 @@ impl Shot {
         }
     }
 }
-
-impl Shot { // Testing stuff.
-    pub fn scorer_and_assists_to_string(&self) -> String {
-        let string = self.get_shooter().person.get_full_name();
-
-        let mut assisters_string = String::new();
-        let assisters = self.get_assisters();
-
-        for (i, assister) in assisters.iter().enumerate() {
-            if i > 0 { assisters_string += ", "; }
-            assisters_string += &assister.person.get_full_name();
-        }
-
-        if assisters_string.len() > 0 {
-            assisters_string = format!(" ({assisters_string})");
-        }
-
-        return string + &assisters_string;
-    }
-}

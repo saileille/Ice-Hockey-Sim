@@ -63,11 +63,6 @@ impl Position {
         POSITIONS.get(id).expect(&format!("no Position with id {id:#?}")).clone()
     }
 
-    // Make sure the position does not contain illegal values.
-    fn is_valid(&self) -> bool {
-        self.id != PositionId::default()
-    }
-
     // Get the defensive value of the position as absence of offence.
     fn get_defensive_value(&self) -> u8 {
         u8::MAX - self.offensive_value

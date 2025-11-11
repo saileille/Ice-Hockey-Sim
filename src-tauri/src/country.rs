@@ -52,14 +52,6 @@ impl Country {
 
         panic!("country with name {name} does not exist!");
     }
-
-    // Make sure the country does not contain illegal values.
-    fn is_valid(&self) -> bool {
-        self.id != 0 &&
-        self.name != String::default() /*&&
-        self.forenames.is_valid() &&
-        self.surnames.is_valid()*/
-    }
 }
 
 impl Country {
@@ -122,20 +114,6 @@ impl NamePool {
 
         pool.calculate_weight();
         return pool;
-    }
-
-    // Check that the NamePool does not contain illegal values.
-    fn is_valid(&self) -> bool {
-        if self.names.len() == 0 || self.names.len() != self.weights.len() {
-            return false;
-        }
-
-        let mut sum = 0;
-        for weight in self.weights.iter() {
-            sum += *weight as u32;
-        }
-
-        return self.total_weight == sum;
     }
 
     // Calculate the weight.
