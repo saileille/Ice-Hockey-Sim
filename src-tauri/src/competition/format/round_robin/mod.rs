@@ -38,11 +38,6 @@ impl RoundRobin {
             points_for_loss: points_for_loss,
         }
     }
-
-    // Make sure the round robin rules do not have illegal values.
-    pub fn is_valid(&self) -> bool {
-        self.rounds != 0 || self.extra_matches != 0
-    }
 }
 
 impl RoundRobin {

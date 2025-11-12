@@ -1,7 +1,7 @@
 // The game database.
 use std::{collections::HashMap, path::PathBuf, sync::{LazyLock, Mutex}};
 use rand::rngs::ThreadRng;
-use tauri::{App, AppHandle, Manager as TauriManager, path::BaseDirectory};
+use tauri::{AppHandle, Manager as TauriManager, path::BaseDirectory};
 use time::{macros::date, Date};
 use lazy_static::lazy_static;
 
