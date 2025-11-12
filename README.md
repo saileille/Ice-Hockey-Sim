@@ -2,16 +2,15 @@ The Discord server of the project: https://discord.com/invite/kqQFFFPa8p
 
 Some notes about the game:
  - Saving the game is not possible yet.
- - All teams start with no players, and you must have a full team (2 goalkeepers, 4 skaters in each position) before the first match of the season, or you risk a CtD.
+ - All teams start with only a few players, and you must have a full team (2 goalkeepers, 4 skaters in each position) before the first match of the season, or you risk a CtD.
  - You can only offer one contract per turn. There is an "Actions remaining" counter in the top bar.
  - You cannot renew contracts of players yet.
  - Players leave their teams at the end of the last day of their contract, meaning they can be signed the day after their contract is marked to expire.
- - I am aware the game is very barebones still, and there is plenty I plan to do still. It is an alpha version for a reason.
+ - I am aware the game is very barebones with plenty to work on. It is an alpha version for a reason.
 
  Changelist:
-  - Changed generated players' maximum age from 40 to 37.
 
- 0.1.1-A:
+ 0.1.2-A:
   - Players grow older.
   - Players' ability changes.
   - Players retire (pretty randomly).
@@ -24,7 +23,11 @@ Some notes about the game:
   - Fixed a visual bug where playoff wins were not visible.
   - Fixed a visual bug where latest results were showing the most recent ones and next games were showing the last scheduled games of the competition.
   - Fixed a visual bug where you could not see approached players in the team screen.
-  - (Possibly) fixed $PATH variables not working correctly for Linux and iOS users.
+  - (Possibly) fixed $PATH variables not working correctly for Linux users.
+  - *Should* work on Linux now.
+
+ 0.1.1-A:
+  - (Deleted release.)
 
 0.1.0-A:
  - First release.
