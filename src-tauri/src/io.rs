@@ -22,28 +22,33 @@ fn read_json_file(path: &str) -> io::Result<String> {
 
 // Load names of a specific country.
 pub fn load_country_names(country: &str) -> HashMap<String, HashMap<String, HashMap<String, u16>>> {
-    let json = match read_json_file(&format!("./json/names/{}.json", country)) {
-        Ok(j) => j,
-        Err(_) => {
-            read_json_file(&format!("E:/Tiedostot/koodaus/Tauri/icehockeysim/Ice Hockey Sim/src-tauri/json/names/{}.json", country)).unwrap()
-        }
-    };
+    let paths = vec![
+        "./json/names", // Windows
+        "..usr/lib/ice-hockey-sim/json/names"   // Linux
+    ];
 
-    return serde_json::from_str(&json).unwrap();
+    for path in paths {
+        match read_json_file(&format!("{path}/{country}.json")) {
+            Ok(j) => return serde_json::from_str(&j).unwrap(),
+            Err(_) => continue,
+        }
+    }
+
+    panic!("bleh");
 }
 
 // Function for listing all JSON files in the names folder.
 // Used for generating countries in the database.
 pub fn get_countries_from_name_files() -> Vec<String> {
-    let paths = match fs::read_dir("./json/names/") {
+    let entries = match fs::read_dir("./json/names/") {
         Ok(r) => r,
         Err(_) => fs::read_dir("E:/Tiedostot/koodaus/Tauri/icehockeysim/Ice Hockey Sim/src-tauri/json/names/").unwrap(),
     };
 
     let mut countries = Vec::new();
 
-    for path in paths {
-        let filename = format!("{}", path.unwrap().file_name().display());
+    for entry in entries {
+        let filename = format!("{}", entry.unwrap().file_name().display());
         if !filename.ends_with(".json") { continue }
 
         let country_name = String::from(&filename[0..filename.len() - 5]);
