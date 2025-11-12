@@ -29,9 +29,9 @@ fn read_json_file(path: &PathBuf) -> io::Result<String> {
 
 // Load names of a specific country.
 pub fn load_country_names(country: &str) -> HashMap<String, HashMap<String, HashMap<String, u16>>> {
-    let country_dir = PEOPLE_NAME_DIR.lock().unwrap().join(format!("{country}.json"));
+    let path_buf = PathBuf::from(PEOPLE_NAME_DIR.lock().unwrap().clone()).join(format!("{country}.json"));
 
-    let json = read_json_file(&country_dir).unwrap();
+    let json = read_json_file(&path_buf).unwrap();
     return serde_json::from_str(&json).unwrap();
 }
 
@@ -43,7 +43,9 @@ pub fn get_read_dir(path: &PathBuf) -> ReadDir {
 // Function for listing all JSON files in the names folder.
 // Used for generating countries in the database.
 pub fn get_countries_from_name_files() -> Vec<String> {
-    let dir = get_read_dir(&PEOPLE_NAME_DIR.lock().unwrap());
+    let path_buf = PathBuf::from(PEOPLE_NAME_DIR.lock().unwrap().clone());
+
+    let dir = get_read_dir(&path_buf);
     let mut countries = Vec::new();
 
     for entry in dir {

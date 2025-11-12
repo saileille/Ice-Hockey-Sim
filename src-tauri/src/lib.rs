@@ -25,11 +25,11 @@ pub fn run() {
 
     tauri::Builder::default()
         .setup(|app| {
+            database::initialise(app.handle());
             #[cfg(debug_assertions)] {
                 let window = app.get_webview_window("main").unwrap();
                 window.open_devtools();
             }
-            database::initialise(app.handle());
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())

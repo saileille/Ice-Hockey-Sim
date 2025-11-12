@@ -109,10 +109,10 @@ impl Season {
     }
 
     // Get some nice JSON for a competition screen.
-    pub fn get_comp_screen_json(&self, comp: &Competition) -> serde_json::Value {
-        let teams: Vec<serde_json::Value> = self.teams.iter().enumerate().map(|(i, a)| a.get_comp_screen_json(comp, i)).collect();
-        let upcoming_games: Vec<serde_json::Value> = self.upcoming_games.iter().map(|a| a.get_comp_screen_json()).collect();
-        let played_games: Vec<serde_json::Value> = self.played_games.iter().map(|a| a.get_comp_screen_json()).collect();
+    pub fn get_comp_screen_package(&self, comp: &Competition) -> serde_json::Value {
+        let teams: Vec<serde_json::Value> = self.teams.iter().enumerate().map(|(i, a)| a.get_comp_screen_package(comp, i)).collect();
+        let upcoming_games: Vec<serde_json::Value> = self.upcoming_games.iter().map(|a| a.get_comp_screen_package()).collect();
+        let played_games: Vec<serde_json::Value> = self.played_games.iter().map(|a| a.get_comp_screen_package()).collect();
 
         json!({
             "name": self.name,

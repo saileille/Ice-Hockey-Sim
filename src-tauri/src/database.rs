@@ -15,8 +15,8 @@ use crate::{
 
 // The current date in the game.
 pub static TODAY: LazyLock<Mutex<Date>> = LazyLock::new(|| Mutex::new(date!(2025-07-01)));
-pub static RESOURCES_DIR: LazyLock<Mutex<PathBuf>> = LazyLock::new(|| Mutex::new(PathBuf::from(r"")));
-pub static PEOPLE_NAME_DIR: LazyLock<Mutex<PathBuf>> = LazyLock::new(|| Mutex::new(PathBuf::from(r"")));
+pub static RESOURCES_DIR: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new("".to_string()));
+pub static PEOPLE_NAME_DIR: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new("".to_string()));
 
 pub static COUNTRIES: LazyLock<Mutex<HashMap<CountryId, Country>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 pub static COMPETITIONS: LazyLock<Mutex<HashMap<CompetitionId, Competition>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -129,9 +129,10 @@ pub fn initialise(handle: &AppHandle) {
 // Get the dir paths for everyone.
 fn create_dir_paths(handle: &AppHandle) {
     let resource_dir = handle.path().resolve("", BaseDirectory::Resource).unwrap();
+    let people_name_dir = resource_dir.join("json/names/");
 
-    *RESOURCES_DIR.lock().unwrap() = resource_dir.clone();
-    *PEOPLE_NAME_DIR.lock().unwrap() = resource_dir.join("json/names/");
+    *RESOURCES_DIR.lock().unwrap() = resource_dir.clone().to_str().unwrap().to_string();
+    *PEOPLE_NAME_DIR.lock().unwrap() = people_name_dir.to_str().unwrap().to_string();
 }
 
 // Add competitions.

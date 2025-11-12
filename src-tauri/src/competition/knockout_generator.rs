@@ -4,7 +4,7 @@ use ordinal::ToOrdinal as _;
 use rand::{Rng, rngs::ThreadRng};
 use time::{Date, Duration};
 
-use crate::{competition::{self, CompConnection, Competition, Seed, format::{self, knockout_round::KnockoutRound as KnockoutRoundFormat}, season::ranking::RankCriteria}, match_event, time::{AnnualDate, AnnualWindow, get_dates}, types::{CompetitionId, convert}};
+use crate::{competition::{self, CompConnection, Competition, Seed, format::{self, knockout_round::KnockoutRound as KnockoutRoundFormat}, season::ranking::RankCriteria}, database::COMPETITIONS, match_event, time::{AnnualDate, AnnualWindow, get_dates}, types::{CompetitionId, convert}};
 
 // Generate a knockout competition with each round being represented as its own competition element.
 pub fn build(
@@ -58,24 +58,27 @@ fn create_rounds(round_names: Vec<&str>, match_rules: Vec<match_event::Rules>, w
     let mut rounds = Vec::new();
 
     for (i, round_size) in teams_in_rounds.iter().enumerate() {
-        let mut round = Competition::default();
-        round.parent_comp_id = parent_comp_id;
-        round.min_no_of_teams = *round_size;
-        round.rank_criteria = rank_criteria.clone();
+        // Create the round and add as many values to it as I can.
+        let mut round = Competition {
+            id: convert::int::<usize, CompetitionId>(COMPETITIONS.lock().unwrap().len() + 1),
+            parent_comp_id: parent_comp_id,
+            min_no_of_teams: *round_size,
+            rank_criteria: rank_criteria.clone(),
+            format: format::Format::build(
+                None,
+                Some(KnockoutRoundFormat::build(
+                    get_from_index_or_last(&wins_required, i)
+            )),
+            get_from_index_or_last(&match_rules, i)
+            ),
+            ..Default::default()
+        };
 
         // Give the round a name from predefined options, or a default one.
         match i < round_names.len() {
             true => round.name = round_names[i].to_string(),
             _ => assign_default_name(&mut round, i, teams_in_rounds.len())
         };
-
-        round.format = format::Format::build(
-            None,
-            Some(KnockoutRoundFormat::build(
-                get_from_index_or_last(&wins_required, i)
-            )),
-            get_from_index_or_last(&match_rules, i)
-        );
 
         rounds.push(round);
     }

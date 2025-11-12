@@ -40,7 +40,7 @@ impl TeamCompData {
     }
 
     // Get relevant information for a competition screen.
-    pub fn get_comp_screen_json(&self, comp: &Competition, index: usize) -> serde_json::Value {
+    pub fn get_comp_screen_package(&self, comp: &Competition, index: usize) -> serde_json::Value {
         json!({
             "id": self.team_id,
             "name": self.get_team().name,
@@ -62,7 +62,7 @@ impl TeamCompData {
     }
 
     // Get information for the competition screen tournament tree.
-    pub fn get_comp_screen_json_pair(&self) -> serde_json::Value {
+    pub fn get_comp_screen_package_pair(&self) -> serde_json::Value {
         json!({
             "id": self.team_id,
             "name": self.get_team().name,

@@ -59,7 +59,7 @@ impl Game {
     }
 
     // Get nice data for a competition screen.
-    pub fn get_comp_screen_json(&self) -> serde_json::Value {
+    pub fn get_comp_screen_package(&self) -> serde_json::Value {
         json!({
             "home": self.home.get_comp_screen_json(),
             "away": self.away.get_comp_screen_json(),

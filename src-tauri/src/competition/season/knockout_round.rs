@@ -153,8 +153,8 @@ impl KnockoutPair {
     // Get nice JSON for comp screen.
     fn get_comp_screen_json(&self) -> serde_json::Value {
         json!({
-            "home": self.home.get_comp_screen_json_pair(),
-            "away": self.away.get_comp_screen_json_pair()
+            "home": self.home.get_comp_screen_package_pair(),
+            "away": self.away.get_comp_screen_package_pair()
         })
     }
 

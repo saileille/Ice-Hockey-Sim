@@ -48,7 +48,7 @@ impl Format {
     }
 
     // Get JSON for a competition screen.
-    pub fn get_comp_screen_json(&self) -> serde_json::Value {
+    pub fn get_comp_screen_package(&self) -> serde_json::Value {
         json!({
             "round_robin": self.round_robin,
             "knockout_round": self.knockout_round,
