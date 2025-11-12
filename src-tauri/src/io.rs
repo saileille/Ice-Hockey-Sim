@@ -1,6 +1,10 @@
 // Input/output logic.
-use std::{collections::HashMap, fs, io, io::Read};
+use std::{collections::HashMap, fs::{self, ReadDir}, io::{self, Read}};
 
+static PATHS: [&str; 2] = [
+    "./json/names", // Windows
+    "..usr/lib/ice-hockey-sim/json/names",  // Linux
+];
 
 // Get a file, or error if it does not exist.
 fn get_file(path: &str) -> io::Result<fs::File> {
@@ -22,12 +26,7 @@ fn read_json_file(path: &str) -> io::Result<String> {
 
 // Load names of a specific country.
 pub fn load_country_names(country: &str) -> HashMap<String, HashMap<String, HashMap<String, u16>>> {
-    let paths = vec![
-        "./json/names", // Windows
-        "..usr/lib/ice-hockey-sim/json/names"   // Linux
-    ];
-
-    for path in paths {
+    for path in PATHS {
         match read_json_file(&format!("{path}/{country}.json")) {
             Ok(j) => return serde_json::from_str(&j).unwrap(),
             Err(_) => continue,
@@ -37,17 +36,28 @@ pub fn load_country_names(country: &str) -> HashMap<String, HashMap<String, Hash
     panic!("bleh");
 }
 
+// Get the country folder.
+pub fn get_country_folder() -> ReadDir {
+    let mut folder_opt = None;
+    for path in PATHS {
+        match fs::read_dir(format!("{path}/")) {
+            Ok(r) => {
+                folder_opt = Some(r);
+                break;
+            }
+            Err(_) => continue
+        }
+    }
+
+    return folder_opt.unwrap();
+}
+
 // Function for listing all JSON files in the names folder.
 // Used for generating countries in the database.
-pub fn get_countries_from_name_files() -> Vec<String> {
-    let entries = match fs::read_dir("./json/names/") {
-        Ok(r) => r,
-        Err(_) => fs::read_dir("E:/Tiedostot/koodaus/Tauri/icehockeysim/Ice Hockey Sim/src-tauri/json/names/").unwrap(),
-    };
-
+pub fn get_countries_from_name_files(folder: ReadDir) -> Vec<String> {
     let mut countries = Vec::new();
 
-    for entry in entries {
+    for entry in folder {
         let filename = format!("{}", entry.unwrap().file_name().display());
         if !filename.ends_with(".json") { continue }
 

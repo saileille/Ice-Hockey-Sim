@@ -104,7 +104,8 @@ pub fn initialise() {
     }
 
     // Creating the countries.
-    let country_names = io::get_countries_from_name_files();
+    let country_folder = io::get_country_folder();
+    let country_names = io::get_countries_from_name_files(country_folder);
     for name in country_names.iter() {
         Country::build_and_save(name);
     }
