@@ -1,6 +1,7 @@
 // The game database.
-use std::{collections::HashMap, sync::{LazyLock, Mutex}};
+use std::{collections::HashMap, path::PathBuf, sync::{LazyLock, Mutex}};
 use rand::rngs::ThreadRng;
+use tauri::{App, AppHandle, Manager as TauriManager, path::BaseDirectory};
 use time::{macros::date, Date};
 use lazy_static::lazy_static;
 
@@ -14,6 +15,8 @@ use crate::{
 
 // The current date in the game.
 pub static TODAY: LazyLock<Mutex<Date>> = LazyLock::new(|| Mutex::new(date!(2025-07-01)));
+pub static RESOURCES_DIR: LazyLock<Mutex<PathBuf>> = LazyLock::new(|| Mutex::new(PathBuf::from(r"")));
+pub static PEOPLE_NAME_DIR: LazyLock<Mutex<PathBuf>> = LazyLock::new(|| Mutex::new(PathBuf::from(r"")));
 
 pub static COUNTRIES: LazyLock<Mutex<HashMap<CountryId, Country>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 pub static COMPETITIONS: LazyLock<Mutex<HashMap<CompetitionId, Competition>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -87,7 +90,9 @@ lazy_static! {
 }
 
 // Initialise the database.
-pub fn initialise() {
+pub fn initialise(handle: &AppHandle) {
+    create_dir_paths(handle);
+
     let today = TODAY.lock().unwrap().clone();
     let mut rng = rand::rng();
     add_competition_data(&today, &mut rng);
@@ -104,8 +109,7 @@ pub fn initialise() {
     }
 
     // Creating the countries.
-    let country_folder = io::get_country_folder();
-    let country_names = io::get_countries_from_name_files(country_folder);
+    let country_names = io::get_countries_from_name_files();
     for name in country_names.iter() {
         Country::build_and_save(name);
     }
@@ -120,6 +124,14 @@ pub fn initialise() {
     for team in teams.values_mut() {
         team.setup(&today, &mut rng);
     }
+}
+
+// Get the dir paths for everyone.
+fn create_dir_paths(handle: &AppHandle) {
+    let resource_dir = handle.path().resolve("", BaseDirectory::Resource).unwrap();
+
+    *RESOURCES_DIR.lock().unwrap() = resource_dir.clone();
+    *PEOPLE_NAME_DIR.lock().unwrap() = resource_dir.join("json/names/");
 }
 
 // Add competitions.

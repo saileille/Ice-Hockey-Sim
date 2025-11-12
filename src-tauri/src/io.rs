@@ -1,18 +1,21 @@
 // Input/output logic.
-use std::{collections::HashMap, fs::{self, ReadDir}, io::{self, Read}};
+use std::{collections::HashMap, fs::{self, ReadDir}, io::{self, Read}, path::PathBuf};
 
-static PATHS: [&str; 2] = [
+
+use crate::database::PEOPLE_NAME_DIR;
+
+/*static PATHS: [&str; 2] = [
     "./json/names", // Windows
     "..usr/lib/ice-hockey-sim/json/names",  // Linux
-];
+];*/
 
 // Get a file, or error if it does not exist.
 fn get_file(path: &str) -> io::Result<fs::File> {
     return fs::File::open(path);
 }
 
-fn read_json_file(path: &str) -> io::Result<String> {
-    // Read a JSON file and return it as a string.
+// Read a JSON file and return it as a string.
+fn read_json_file(path: &PathBuf) -> io::Result<String> {
     let mut json = String::new();
     // let file_result = File::open(path.as_ref());
     let mut file = match fs::File::open(path) {
@@ -26,38 +29,24 @@ fn read_json_file(path: &str) -> io::Result<String> {
 
 // Load names of a specific country.
 pub fn load_country_names(country: &str) -> HashMap<String, HashMap<String, HashMap<String, u16>>> {
-    for path in PATHS {
-        match read_json_file(&format!("{path}/{country}.json")) {
-            Ok(j) => return serde_json::from_str(&j).unwrap(),
-            Err(_) => continue,
-        }
-    }
+    let country_dir = PEOPLE_NAME_DIR.lock().unwrap().join(format!("{country}.json"));
 
-    panic!("bleh");
+    let json = read_json_file(&country_dir).unwrap();
+    return serde_json::from_str(&json).unwrap();
 }
 
-// Get the country folder.
-pub fn get_country_folder() -> ReadDir {
-    let mut folder_opt = None;
-    for path in PATHS {
-        match fs::read_dir(format!("{path}/")) {
-            Ok(r) => {
-                folder_opt = Some(r);
-                break;
-            }
-            Err(_) => continue
-        }
-    }
-
-    return folder_opt.unwrap();
+// Get a readable directory from a string.
+pub fn get_read_dir(path: &PathBuf) -> ReadDir {
+    return fs::read_dir(path).expect(&format!("no path {}", path.to_str().unwrap()));
 }
 
 // Function for listing all JSON files in the names folder.
 // Used for generating countries in the database.
-pub fn get_countries_from_name_files(folder: ReadDir) -> Vec<String> {
+pub fn get_countries_from_name_files() -> Vec<String> {
+    let dir = get_read_dir(&PEOPLE_NAME_DIR.lock().unwrap());
     let mut countries = Vec::new();
 
-    for entry in folder {
+    for entry in dir {
         let filename = format!("{}", entry.unwrap().file_name().display());
         if !filename.ends_with(".json") { continue }
 
