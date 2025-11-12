@@ -10,7 +10,7 @@ Some notes about the game:
 
  Changelist:
 
- 0.1.2-A:
+ 0.1.3-A:
   - Players grow older.
   - Players' ability changes.
   - Players retire (pretty randomly).
@@ -25,9 +25,6 @@ Some notes about the game:
   - Fixed a visual bug where you could not see approached players in the team screen.
   - (Possibly) fixed $PATH variables not working correctly for Linux users.
   - *Should* work on Linux now.
-
- 0.1.1-A:
-  - (Deleted release.)
 
 0.1.0-A:
  - First release.
