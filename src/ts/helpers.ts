@@ -1,9 +1,11 @@
 // Generic helper functions to alleviate the tedious verbosity.
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 import { drawScreen as drawTeamScreen } from "./screens/team";
 import { drawScreen as drawPlayerScreen } from "./screens/player";
 import { drawScreen as drawCompScreen } from "./screens/competition";
 import { EventType, LinkType, Listener, Query, TagName } from "./types/dom";
+import { CountryNameAndFlag } from "./types/team";
 
 // Do not touch anything, It Just Works™.
 export const createEventListener = (query: Query, event: EventType, listener: Listener) => {
@@ -31,11 +33,42 @@ export const createElement = (elementType: TagName, attributes: any, children: A
 
 
 // Draw a link field for any purpose.
-export const createLink = (tag: string, type: LinkType, id: number, text: string) => {
+export const createLink = (tag: string, type: LinkType, id: number, text: string): HTMLElement => {
     return createElement(tag, {
         "textContent": text,
         "className": `${type}${id} link`
     }, []);
+};
+
+export const createImage = (country: CountryNameAndFlag, type: "block" | "inline"): HTMLSpanElement | HTMLImageElement => {
+    if (country.flag_path === null) {
+        return createElement("span", {
+            "textContent": country.name,
+        }, [])
+    };
+
+    return createElement("img", {
+        "className": `contained-${type}`,    // Using this to resize after drawing.
+        "src": convertFileSrc(country.flag_path),
+        "title": country.name,
+    }, [])
+};
+
+// Resize all graphical elements at once. Can be used for other images as well.
+export const resizeImages = () => {
+    const images = document.querySelectorAll("img.contained-block, img.contained-inline") as NodeListOf<HTMLImageElement>;
+    console.log(images.length);
+    for (const image of images) {
+        const height = calculateImageHeight(getComputedStyle(image.parentElement as HTMLElement));
+        console.log(height);
+        image.style.height = height;
+    }
+};
+
+// Get the actual height of the graphics element, or die trying.
+const calculateImageHeight = (computed: CSSStyleProperties): string => {
+    let height = parseFloat(computed.getPropertyValue("line-height"));
+    return `${height}px`;
 };
 
 // A dynamic link listener function that makes it possible to create listeners without having the associated element in the document.

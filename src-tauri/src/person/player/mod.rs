@@ -124,24 +124,12 @@ impl Player {
 
     // Get relevant information of the player.
     pub fn get_package(&self, today: &Date) -> serde_json::Value {
-        let contract = match self.person.contract.as_ref() {
-            Some(contract) => Some(contract.get_package(today)),
-            _ => None
-        };
-
-        let contract_offers: Vec<serde_json::Value> = self.person.contract_offers.iter().map(|a| a.get_package(today)).collect();
-
         json!({
+            "person": self.person.get_package(today),
             "id": self.id,
-            "name": self.person.get_full_name(),
-            "country": self.person.get_country().name,
             "position": self.get_position().abbreviation,
-            "age": self.person.get_age_years(today),
-            "birthday": date_to_db_string(&self.person.birthday),
             "ability": self.ability.get_display(),
             "real_ability": self.ability.get(),
-            "contract": contract,
-            "offers": contract_offers
         })
     }
 

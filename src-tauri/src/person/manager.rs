@@ -61,9 +61,9 @@ impl Manager {
     }
 
     // Get relevant information to the team screen.
-    pub fn get_team_screen_json(&self) -> serde_json::Value {
+    pub fn get_team_screen_package(&self, today: &Date) -> serde_json::Value {
         json!({
-            "name": self.person.get_full_name()
+            "person": self.person.get_package(today)
         })
     }
 

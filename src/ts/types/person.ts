@@ -1,3 +1,14 @@
+import { CountryNameAndFlag } from "./team";
+
+type Person = {
+    name: string,
+    country: CountryNameAndFlag,
+    age: number,
+    birthday: string,
+    contract: Contract | null,
+    offers: Array<Contract>,
+};
+
 export type Position = "GK" | "LD" | "RD" | "LW" | "C" | "RW";
 
 type ContractTeam = {
@@ -13,14 +24,13 @@ export type Contract = {
 };
 
 export type Player = {
+    person: Person,
     id: number,
-    name: string,
-    country: string,
     position: Position,
-    age: number,
-    birthday: string,
     ability: number,
     real_ability: number,
-    contract: Contract | null,
-    offers: Array<Contract>
+};
+
+export type Manager = {
+    person: Person,
 };

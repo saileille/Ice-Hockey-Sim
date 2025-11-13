@@ -19,11 +19,13 @@ pub type AttributeValue = u16;
 
 // Type conversions.
 pub mod convert {
+    use std::fmt::Display;
+
     // Convert between integers.
-    pub fn int<N1, N2: TryFrom<N1>>(num: N1) -> N2 {
+    pub fn int<N1: Display + Copy, N2: TryFrom<N1>>(num: N1) -> N2 {
         match num.try_into() {
             Ok(n) => n,
-            Err(_) => panic!()
+            Err(_) => panic!("num: {num}")
         }
     }
 

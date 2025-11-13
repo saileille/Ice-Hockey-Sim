@@ -126,6 +126,25 @@ impl Person {
     fn get_age_years(&self, today: &Date) -> i8 {
         return get_years_between(&self.birthday, &today);
     }
+
+    // Get a package of the person.
+    fn get_package(&self, today: &Date) -> serde_json::Value {
+        let contract = match self.contract.as_ref() {
+            Some(contract) => Some(contract.get_package(today)),
+            _ => None
+        };
+
+        let contract_offers: Vec<serde_json::Value> = self.contract_offers.iter().map(|a| a.get_package(today)).collect();
+
+        json!({
+            "name": self.get_full_name(),
+            "country": self.get_country().get_name_and_flag_package(),
+            "age": self.get_age_years(today),
+            "birthday": date_to_db_string(&self.birthday),
+            "contract": contract,
+            "offers": contract_offers
+        })
+    }
 }
 
 // Functional.
@@ -194,6 +213,7 @@ impl Contract {
     // How many seasons there are left of the contract.
     // Note that 1 means less than a year left of the contract!
     fn get_seasons_left(&self, today: &Date) -> i8 {
+        println!("contract end date: {}", self.end_date);
         let end_date = db_string_to_date(&self.end_date);
         return get_years_between(&today, &end_date) + 1;
     }

@@ -1,19 +1,31 @@
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen, updateTopBar } from "./basics";
-import { createElement, createEventListener, createLink } from "../helpers";
+import { createElement, createEventListener, createImage, createLink, resizeImages } from "../helpers";
 import { drawScreen as drawHomeScreen } from "./home";
-import { Contract, Player } from "../types/player";
+import { Contract, Player } from "../types/person";
 import { HumanPackage, HumanTeamPackage } from "../types/team";
 import { Listener } from "../types/dom";
 
 // Get the player screen title.
 const getTitle = (player: Player): HTMLHeadingElement => {
     const element = document.createElement("h1");
-    element.append(`${player.name} (`);
-    if (player.contract !== null) {
-        element.appendChild(createLink("span", "team", player.contract.team.id, player.contract.team.name));
+
+    element.append(
+        createImage(player.person.country, "inline"),
+        ` ${player.person.name} (`
+    );
+
+    if (player.person.contract !== null) {
+        element.append(
+            createLink("span", "team", player.person.contract.team.id, player.person.contract.team.name),
+            ", "
+        );
     }
-    element.append(`${player.position}, ${player.ability}, ${player.country})`);
+
+    element.append(
+        `${player.position}, ${player.ability})`
+    );
+
     return element;
 };
 
@@ -25,13 +37,13 @@ export const drawScreen = async (id: number) => {
     const screen = initialiseContentScreen();
     screen.append(
         getTitle(player),
-        createElement("div", {"textContent": `Birthday: ${player.birthday}`}, []),
+        createElement("div", {"textContent": `Birthday: ${player.person.birthday}`}, []),
         drawContractTable(player),
     );
 
     // Contract offer can be made if...
     if (
-        player.contract === null && // ...player does not have a contract,
+        player.person.contract === null && // ...player does not have a contract,
         humanPackage.team !== null &&  // ...human is managing a team,
         !humanPackage.team.approached_players.includes(id) &&  // ...human's team has not approached the player,
         humanPackage.team.actions_remaining > 0    // ...and human team has actions remaining.
@@ -39,14 +51,16 @@ export const drawScreen = async (id: number) => {
         screen.appendChild(createElement("button", { "id": `offer-contract${id}`, "textContent": "Offer Contract" }, []));
         createEventListener(`#offer-contract${id}`, "click", drawNegotiationScreen);
     }
+
+    resizeImages();
 };
 
 // Draw the contract table.
 const drawContractTable = (player: Player) => {
     return createElement("table", {}, [
         createElement("tbody", {}, [
-            ...drawContract(player.contract),
-            ...drawOffers(player.offers),
+            ...drawContract(player.person.contract),
+            ...drawOffers(player.person.offers),
         ])
     ])
 }

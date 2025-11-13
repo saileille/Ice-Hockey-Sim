@@ -1,14 +1,10 @@
-import { Player, Position } from "./player";
+import { Manager, Player, Position } from "./person";
 
 export type RosterOverview = Array<{
     "position": Position,
     "id": number,
     "in_roster": boolean,
 }>;
-
-type Manager = {
-    name: string
-};
 
 
 export type HumanTeamPackage = {
@@ -35,6 +31,11 @@ export type Team = {
 };
 
 export type TopBarPackage = {
-    "date": string,
-    "human": HumanPackage,
+    date: string,
+    human: HumanPackage,
 };
+
+export type CountryNameAndFlag = {
+    name: string,
+    flag_path: string,
+}

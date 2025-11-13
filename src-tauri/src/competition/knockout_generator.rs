@@ -53,33 +53,39 @@ fn get_teams_in_rounds(teams_in_rounds: &mut Vec<u8>, teams_at_end: u8) {
     teams_in_rounds.append(&mut last_rounds);
 }
 
+// Build a single competition round.
+fn build_round(round_names: &[&str], match_rules: &[match_event::Rules], wins_required: &[u8], teams_in_rounds: &[u8], rank_criteria: &Vec<RankCriteria>, parent_comp_id: CompetitionId, round_size: u8, i: usize) -> Competition {
+    // Create the round and add as many values to it as I can.
+    let mut round = Competition {
+        id: convert::int::<usize, CompetitionId>(COMPETITIONS.lock().unwrap().len() + 1),
+        parent_comp_id: parent_comp_id,
+        min_no_of_teams: round_size,
+        rank_criteria: rank_criteria.clone(),
+        format: format::Format::build(
+            None,
+            Some(KnockoutRoundFormat::build(
+                get_from_index_or_last(wins_required, i)
+        )),
+        get_from_index_or_last(match_rules, i)
+        ),
+        ..Default::default()
+    };
+
+    // Give the round a name from predefined options, or a default one.
+    match i < round_names.len() {
+        true => round.name = round_names[i].to_string(),
+        _ => assign_default_name(&mut round, i, teams_in_rounds.len())
+    };
+
+    return round;
+}
+
 // Create rounds.
 fn create_rounds(round_names: Vec<&str>, match_rules: Vec<match_event::Rules>, wins_required: Vec<u8>, teams_in_rounds: Vec<u8>, rank_criteria: Vec<RankCriteria>, parent_comp_id: CompetitionId) -> Vec<Competition> {
     let mut rounds = Vec::new();
 
     for (i, round_size) in teams_in_rounds.iter().enumerate() {
-        // Create the round and add as many values to it as I can.
-        let mut round = Competition {
-            id: convert::int::<usize, CompetitionId>(COMPETITIONS.lock().unwrap().len() + 1),
-            parent_comp_id: parent_comp_id,
-            min_no_of_teams: *round_size,
-            rank_criteria: rank_criteria.clone(),
-            format: format::Format::build(
-                None,
-                Some(KnockoutRoundFormat::build(
-                    get_from_index_or_last(&wins_required, i)
-            )),
-            get_from_index_or_last(&match_rules, i)
-            ),
-            ..Default::default()
-        };
-
-        // Give the round a name from predefined options, or a default one.
-        match i < round_names.len() {
-            true => round.name = round_names[i].to_string(),
-            _ => assign_default_name(&mut round, i, teams_in_rounds.len())
-        };
-
+        let round = build_round(&round_names, &match_rules, &wins_required, &teams_in_rounds, &rank_criteria, parent_comp_id, *round_size, i);
         rounds.push(round);
     }
 

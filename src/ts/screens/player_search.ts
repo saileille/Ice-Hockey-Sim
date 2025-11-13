@@ -2,9 +2,9 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen } from "./basics";
-import { createElement, createLink, extractIdFromElement } from "../helpers";
+import { createImage, createElement, createLink, extractIdFromElement, resizeImages } from "../helpers";
 import { Listener } from "../types/dom";
-import { Player } from "../types/player";
+import { Player } from "../types/person";
 import { HumanPackage } from "../types/team";
 
 type PlayerFilter = "all" | "not-approached";
@@ -20,6 +20,7 @@ export const drawScreen: Listener = async (_e: Event) => {
     ])
 
     const tbody = createElement("tbody", { "id": "players" }, []);
+
     for (const player of players) {
         tbody.appendChild(drawPlayer(player));
     }
@@ -41,19 +42,22 @@ export const drawScreen: Listener = async (_e: Event) => {
         ])
     );
 
+    resizeImages();
     playerFilter.addEventListener("change", onChangePlayerFilter);
 };
 
 // Get a row of a single player.
 const drawPlayer = (player: Player): HTMLTableRowElement => {
-    return createElement("tr", {}, [
-        createElement("td", {}, [createLink("span", "player", player.id, player.name)]),
-        createElement("td", { "textContent": player.country }, []),
+    const row = createElement("tr", {}, [
+        createElement("td", {}, [createLink("span", "player", player.id, player.person.name)]),
+        createElement("td", {}, [createImage(player.person.country, "block")]),
         createElement("td", { "textContent": player.position }, []),
-        createElement("td", { "textContent": player.age }, []),
+        createElement("td", { "textContent": player.person.age }, []),
         createElement("td", { "textContent": player.ability }, []),
-        createElement("td", { "textContent": player.offers.length }, []),
+        createElement("td", { "textContent": player.person.offers.length }, []),
     ]);
+
+    return row;
 };
 
 const onChangePlayerFilter: Listener = async (e: Event) => {

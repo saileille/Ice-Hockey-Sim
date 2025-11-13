@@ -7,6 +7,23 @@ body {
     user-select: none; /* Standard syntax */
 }
 
-span.link {
+.link {
     cursor: pointer;
+}
+
+img.contained-block {
+    /* This way the image takes all space it can. */
+    display: block;
+    /* Height is calculated once the image is drawn. */
+    height: 0px;
+    width: auto;
+    object-fit: contain;
+}
+
+img.contained-inline {
+    display: inline-block;
+    height: 0px;
+    width: auto;
+    object-fit: contain;
+    vertical-align: bottom;
 }

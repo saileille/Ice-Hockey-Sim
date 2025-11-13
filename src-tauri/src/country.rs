@@ -1,14 +1,16 @@
 // Countries and such.
 use std::collections::HashMap;
 use rand::{Rng, rngs::ThreadRng};
+use serde_json::json;
 
-use crate::{database::COUNTRIES, io::load_country_names, person::Gender, types::{CountryId, CountryNamePool, convert}};
+use crate::{database::COUNTRIES, io::{get_flag_path, load_country_names}, person::Gender, types::{CountryId, CountryNamePool, convert}};
 
 #[derive(Default, Clone)]
 pub struct Country {
     pub id: CountryId,
     pub name: String,
     names: CountryNamePool,
+    flag_path: Option<String>,
 }
 
 // Basics.
@@ -18,6 +20,7 @@ impl Country {
         let mut country = Self {
             id: convert::int::<usize, CountryId>(COUNTRIES.lock().unwrap().len() + 1),
             name: name.to_string(),
+            flag_path: get_flag_path(name),
             ..Default::default()
         };
 
@@ -51,6 +54,13 @@ impl Country {
         }
 
         panic!("country with name {name} does not exist!");
+    }
+
+    pub fn get_name_and_flag_package(&self) -> serde_json::Value {
+        json!({
+            "name": self.name,
+            "flag_path": self.flag_path,
+        })
     }
 }
 

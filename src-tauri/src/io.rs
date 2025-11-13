@@ -2,7 +2,7 @@
 use std::{collections::HashMap, fs::{self, ReadDir}, io::{self, Read}, path::PathBuf};
 
 
-use crate::database::PEOPLE_NAME_DIR;
+use crate::database::{COUNTRY_FLAG_DIR, PEOPLE_NAME_DIR};
 
 /*static PATHS: [&str; 2] = [
     "./json/names", // Windows
@@ -33,6 +33,15 @@ pub fn load_country_names(country: &str) -> HashMap<String, HashMap<String, Hash
 
     let json = read_json_file(&path_buf).unwrap();
     return serde_json::from_str(&json).unwrap();
+}
+
+// Get the flag path for a country.
+pub fn get_flag_path(country: &str) -> Option<String> {
+    let path_buf = PathBuf::from(COUNTRY_FLAG_DIR.lock().unwrap().clone()).join(format!("{country}.svg"));
+    match path_buf.exists() {
+        true => Some(path_buf.to_str().unwrap().to_string()),
+        _ => None,
+    }
 }
 
 // Get a readable directory from a string.

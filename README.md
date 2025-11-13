@@ -1,6 +1,6 @@
-The Discord server of the project: https://discord.com/invite/kqQFFFPa8p
+### Join the project's [Discord server](https://discord.com/invite/kqQFFFPa8p)!
 
-Some notes about the game:
+## Some notes about the game:
  - Saving the game is not possible yet.
  - All teams start with only a few players, and you must have a full team (2 goalkeepers, 4 skaters in each position) before the first match of the season, or you risk a CtD.
  - You can only offer one contract per turn. There is an "Actions remaining" counter in the top bar.
@@ -8,9 +8,11 @@ Some notes about the game:
  - Players leave their teams at the end of the last day of their contract, meaning they can be signed the day after their contract is marked to expire.
  - I am aware the game is very barebones with plenty to work on. It is an alpha version for a reason.
 
- Changelist:
+ ## Changelist:
+ - Fixed the player page title when player is under contract.
+ - Added country flags.
 
- 0.1.3-A:
+ # [0.1.3-A](https://github.com/saileille/Ice-Hockey-Sim/releases/tag/0.1.3-A):
   - Players grow older.
   - Players' ability changes.
   - Players retire (pretty randomly).
@@ -26,5 +28,5 @@ Some notes about the game:
   - (Possibly) fixed $PATH variables not working correctly for Linux users.
   - *Should* work on Linux now.
 
-0.1.0-A:
+# [0.1.0-A](https://github.com/saileille/Ice-Hockey-Sim/releases/tag/0.1.0-A):
  - First release.

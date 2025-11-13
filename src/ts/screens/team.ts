@@ -1,9 +1,9 @@
 // Team screen stuffs.
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen } from "./basics";
-import { createElement, createLink } from "../helpers";
+import { createImage, createElement, createLink, resizeImages } from "../helpers";
 import { RosterSetting, Team } from "../types/team";
-import { Player } from "../types/player";
+import { Player } from "../types/person";
 import { Listener } from "../types/dom";
 
 
@@ -16,7 +16,7 @@ export const drawScreen = async (id: number) => {
     ];
 
     if (team.manager !== null) {
-        elements.push(createElement("div", { "textContent": `Manager: ${team.manager.name}` }, []));
+        elements.push(createElement("div", { "textContent": `Manager: ${team.manager.person.name}` }, []));
     }
 
     const screen = initialiseContentScreen();
@@ -32,17 +32,17 @@ const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
         createElement("option", {"value": "approached", "textContent": "Approached"}, []),
     ])
 
-    const roster = createElement("tbody", {"id": "players"}, []);
+    const roster = createElement("tbody", { "id": "players" }, []);
     for (const player of players) {
         let seasonsLeft = 0;
-        if (player.contract !== null)
-            seasonsLeft = player.contract.seasons_left;
+        if (player.person.contract !== null)
+            seasonsLeft = player.person.contract.seasons_left;
 
         roster.appendChild(createElement("tr", {}, [
-            createElement("td", {}, [createLink("span", "player", player.id, player.name)]),
-            createElement("td", { "textContent": player.country }, []),
+            createElement("td", {}, [createLink("span", "player", player.id, player.person.name)]),
+            createElement("td", {}, [createImage(player.person.country, "block")]),
             createElement("td", { "textContent": player.position }, []),
-            createElement("td", { "textContent": player.age }, []),
+            createElement("td", { "textContent": player.person.age }, []),
             createElement("td", { "textContent": player.ability }, []),
             createElement("td", { "textContent": seasonsLeft }, []),
         ]));
@@ -65,6 +65,7 @@ const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
         ])
     );
 
+    resizeImages();
     filterSelect.addEventListener("change", onChangePlayerFilter);
 };
 

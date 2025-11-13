@@ -102,7 +102,7 @@ impl Team {
             "id": self.id,
             "name": self.name,
             "manager": match self.get_manager() {
-                Some(manager) => Some(manager.get_team_screen_json()),
+                Some(manager) => Some(manager.get_team_screen_package(today)),
                 _ => None
             },
             "players": json_players
@@ -173,7 +173,7 @@ impl Team {
     fn create_manager(&mut self, today: &Date, rng: &mut ThreadRng) {
         let mut manager = Manager::build_and_save_random(today, rng);
         self.manager_id = manager.id;
-        manager.person.contract = Some(Contract::build(&date_to_db_string(today), &date_to_db_string(&Date::MAX), self.id));
+        manager.person.contract = Some(Contract::build(&date_to_db_string(today), "2125-06-01", self.id));
         manager.save();
     }
 
