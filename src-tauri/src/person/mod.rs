@@ -213,7 +213,6 @@ impl Contract {
     // How many seasons there are left of the contract.
     // Note that 1 means less than a year left of the contract!
     fn get_seasons_left(&self, today: &Date) -> i8 {
-        println!("contract end date: {}", self.end_date);
         let end_date = db_string_to_date(&self.end_date);
         return get_years_between(&today, &end_date) + 1;
     }

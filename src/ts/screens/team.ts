@@ -1,7 +1,7 @@
 // Team screen stuffs.
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen } from "./basics";
-import { createImage, createElement, createLink, resizeImages } from "../helpers";
+import { createTextImage, createElement, createLink } from "../helpers";
 import { RosterSetting, Team } from "../types/team";
 import { Player } from "../types/person";
 import { Listener } from "../types/dom";
@@ -40,7 +40,7 @@ const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
 
         roster.appendChild(createElement("tr", {}, [
             createElement("td", {}, [createLink("span", "player", player.id, player.person.name)]),
-            createElement("td", {}, [createImage(player.person.country, "block")]),
+            createElement("td", {}, [createTextImage(player.person.country)]),
             createElement("td", { "textContent": player.position }, []),
             createElement("td", { "textContent": player.person.age }, []),
             createElement("td", { "textContent": player.ability }, []),
@@ -65,7 +65,6 @@ const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
         ])
     );
 
-    resizeImages();
     filterSelect.addEventListener("change", onChangePlayerFilter);
 };
 

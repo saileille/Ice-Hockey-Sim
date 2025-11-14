@@ -2,7 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen } from "./basics";
-import { createImage, createElement, createLink, extractIdFromElement, resizeImages } from "../helpers";
+import { createTextImage, createElement, createLink, extractIdFromElement } from "../helpers";
 import { Listener } from "../types/dom";
 import { Player } from "../types/person";
 import { HumanPackage } from "../types/team";
@@ -42,7 +42,6 @@ export const drawScreen: Listener = async (_e: Event) => {
         ])
     );
 
-    resizeImages();
     playerFilter.addEventListener("change", onChangePlayerFilter);
 };
 
@@ -50,7 +49,7 @@ export const drawScreen: Listener = async (_e: Event) => {
 const drawPlayer = (player: Player): HTMLTableRowElement => {
     const row = createElement("tr", {}, [
         createElement("td", {}, [createLink("span", "player", player.id, player.person.name)]),
-        createElement("td", {}, [createImage(player.person.country, "block")]),
+        createElement("td", {}, [createTextImage(player.person.country)]),
         createElement("td", { "textContent": player.position }, []),
         createElement("td", { "textContent": player.person.age }, []),
         createElement("td", { "textContent": player.ability }, []),

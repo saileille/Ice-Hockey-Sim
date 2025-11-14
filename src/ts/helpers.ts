@@ -40,7 +40,7 @@ export const createLink = (tag: string, type: LinkType, id: number, text: string
     }, []);
 };
 
-export const createImage = (country: CountryNameAndFlag, type: "block" | "inline"): HTMLSpanElement | HTMLImageElement => {
+export const createTextImage = (country: CountryNameAndFlag): HTMLSpanElement | HTMLImageElement => {
     if (country.flag_path === null) {
         return createElement("span", {
             "textContent": country.name,
@@ -48,27 +48,10 @@ export const createImage = (country: CountryNameAndFlag, type: "block" | "inline
     };
 
     return createElement("img", {
-        "className": `contained-${type}`,    // Using this to resize after drawing.
+        "className": "text",
         "src": convertFileSrc(country.flag_path),
         "title": country.name,
     }, [])
-};
-
-// Resize all graphical elements at once. Can be used for other images as well.
-export const resizeImages = () => {
-    const images = document.querySelectorAll("img.contained-block, img.contained-inline") as NodeListOf<HTMLImageElement>;
-    console.log(images.length);
-    for (const image of images) {
-        const height = calculateImageHeight(getComputedStyle(image.parentElement as HTMLElement));
-        console.log(height);
-        image.style.height = height;
-    }
-};
-
-// Get the actual height of the graphics element, or die trying.
-const calculateImageHeight = (computed: CSSStyleProperties): string => {
-    let height = parseFloat(computed.getPropertyValue("line-height"));
-    return `${height}px`;
 };
 
 // A dynamic link listener function that makes it possible to create listeners without having the associated element in the document.

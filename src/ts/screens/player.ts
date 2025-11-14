@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen, updateTopBar } from "./basics";
-import { createElement, createEventListener, createImage, createLink, resizeImages } from "../helpers";
+import { createElement, createEventListener, createTextImage, createLink } from "../helpers";
 import { drawScreen as drawHomeScreen } from "./home";
 import { Contract, Player } from "../types/person";
 import { HumanPackage, HumanTeamPackage } from "../types/team";
@@ -11,7 +11,7 @@ const getTitle = (player: Player): HTMLHeadingElement => {
     const element = document.createElement("h1");
 
     element.append(
-        createImage(player.person.country, "inline"),
+        createTextImage(player.person.country),
         ` ${player.person.name} (`
     );
 
@@ -51,8 +51,6 @@ export const drawScreen = async (id: number) => {
         screen.appendChild(createElement("button", { "id": `offer-contract${id}`, "textContent": "Offer Contract" }, []));
         createEventListener(`#offer-contract${id}`, "click", drawNegotiationScreen);
     }
-
-    resizeImages();
 };
 
 // Draw the contract table.
