@@ -117,15 +117,18 @@ pub fn initialise(handle: &AppHandle) {
         Country::build_and_save(name);
     }
 
+    // Getting the countries here so we do not have to clone it several times.
+    let countries = COUNTRIES.lock().unwrap().clone();
+
     // Generate 50 players per team.
     for _ in 0..TEAMS.lock().unwrap().len() * 50 {
-        Player::build_and_save(&today, &mut rng, 16, 37);
+        Player::build_and_save(&countries, &today, &mut rng, 16, 37);
     }
 
     // Set up the teams.
     let mut teams = TEAMS.lock().unwrap().clone();
     for team in teams.values_mut() {
-        team.setup(&today, &mut rng);
+        team.setup(&countries, &today, &mut rng);
     }
 }
 

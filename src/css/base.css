@@ -1,10 +1,13 @@
-/* Styling that applies everywhere. */
+/* Styling that is part of the game's core functionality. */
 
-body {
-    /* No selecting */
-    -webkit-user-select: none; /* Safari */
-    -ms-user-select: none; /* IE 10 and IE 11 */
-    user-select: none; /* Standard syntax */
+/* No selecting */
+* {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }
 
 .link {

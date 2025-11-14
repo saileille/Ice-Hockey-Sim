@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use serde_json::json;
 use time::Date;
 
-use crate::{competition::{self, Competition}, database::{COMPETITIONS, TODAY}, person::{Contract, manager::Manager, player::Player}, team::Team, time::date_to_db_string, types::{CompetitionId, PlayerId, TeamId}};
+use crate::{competition::{self, Competition}, database::{COMPETITIONS, COUNTRIES, TODAY}, person::{Contract, manager::Manager, player::Player}, team::Team, time::date_to_db_string, types::{CompetitionId, PlayerId, TeamId}};
 
 
 // Get name and ID of all competitions that are not part of another competition.
@@ -84,7 +84,8 @@ pub fn get_player_package(id: PlayerId) -> serde_json::Value {
 // Create a human manager in the game.
 #[tauri::command]
 pub fn create_human_manager(id: TeamId) {
-    let mut human = Manager::build_and_save_random(&TODAY.lock().unwrap().clone(), &mut rand::rng());
+    let countries = COUNTRIES.lock().unwrap().clone();
+    let mut human = Manager::build_and_save_random(&countries, &TODAY.lock().unwrap().clone(), &mut rand::rng());
     human.is_human = true;
 
     human.person.forename = "Human".to_string();

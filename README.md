@@ -12,7 +12,7 @@
  - Fixed the player page title when player is under contract.
  - Added country flags.
 
- # [0.1.3-A](https://github.com/saileille/Ice-Hockey-Sim/releases/tag/0.1.3-A):
+ ### [0.1.3-A](https://github.com/saileille/Ice-Hockey-Sim/releases/tag/0.1.3-A):
   - Players grow older.
   - Players' ability changes.
   - Players retire (pretty randomly).
@@ -28,5 +28,5 @@
   - (Possibly) fixed $PATH variables not working correctly for Linux users.
   - *Should* work on Linux now.
 
-# [0.1.0-A](https://github.com/saileille/Ice-Hockey-Sim/releases/tag/0.1.0-A):
+### [0.1.0-A](https://github.com/saileille/Ice-Hockey-Sim/releases/tag/0.1.0-A):
  - First release.

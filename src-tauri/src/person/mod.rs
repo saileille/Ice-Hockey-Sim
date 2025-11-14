@@ -2,6 +2,8 @@ pub mod player;
 pub mod manager;
 pub mod attribute;
 
+use std::collections::HashMap;
+
 use rand::{self, Rng, rngs::ThreadRng};
 use serde_json::json;
 use time::{Date, Duration};
@@ -63,14 +65,13 @@ impl Person {
     }
 
     // Make a random person.
-    pub fn create(today: &Date, rng: &mut ThreadRng, min_age: u8, max_age: u8, gender: Gender) -> Self {
+    pub fn create(countries: &HashMap<CountryId, Country>, today: &Date, rng: &mut ThreadRng, min_age: u8, max_age: u8, gender: Gender) -> Self {
         let min_days = years_to_days(min_age);
         let max_days = years_to_days(max_age);
 
         let age = rng.random_range(min_days..=max_days);
 
         // First determining the person's nationality with weighted random.
-        let countries = COUNTRIES.lock().unwrap().clone();
         let mut country_weights = Vec::new();
         let mut total_weight = 0;
         for country in countries.values() {

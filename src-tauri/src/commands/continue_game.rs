@@ -1,11 +1,11 @@
 // Commands and helper functions that have to do with continuing the game.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use rand::rngs::ThreadRng;
 use time::Date;
 
-use crate::{competition::season::Season, database::{COMPETITIONS, MANAGERS, PLAYERS, TODAY}, person::player::Player, team::Team, time::db_string_to_date, types::TeamId};
+use crate::{competition::season::Season, country::Country, database::{COMPETITIONS, COUNTRIES, MANAGERS, PLAYERS, TODAY}, person::player::Player, team::Team, time::db_string_to_date, types::{CountryId, TeamId}};
 
 
 // Advance the time with one day.
@@ -13,9 +13,10 @@ use crate::{competition::season::Season, database::{COMPETITIONS, MANAGERS, PLAY
 pub fn go_to_next_day() {
     let mut rng = rand::rng();
     let today = TODAY.lock().unwrap().clone();
+    let countries = COUNTRIES.lock().unwrap().clone();
 
     handle_players(&today, &mut rng);
-    handle_managers_and_teams(&today, &mut rng);
+    handle_managers_and_teams(&countries, &today, &mut rng);
 
     // Games are simulated here - this must be the last one!
     handle_comps(&today, &mut rng);
@@ -44,7 +45,7 @@ fn handle_comps(today: &Date, rng: &mut ThreadRng) {
 }
 
 // Do the daily tasks of managers (and teams, they are connected).
-fn handle_managers_and_teams(today: &Date, rng: &mut ThreadRng) {
+fn handle_managers_and_teams(countries: &HashMap<CountryId, Country>, today: &Date, rng: &mut ThreadRng) {
     let mut managers = MANAGERS.lock().unwrap().clone();
     let mut teams_visited = HashSet::new();
 
@@ -64,7 +65,7 @@ fn handle_managers_and_teams(today: &Date, rng: &mut ThreadRng) {
         // Do not do anything on behalf of the human.
         if manager.is_human {
             team.return_actions_to_full();
-            team.season_end_checker(today, rng);
+            team.season_end_checker(countries, today, rng);
             team.save();
             continue;
         }
@@ -87,7 +88,7 @@ fn handle_managers_and_teams(today: &Date, rng: &mut ThreadRng) {
         }
 
         team.return_actions_to_full();
-        team.season_end_checker(today, rng);
+        team.season_end_checker(countries, today, rng);
         team.save();
     }
 

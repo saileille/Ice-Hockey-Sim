@@ -1,14 +1,16 @@
 pub mod lineup;
 pub mod ai;
 
+use std::collections::HashMap;
+
 use rand::{Rng, rngs::ThreadRng};
 use serde_json::json;
 use time::Date;
 use crate::{
-    competition::Competition, database::TEAMS, person::{Contract, manager::Manager, player::
+    competition::Competition, country::Country, database::TEAMS, person::{Contract, manager::Manager, player::
         Player
     }, team::ai::PlayerNeed, time::date_to_db_string, types::{
-        CompetitionId, ManagerId, PlayerId, TeamId, convert
+        CompetitionId, CountryId, ManagerId, PlayerId, TeamId, convert
     }
 };
 use self::lineup::LineUp;
@@ -170,25 +172,25 @@ impl Team {
 
 impl Team {
     // Create a manager out of thin air.
-    fn create_manager(&mut self, today: &Date, rng: &mut ThreadRng) {
-        let mut manager = Manager::build_and_save_random(today, rng);
+    fn create_manager(&mut self, countries: &HashMap<CountryId, Country>, today: &Date, rng: &mut ThreadRng) {
+        let mut manager = Manager::build_and_save_random(countries, today, rng);
         self.manager_id = manager.id;
         manager.person.contract = Some(Contract::build(&date_to_db_string(today), "2125-06-01", self.id));
         manager.save();
     }
 
     // Set up the team when initialising a game.
-    pub fn setup(&mut self, today: &Date, rng: &mut ThreadRng) {
-        self.create_manager(today, rng);
+    pub fn setup(&mut self, countries: &HashMap<CountryId, Country>, today: &Date, rng: &mut ThreadRng) {
+        self.create_manager(countries, today, rng);
         self.return_actions_to_full();
-        self.promote_junior_players(today, rng);
+        self.promote_junior_players(countries, today, rng);
         self.save();
     }
 
     // Give a few junior players to the team at the end of the season.
-    fn promote_junior_players(&mut self, today: &Date, rng: &mut ThreadRng) {
+    fn promote_junior_players(&mut self, countries: &HashMap<CountryId, Country>, today: &Date, rng: &mut ThreadRng) {
         for _ in 0..rng.random_range(1..=3) {
-            let mut player = Player::create(today, rng, 16, 19);
+            let mut player = Player::create(countries, today, rng, 16, 19);
             let contract = Contract::build_from_years(self, today, 4);
             player.person.contract = Some(contract);
             self.roster.push(player.id);
@@ -196,9 +198,9 @@ impl Team {
         }
     }
 
-    pub fn season_end_checker(&mut self, today: &Date, rng: &mut ThreadRng) {
+    pub fn season_end_checker(&mut self, countries: &HashMap<CountryId, Country>, today: &Date, rng: &mut ThreadRng) {
         if self.is_season_end_date(today) {
-            self.promote_junior_players(today, rng);
+            self.promote_junior_players(countries, today, rng);
         }
     }
 }

@@ -1,12 +1,14 @@
 pub mod position;
 mod ai;
 
+use std::collections::HashMap;
+
 use rand::rngs::ThreadRng;
 use serde_json::json;
 use time::Date;
 
 use crate::{
-    database::PLAYERS, person::{Gender, attribute::{AttributeId, PersonAttribute}}, time::date_to_db_string, types::{PlayerId, TeamId, convert}
+    country::Country, database::PLAYERS, person::{Gender, attribute::{AttributeId, PersonAttribute}}, time::date_to_db_string, types::{CountryId, PlayerId, TeamId, convert}
 };
 use super::Person;
 use self::position::{Position, PositionId};
@@ -33,15 +35,15 @@ impl Player {
     }
 
     // Create a player and store it in the database. Return a clone of the Player.
-    pub fn build_and_save(today: &Date, rng: &mut ThreadRng, min_age: u8, max_age: u8) -> Self {
-        let player = Self::create(today, rng, min_age, max_age);
+    pub fn build_and_save(countries: &HashMap<CountryId, Country>, today: &Date, rng: &mut ThreadRng, min_age: u8, max_age: u8) -> Self {
+        let player = Self::create(countries, today, rng, min_age, max_age);
         player.save();
         return player;
     }
 
     // Just like build and save, but minimal arguments.
-    pub fn create(today: &Date, rng: &mut ThreadRng, min_age: u8, max_age: u8) -> Self {
-        let person = Person::create(today, rng, min_age, max_age, Gender::Male);
+    pub fn create(countries: &HashMap<CountryId, Country>, today: &Date, rng: &mut ThreadRng, min_age: u8, max_age: u8) -> Self {
+        let person = Person::create(countries, today, rng, min_age, max_age, Gender::Male);
         let position_id = PositionId::get_random(rng);
 
         let mut player = Self::build(person, position_id);

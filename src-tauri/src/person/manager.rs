@@ -1,10 +1,12 @@
 // This is what a player is!
 
+use std::collections::HashMap;
+
 use rand::rngs::ThreadRng;
 use serde_json::json;
 use time::Date;
 
-use crate::{database::MANAGERS, person::{Gender, Person}, types::{ManagerId, convert}};
+use crate::{country::Country, database::MANAGERS, person::{Gender, Person}, types::{CountryId, ManagerId, convert}};
 
 #[derive(Default, Clone)]
 pub struct Manager {
@@ -31,8 +33,8 @@ impl Manager {
     }
 
     // Build a random manager.
-    pub fn build_and_save_random(today: &Date, rng: &mut ThreadRng) -> Self {
-        let person = Person::create(today, rng, 30, 60, Gender::Male);
+    pub fn build_and_save_random(countries: &HashMap<CountryId, Country>, today: &Date, rng: &mut ThreadRng) -> Self {
+        let person = Person::create(countries, today, rng, 30, 60, Gender::Male);
         return Self::build_and_save(person);
     }
 
