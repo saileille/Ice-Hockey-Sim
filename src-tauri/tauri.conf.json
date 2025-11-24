@@ -30,7 +30,7 @@
   },
   "bundle": {
     "resources": [
-      "json/"
+      "data/"
     ],
     "active": true,
     "targets": ["nsis", "appimage", "deb", "rpm"],

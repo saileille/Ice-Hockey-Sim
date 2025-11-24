@@ -1,26 +1,44 @@
 // Game cache.
 
-use crate::{match_event::{self, team::{cache::TeamGameDataCache, TeamGameData}}, team::lineup::LineUp};
+
+use crate::{match_event::{Rules, team::cache::TeamGameCache}, types::{Db, GameId, TeamId}};
+
+#[derive(Debug)]
+#[derive(Default, Clone)]
+pub enum Attacker {
+    #[default]
+    Null,
+    Home,
+    Away,
+}
 
 #[derive(Debug)]
 #[derive(Default, Clone)]
 pub struct GameCache {
-    pub home: TeamGameDataCache,
-    pub away: TeamGameDataCache,
-    pub rules: match_event::Rules,
+    pub home: TeamGameCache,
+    pub away: TeamGameCache,
+    pub rules: Rules,
+    pub attacker: Attacker,
+    // pub initialised: bool,
 }
 
 impl GameCache {
-    pub fn build(home: &TeamGameData, away: &TeamGameData, rules: &match_event::Rules) -> Self {
+    pub async fn build(db: &Db, game_id: GameId, home_id: TeamId, away_id: TeamId, rules: Rules) -> Self {
         Self {
-            home: TeamGameDataCache::build(home),
-            away: TeamGameDataCache::build(away),
-            rules: rules.clone(),
+            home: TeamGameCache::build(db, game_id, home_id).await,
+            away: TeamGameCache::build(db, game_id, away_id).await,
+            rules,
+            // initialised: true,
+
+            ..Default::default()
         }
     }
 
-    pub fn build_lineups(&mut self, home: &LineUp, away: &LineUp) {
-        self.home.build_lineup(home);
-        self.away.build_lineup(away);
+    pub async fn build_lineups(&mut self, db: &Db) {
+        self.home.team.auto_build_lineup(db).await;
+        self.away.team.auto_build_lineup(db).await;
+
+        self.home.build_lineup(db).await;
+        self.away.build_lineup(db).await;
     }
 }

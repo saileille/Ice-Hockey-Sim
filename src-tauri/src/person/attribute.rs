@@ -24,7 +24,7 @@ pub enum AttributeId {
 // Etc.
 #[derive(Clone)]
 pub struct Attribute {
-    id: AttributeId,
+    _id: AttributeId,
 
     // The age when the attribute starts to develop.
     start_change: u16,
@@ -36,7 +36,7 @@ pub struct Attribute {
 impl Attribute {
     pub fn build(id: AttributeId, start_change: u8, peak: u8) -> Self {
         Self {
-            id: id,
+            _id: id,
             start_change: years_to_days(start_change),
             peak: years_to_days(peak),
         }
@@ -51,7 +51,7 @@ impl Attribute {
 #[derive(Clone)]
 pub struct PersonAttribute {
     id: AttributeId,
-    value: AttributeValue,
+    pub value: AttributeValue,
 }
 
 impl Default for PersonAttribute {
@@ -84,7 +84,7 @@ impl PersonAttribute {
     }
 
     // Get a display value of the attribute.
-    pub fn get_display(&self) -> u8 {
+    pub fn display(&self) -> u8 {
         // Now between 0 and 16.
         let mut log = (self.value as f64).log2();
 

@@ -2,13 +2,14 @@
 
 use std::collections::HashMap;
 
-use rand::{Rng, rngs::ThreadRng, seq::IndexedRandom};
-use time::Date;
+use rand::seq::IndexedRandom;
+use serde::{Deserialize, Serialize};
 
-use crate::{person::{Contract, player::{Player, position::PositionId}}, team::Team, types::{PlayerId, convert}};
+use crate::{person::{Contract, ContractRole, player::{Player, position::PositionId}}, team::Team, types::{Db, PersonId, convert}};
 
 #[derive(Debug)]
 #[derive(Default, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct PlayerNeed {
     pub position: PositionId,
 
@@ -31,26 +32,26 @@ impl PlayerNeed {
     }
 
     // Get how many players the team has that have to be left outside a match lineup.
-    fn get_surplus(&self) -> i8 {
-        convert::int::<usize, i8>(self.abilities.len()) - self.get_lineup_places()
+    fn surplus(&self) -> i8 {
+        convert::int::<usize, i8>(self.abilities.len()) - self.lineup_places()
     }
 
     // Get the average ability of the players.
-    fn get_avg_ability(&self) -> f64 {
+    fn avg_ability(&self) -> f64 {
         let total: f64 = self.abilities.iter().sum();
         return total / convert::usize_to_f64(self.abilities.len());
     }
 
     // Get the worst ability of a player in lineup.
     pub fn get_worst(&self) -> f64 {
-        match self.get_surplus() < 0 {
+        match self.surplus() < 0 {
             true => 0.0,
             _ => *self.abilities.last().unwrap()
         }
     }
 
     // Get the best ability of a player in lineup.
-    fn get_best(&self) -> f64 {
+    fn _get_best(&self) -> f64 {
         match self.abilities.first() {
             Some(a) => *a,
             _ => 0.0
@@ -64,40 +65,40 @@ impl PlayerNeed {
         let mut index = 0.0;
 
         for ability in self.abilities.iter() {
-            if player.ability.get_display() as f64 > *ability {
+            if player.ability.display() as f64 > *ability {
                 break;
             }
             index += 1.0;
         }
 
-        return 1.0 - (index / (self.get_lineup_places()) as f64);
+        return 1.0 - (index / (self.lineup_places()) as f64);
     }
 
     // Calculate how much a team wants this type of player.
     fn calculate_urgency(&mut self, needs: &[Self]) {
         // If the team does not have enough players to play, something ought to be done about it...
-        if self.get_surplus() < 0 {
+        if self.surplus() < 0 {
             self.urgency = 10000.0; // Arbitrary
             return;
         }
 
         // Team will not hire more players if they have double of what they can fit in lineup.
-        else if self.get_surplus() >= self.get_lineup_places() {
+        else if self.surplus() >= self.lineup_places() {
             self.urgency = -10000.0;    // Arbitrary.
             return;
         }
 
-        let total_position_ability: f64 = needs.iter().map(|a| a.get_avg_ability()).sum();
+        let total_position_ability: f64 = needs.iter().map(|a| a.avg_ability()).sum();
         let avg_position_ability = total_position_ability / convert::usize_to_f64(needs.len());
 
         // The lower the quality in position, the bigger the modifier.
         // Lowest possible: 0.167, highest that is not arbitrary max: 1276.
-        let ability_modifier = if self.get_avg_ability() == 0.0 {
+        let ability_modifier = if self.avg_ability() == 0.0 {
             if avg_position_ability == 0.0 { 1.0 }
             else { 2000.0 /* Arbitrary */ }
         }
         else {
-            avg_position_ability / self.get_avg_ability()
+            avg_position_ability / self.avg_ability()
         };
 
         // Could have more stuff baked into it, but this should do for now.
@@ -106,7 +107,7 @@ impl PlayerNeed {
 
     // Get how many players of this particular position are allowed in lineup.
     // Does not take into account the possible variable lineup sizes of different competitions.
-    fn get_lineup_places(&self) -> i8 {
+    fn lineup_places(&self) -> i8 {
         match self.position {
             PositionId::Goalkeeper => 2,
             _ => 4
@@ -115,27 +116,25 @@ impl PlayerNeed {
 
     // Evaluate the team's desire to acquire given player.
     // Do not bother if the value is negative.
-    fn evaluate_player(&self, player: &Player) -> f64 {
-        let worst = match self.get_surplus() {
+    async fn evaluate_player(&self, db: &Db, player: &Player) -> f64 {
+        let worst = match self.surplus() {
             i8::MIN..0 => 0.0,
             _ => self.get_worst()
         };
 
-        (player.ability.get_display() as f64 - worst) * self.urgency * (1.0 / (player.person.contract_offers.len() + 1) as f64)
+        (player.ability.display() as f64 - worst) * self.urgency * (1.0 / (player.person.no_of_offers(db).await + 1) as f64)
     }
 }
 
 impl Team {
     // Team evaluates what kind of players it might need, and how desperately.
     // Needs rework once player development becomes a thing.
-    pub fn evaluate_player_needs(&mut self) {
-        let mut roster_build = self.get_players();
-        roster_build.append(&mut self.get_approached_players());
-        roster_build.sort_by(|a, b| b.ability.get_display().cmp(&a.ability.get_display()));
+    pub async fn evaluate_player_needs(&mut self, db: &Db) {
+        let mut roster_build = self.players_and_approached(db).await;
+        roster_build.sort_by(|a, b| b.ability.display().cmp(&a.ability.display()));
+
         let players = get_players_per_position(roster_build);
-
-
-        self.player_needs = players.iter().map(|(k, v)| evaluate_position_needs(k, v)).collect();
+        self.player_needs = players.into_iter().map(|(k, v)| evaluate_position_needs(k, v)).collect();
 
         let needs_clone = self.player_needs.clone();
         for i in 0..self.player_needs.len() {
@@ -144,38 +143,46 @@ impl Team {
         }
 
         self.player_needs.sort_by(|a, b| b.urgency.total_cmp(&a.urgency));
+
+        // Save the player needs to the database.
+        sqlx::query(
+            "UPDATE Team SET player_needs = $1
+            WHERE id = $2"
+        ).bind(serde_json::to_string(&self.player_needs).unwrap())
+        .bind(self.id)
+        .execute(db).await.unwrap();
     }
 
     // Offer contract to a player, if the team needs one.
     // Return whether contract was offered or not.
-    pub fn offer_contract(&mut self, today: &Date, rng: &mut ThreadRng) -> bool {
-        let mut player = self.select_player_from_shortlist(rng);
-        if player.is_none() { return false; }
+    pub async fn offer_contract(&mut self, db: &Db) -> bool {
+        let o_player = self.select_player_from_shortlist(db).await;
+        if o_player.is_none() { return false; }
+        let player = o_player.unwrap();
 
-        let contract = self.create_contract_offer(player.as_ref().unwrap(), today, rng);
-        self.offer_contract_to_player(player.as_mut().unwrap(), contract);
+        self.create_contract_offer(db, player).await;
         return true;
     }
 
     // Give the team an opportunity to offer a contract to a player.
     // Assumes that self.player_needs is up-to-date!
-    fn select_player_from_shortlist(&self, rng: &mut ThreadRng) -> Option<Player> {
-        let free_agents = self.get_player_shortlist();
+    async fn select_player_from_shortlist(&self, db: &Db) -> Option<Player> {
+        let free_agents = self.player_shortlist(db).await;
 
         // Do not offer any contracts if there is no-one the team wants.
         if free_agents.is_empty() { return None; }
 
         // How much a team wants a specific player.
-        let mut player_attraction: Vec<(PlayerId, f64)> = Vec::new();
-        for player in free_agents.iter() {
+        let mut player_attraction: Vec<(Player, f64)> = Vec::new();
+        for player in free_agents {
             for need in self.player_needs.iter() {
                 if need.position == player.position_id {
-                    let evaluation = need.evaluate_player(player);
+                    let evaluation = need.evaluate_player(db, &player).await;
 
                     // Do not add these.
                     if evaluation <= 0.0 { continue; }
 
-                    player_attraction.push((player.id, evaluation));
+                    player_attraction.push((player, evaluation));
                     break;
                 }
             }
@@ -185,36 +192,32 @@ impl Team {
         player_attraction.sort_by(|(_, a), (_, b)| b.total_cmp(&a));
 
         // Choose randomly from equally good options.
-        let mut choices: Vec<(PlayerId, f64)> = Vec::new();
+        let mut choices: Vec<(Player, f64)> = Vec::new();
         for attraction in player_attraction {
             if choices.is_empty() || choices[0].1 <= attraction.1 {
                 choices.push(attraction);
             }
         }
 
-        let choice = choices.choose(rng).unwrap();
-
-        return Player::fetch_from_db(&choice.0);
+        let choice = choices.choose(&mut rand::rng()).unwrap();
+        return Some(choice.0.clone());
     }
 
-    // Offer contract to a given player.
-    pub fn offer_contract_to_player(&mut self, player: &mut Player, contract: Contract) {
-        player.person.contract_offers.push(contract);
-        self.approached_players.push(player.id);
-        player.save();
-
-        self.actions_remaining -= 1;
+    // Create a contract offer from this team to a given person.
+    pub async fn send_contract_offer(&mut self, db: &Db, person_id: PersonId, years: i32, role: ContractRole) {
+        Contract::build_from_years(db, person_id, self, years, role, false).await;
+        self.remove_action(db).await;
     }
 
     // AI makes a contract offer to a player.
     // The player itself should affect the contract offer at some point.
-    pub fn create_contract_offer(&self, player: &Player, today: &Date, rng: &mut ThreadRng) -> Contract {
-        let years = rng.random_range(1..=4);  // 1-4 year contract offers, just like MHM.
-        return Contract::build_from_years(self, today, years);
+    pub async fn create_contract_offer(&mut self, db: &Db, player: Player) {
+        let years = rand::random_range(1..=4);  // 1-4 year contract offers, just like MHM.
+        self.send_contract_offer(db, player.person.id, years, ContractRole::Player).await;
     }
 
     // Get a player shortlist of possible hirelings.
-    fn get_player_shortlist(&self) -> Vec<Player> {
+    async fn player_shortlist(&self, db: &Db) -> Vec<Player> {
         let mut positions = vec![&self.player_needs[0].position];
         let highest_urgency = self.player_needs[0].urgency;
 
@@ -227,8 +230,8 @@ impl Team {
             }
         }
 
-        let mut free_agents = Player::get_free_agents_for_team(positions, self.id);
-        free_agents.sort_by(|a, b| b.ability.get_display().cmp(&a.ability.get_display()));
+        let mut free_agents = Player::free_agents_for_team(db, positions, self.id).await;
+        free_agents.sort_by(|a, b| b.ability.display().cmp(&a.ability.display()));
 
         return free_agents;
     }
@@ -252,10 +255,10 @@ fn get_players_per_position(players: Vec<Player>) -> HashMap<PositionId, Vec<Pla
 }
 
 // Evaluate the need for a specific position.
-fn evaluate_position_needs(position: &PositionId, players: &[Player]) -> PlayerNeed {
-    let mut need = PlayerNeed::build(position.clone());
-    let players_in_lineup = players.len().clamp(0, need.get_lineup_places() as usize);
-    need.abilities = players[0..players_in_lineup].iter().map(|a| a.ability.get_display() as f64).collect();
+fn evaluate_position_needs(position: PositionId, players: Vec<Player>) -> PlayerNeed {
+    let mut need = PlayerNeed::build(position);
+    let players_in_lineup = players.len().clamp(0, need.lineup_places() as usize);
+    need.abilities = players[0..players_in_lineup].into_iter().map(|a| a.ability.display() as f64).collect();
 
     return need;
 }

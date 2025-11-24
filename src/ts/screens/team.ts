@@ -9,7 +9,7 @@ import { Listener } from "../types/dom";
 
 // Draw the screen of a given team.
 export const drawScreen = async (id: number) => {
-    const team: Team = await invoke("get_team_screen_package", { id: id });
+    const team: Team = await invoke("team_screen_package", { id: id });
 
     const elements: Array<HTMLElement> = [
         createElement("h1", {"textContent": team.name}, [])

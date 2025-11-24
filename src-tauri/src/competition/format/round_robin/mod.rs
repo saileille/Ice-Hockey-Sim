@@ -1,17 +1,19 @@
 // The round robin struct and methods for round-robin stages.
 mod schedule_validator;
 
-use crate::{competition::season::Season, types::{convert}};
+use serde::{Deserialize, Serialize};
+
+use crate::{competition::season::Season, types::Db};
 
 #[derive(Default, Clone, PartialEq, Debug)]
 pub enum MatchGenType {
     #[default] Null,
-    MatchCount,
-    Random,
+    _MatchCount,
+    _Random,
     Alternating,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[derive(Default, Clone)]
 pub struct RoundRobin {
     pub rounds: u8, // How many times each team plays one another.
@@ -42,48 +44,13 @@ impl RoundRobin {
 
 impl RoundRobin {
     // Get how many matches each team should play.
-    pub fn get_theoretical_matches_per_team(&self, season: &Season) -> u8 {
-        self.get_round_length(season) * self.rounds
+    pub async fn get_theoretical_matches_per_team(&self, db: &Db, season: &Season) -> u8 {
+        self.get_round_length(db, season).await * self.rounds
         + self.extra_matches
     }
 
-    // Check if the stage has a valid amount of matches.
-    // Increase the match amount if that is not the case.
-    fn validate_match_amount(&mut self, season: &Season) {
-        let matches_per_team = self.get_theoretical_matches_per_team(season);
-
-        // Make sure there is at least one match on the stage per team.
-        if matches_per_team == 0 {
-            self.extra_matches += 1
-        }
-
-        // Either the amount of teams or the matches per team must be even.
-        if (season.teams.len() % 2 != 0) && (matches_per_team % 2 != 0) {
-            self.extra_matches += 1;
-        }
-    }
-
-    // Check if the match schedule went according to plan.
-    pub fn had_successful_match_generation(&self, season: &Season) -> bool {
-        self.get_theoretical_total_matches(season) == convert::int::<usize, u16>(season.get_all_games().len())
-    }
-
     // Get how many matches each team has to play to face each team once.
-    pub fn get_round_length(&self, season: &Season) -> u8 {
-        convert::int::<usize, u8>(season.teams.len() - 1)
-    }
-}
-
-// Testing.
-impl RoundRobin {
-    // Get how many matches there should be in the stage in total.
-    pub fn get_theoretical_total_matches(&self, season: &Season) -> u16 {
-        return (self.get_theoretical_matches_per_team(season) as u16) * convert::int::<usize, u16>(season.teams.len()) / 2;
-    }
-
-    // Check if the stage has a valid amount of matches.
-    // For testing purposes only. For in-game use, see validate_match_amount.
-    pub fn has_valid_match_amount(&self, season: &Season) -> bool {
-        (season.teams.len() % 2 == 0) || (self.get_theoretical_matches_per_team(season) % 2 == 0)
+    pub async fn get_round_length(&self, db: &Db, season: &Season) -> u8 {
+        season.no_of_teams(db).await - 1
     }
 }

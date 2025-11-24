@@ -2,7 +2,7 @@
 
 use rand::rngs::ThreadRng;
 
-use crate::{match_event::event::PlayersOnIce, misc::random_with_weights, person::player::Player, team::lineup::{DefencePair, ForwardLine, LineUp}, types::PlayerId};
+use crate::{match_event::event::PlayersOnIce, misc::random_with_weights, person::player::Player, team::lineup::{DefencePair, ForwardLine, LineUp}, types::{Db, PersonId}};
 
 #[derive(Debug)]
 #[derive(Default, Clone)]
@@ -14,19 +14,19 @@ pub struct LineUpCache {
 }
 
 impl LineUpCache {
-    pub fn build(lineup: &LineUp) -> Self {
+    pub async fn build(db: &Db, lineup: &LineUp) -> Self {
         let mut cache = Self::default();
 
         for (i, gk) in lineup.gk_ids.iter().enumerate() {
-            cache.goalkeepers[i] = Player::fetch_from_db(gk);
+            cache.goalkeepers[i] = Player::fetch_from_db(db, *gk).await;
         }
 
         for (i, pair) in lineup.defence_pairs.iter().enumerate() {
-            cache.defence_pairs[i] = DefencePairCache::build(pair);
+            cache.defence_pairs[i] = DefencePairCache::build(db, pair).await;
         }
 
         for (i, line) in lineup.forward_lines.iter().enumerate() {
-            cache.forward_lines[i] = ForwardLineCache::build(line);
+            cache.forward_lines[i] = ForwardLineCache::build(db, line).await;
         }
 
         return cache;
@@ -53,39 +53,39 @@ impl LineUpCache {
 
     // Get the average ability of the lineup.
     // This is for player contract AI.
-    pub fn get_average_ability(&self) -> f64 {
+    pub fn average_ability(&self) -> f64 {
         let mut total_ability = 0;
         let mut counter: u8 = 0;
 
         for gk in self.goalkeepers.iter() {
             if gk.is_some() {
-                total_ability += gk.as_ref().unwrap().ability.get_display() as u16;
+                total_ability += gk.as_ref().unwrap().ability.display() as u16;
                 counter += 1;
             }
         }
 
         for pair in self.defence_pairs.iter() {
             if pair.ld.is_some() {
-                total_ability += pair.ld.as_ref().unwrap().ability.get_display() as u16;
+                total_ability += pair.ld.as_ref().unwrap().ability.display() as u16;
                 counter += 1;
             }
             if pair.rd.is_some() {
-                total_ability += pair.rd.as_ref().unwrap().ability.get_display() as u16;
+                total_ability += pair.rd.as_ref().unwrap().ability.display() as u16;
                 counter += 1;
             }
         }
 
         for line in self.forward_lines.iter() {
             if line.lw.is_some() {
-                total_ability += line.lw.as_ref().unwrap().ability.get_display() as u16;
+                total_ability += line.lw.as_ref().unwrap().ability.display() as u16;
                 counter += 1;
             }
             if line.c.is_some() {
-                total_ability += line.c.as_ref().unwrap().ability.get_display() as u16;
+                total_ability += line.c.as_ref().unwrap().ability.display() as u16;
                 counter += 1;
             }
             if line.rw.is_some() {
-                total_ability += line.rw.as_ref().unwrap().ability.get_display() as u16;
+                total_ability += line.rw.as_ref().unwrap().ability.display() as u16;
                 counter += 1;
             }
         }
@@ -106,10 +106,10 @@ struct DefencePairCache {
 }
 
 impl DefencePairCache {
-    fn build(defence_pair: &DefencePair) -> Self {
+    async fn build(db: &Db, defence_pair: &DefencePair) -> Self {
         DefencePairCache {
-            ld: defence_pair.get_left_defender(),
-            rd: defence_pair.get_right_defender(),
+            ld: defence_pair.left_defender(db).await,
+            rd: defence_pair.right_defender(db).await,
         }
     }
 }
@@ -123,11 +123,11 @@ struct ForwardLineCache {
 }
 
 impl ForwardLineCache {
-    fn build(forward_line: &ForwardLine) -> Self {
+    async fn build(db: &Db, forward_line: &ForwardLine) -> Self {
         ForwardLineCache {
-            lw: forward_line.get_left_winger(),
-            c: forward_line.get_centre(),
-            rw: forward_line.get_right_winger(),
+            lw: forward_line.left_winger(db).await,
+            c: forward_line.centre(db).await,
+            rw: forward_line.right_winger(db).await,
         }
     }
 }
@@ -146,7 +146,7 @@ pub struct PlayersOnIceCache {
 
 impl PlayersOnIceCache {
     // Get the total ability of skaters (not goalkeeper).
-    fn get_skaters_ability(&self) -> u32 {
+    fn skaters_ability(&self) -> u32 {
         let mut total_ability = 0;
 
         if self.ld.is_some() { total_ability += self.ld.as_ref().unwrap().ability.get() as u32 }
@@ -160,9 +160,9 @@ impl PlayersOnIceCache {
     }
 
     // Compare the ability of skaters on ice to the opponent.
-    pub fn get_skaters_ability_ratio(&self, opponent: &Self) -> f64 {
-        let ability = self.get_skaters_ability() as f64;
-        let both_sides_ability = ability + (opponent.get_skaters_ability() as f64);
+    pub fn skaters_ability_ratio(&self, opponent: &Self) -> f64 {
+        let ability = self.skaters_ability() as f64;
+        let both_sides_ability = ability + (opponent.skaters_ability() as f64);
 
         // To avoid dividing by zero.
         match both_sides_ability {
@@ -172,22 +172,22 @@ impl PlayersOnIceCache {
     }
 
     // Get the IDs of the players.
-    pub fn get_ids(&self) -> PlayersOnIce {
+    pub fn ids(&self) -> PlayersOnIce {
         PlayersOnIce::build(
-            Self::get_player_id(&self.gk.as_ref()),
-            Self::get_player_id(&self.ld.as_ref()),
-            Self::get_player_id(&self.rd.as_ref()),
-            Self::get_player_id(&self.lw.as_ref()),
-            Self::get_player_id(&self.c.as_ref()),
-            Self::get_player_id(&self.rw.as_ref()),
-            Self::get_player_id(&self.extra_attacker.as_ref())
+            Self::player_id(&self.gk.as_ref()),
+            Self::player_id(&self.ld.as_ref()),
+            Self::player_id(&self.rd.as_ref()),
+            Self::player_id(&self.lw.as_ref()),
+            Self::player_id(&self.c.as_ref()),
+            Self::player_id(&self.rw.as_ref()),
+            Self::player_id(&self.extra_attacker.as_ref())
         )
     }
 
     // Get a player's ID.
-    fn get_player_id(player: &Option<&Player>) -> PlayerId {
+    fn player_id(player: &Option<&Player>) -> PersonId {
         if player.is_none() { return 0; }
-        return player.unwrap().id;
+        return player.unwrap().person.id;
     }
 
     // Create a vector of the skaters.

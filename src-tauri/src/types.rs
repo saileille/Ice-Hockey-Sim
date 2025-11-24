@@ -2,15 +2,20 @@
 
 use std::collections::HashMap;
 
+use sqlx::SqlitePool;
+
 use crate::{country::NamePool, person::Gender};
+
+pub type Db = SqlitePool;
 
 // Database ID types.
 pub type CountryId = u8;
 pub type CompetitionId = u8;
+pub type SeasonId = u8;
+pub type GameId = u16;
 
 pub type TeamId = u8;
-pub type PlayerId = u16;
-pub type ManagerId = u8;
+pub type PersonId = u16;
 
 pub type CountryNamePool = HashMap<Gender, HashMap<String, NamePool>>;
 
@@ -35,13 +40,5 @@ pub mod convert {
             return num as f64;
         }
         panic!("{num} is bigger than {}", f64::MAX);
-    }
-
-    // Convert f64 to u8.
-    pub fn f64_to_u8(num: f64) -> u8 {
-        if num <= (u8::MAX as f64) {
-            return num as u8;
-        }
-        panic!("{num} is bigger than {}", u8::MAX);
     }
 }

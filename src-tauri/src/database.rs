@@ -1,60 +1,43 @@
 // The game database.
-use std::{collections::HashMap, sync::{LazyLock, Mutex}};
+use std::{collections::HashMap, path::Path};
 use rand::rngs::ThreadRng;
+use sqlx::{Sqlite, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
 use tauri::{AppHandle, Manager as TauriManager, path::BaseDirectory};
 use time::{macros::date, Date};
 use lazy_static::lazy_static;
 
 use crate::{
-    competition::{
-        format::{self}, knockout_generator, season::{ranking::RankCriteria, Season}, CompConnection, Competition, Seed
-    }, country::Country, event, io, match_event, person::{attribute::{Attribute, AttributeId}, manager::Manager, player::{
-        position::{Position, PositionId}, Player
-    }}, team::Team, time::{AnnualDate, AnnualWindow}, types::{CompetitionId, CountryId, ManagerId, PlayerId, TeamId}
+    app_data::{AppData, Directories}, competition::{
+        CompConnection, Competition, Seed, format::{self}, knockout_generator, season::ranking::RankCriteria
+    }, country::Country, event, io, match_event, person::{attribute::{Attribute, AttributeId}, player::
+        Player
+    }, team::Team, time::{AnnualDate, AnnualWindow}, types::Db
 };
 
-// The current date in the game.
-pub static TODAY: LazyLock<Mutex<Date>> = LazyLock::new(|| Mutex::new(date!(2025-07-01)));
+// Get the current date.
+pub async fn get_today(db: &Db) -> Date {
+    sqlx::query_scalar(
+        "SELECT value_data FROM KeyValue
+        WHERE key_name = 'today'"
+    ).fetch_one(db).await.unwrap()
+}
 
-// Resource directories.
-pub static JSON_DIR: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new("".to_string()));
-pub static PEOPLE_NAME_DIR: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new("".to_string()));
-pub static COUNTRY_FLAG_DIR: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new("".to_string()));
+async fn save_today(db: &Db, today: Date) {
+    sqlx::query(
+        "UPDATE KeyValue SET value_data = $1
+        WHERE key_name = 'today'"
+    ).bind(today)
+    .execute(db).await.unwrap();
+}
 
-pub static COUNTRIES: LazyLock<Mutex<HashMap<CountryId, Country>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-pub static COMPETITIONS: LazyLock<Mutex<HashMap<CompetitionId, Competition>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-
-// Seasons are special in that they are stored in vectors by competition ID.
-pub static SEASONS: LazyLock<Mutex<HashMap<CompetitionId, Vec<Season>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-
-pub static TEAMS: LazyLock<Mutex<HashMap<TeamId, Team>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-pub static PLAYERS: LazyLock<Mutex<HashMap<PlayerId, Player>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-pub static MANAGERS: LazyLock<Mutex<HashMap<ManagerId, Manager>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+// Continue to the next day.
+pub async fn next_day(db: &Db) {
+    let mut today = get_today(db).await;
+    today = today.next_day().unwrap();
+    save_today(db, today).await;
+}
 
 lazy_static! {
-    pub static ref POSITIONS: HashMap<PositionId, Position> = {
-         HashMap::from([
-            (PositionId::Goalkeeper, Position::build(
-                PositionId::Goalkeeper, "GK", 0
-            )),
-            (PositionId::LeftDefender, Position::build(
-                PositionId::LeftDefender, "LD", 0
-            )),
-            (PositionId::RightDefender, Position::build(
-                PositionId::RightDefender, "RD", 0
-            )),
-            (PositionId::LeftWinger, Position::build(
-                PositionId::LeftWinger, "LW", 0
-            )),
-            (PositionId::Centre, Position::build(
-                PositionId::Centre, "C", 0
-            )),
-            (PositionId::RightWinger, Position::build(
-                PositionId::RightWinger, "RW", 0
-            )),
-        ])
-    };
-
     pub static ref ATTRIBUTES: HashMap<AttributeId, Attribute> = {
          HashMap::from([
              (AttributeId::Defending, Attribute::build(
@@ -92,79 +75,97 @@ lazy_static! {
     };
 }
 
+pub async fn setup(dir: &Path) -> Db {
+    // let canonised = dunce::canonicalize(dir).unwrap();
+    // let path = canonised.to_str().unwrap();
+    // println!("{path}");
+    // Sqlite::create_database(format!("sqlite://{path}/db.db?mode=rwc").as_str()).await.unwrap();
+    // let db = SqlitePoolOptions::new().connect(format!("sqlite://{path}/db.db").as_str()).await.unwrap();
+    Sqlite::create_database(format!("sqlite::memory:").as_str()).await.unwrap();
+    let db = SqlitePoolOptions::new().connect(format!("sqlite::memory:").as_str()).await.unwrap();
+    sqlx::migrate!("./sql/migrations").run(&db).await.unwrap();
+
+    return db;
+}
+
 // Initialise the database.
-pub fn initialise(handle: &AppHandle) {
-    create_dir_paths(handle);
+pub async fn initialise(handle: &AppHandle) -> AppData {
+    let data = create_dir_paths(handle).await;
 
-    let today = TODAY.lock().unwrap().clone();
+    // Creating the start date and saving it to the database.
+    let today = date!(2025-07-01);
+    sqlx::query(
+        "INSERT INTO KeyValue (key_name, value_data)
+        VALUES ('today', $1)"
+    ).bind(today)
+    .execute(&data.db).await.unwrap();
+
     let mut rng = rand::rng();
-    add_competition_data(&today, &mut rng);
+    add_competition_data(&data.db, &mut rng).await;
 
-    let comps = COMPETITIONS.lock().unwrap().clone();
-    for comp in comps.values() {
-        // Add parent IDs.
-        comp.give_id_to_children_comps();
-
-        // Set up seasons, starting from the top level.
-        if comp.parent_comp_id == 0 {
-            comp.setup_season(&mut Vec::new(), & mut rng);
-        }
+    // Set up seasons, starting from the parent competitions and going down the hierarchy.
+    let comps = Competition::fetch_parents(&data.db).await;
+    for comp in comps {
+        comp.setup_season(&data.db, &mut Vec::new()).await;
     }
 
     // Creating the countries.
-    let country_names = io::get_countries_from_name_files();
+    let country_names = io::get_countries_from_name_files(&data.directories);
     for name in country_names.iter() {
-        Country::build_and_save(name);
+        Country::build_and_save(&data.directories, &data.db, name).await;
     }
 
-    // Getting the countries here so we do not have to clone it several times.
-    let countries = COUNTRIES.lock().unwrap().clone();
-
+    let teams = Team::fetch_all(&data.db).await;
     // Generate 50 players per team.
-    for _ in 0..TEAMS.lock().unwrap().len() * 50 {
-        Player::build_and_save(&countries, &today, &mut rng, 16, 37);
+    for _ in 0..teams.len() * 50 {
+        Player::build_and_save(&data.db, 16, 35).await;
     }
 
     // Set up the teams.
-    let mut teams = TEAMS.lock().unwrap().clone();
-    for team in teams.values_mut() {
-        team.setup(&countries, &today, &mut rng);
+    for mut team in teams.into_iter() {
+        team.setup(&data.db).await;
     }
+
+    return data
 }
 
-// Get the dir paths for everyone.
-fn create_dir_paths(handle: &AppHandle) {
-    let json_dir = handle.path().resolve("json/", BaseDirectory::Resource).unwrap();
-    let people_name_dir = json_dir.join("names/");
-    let flag_dir = json_dir.join("flags/");
+// Create the resource directory paths.
+async fn create_dir_paths(handle: &AppHandle) -> AppData {
+    let data_dir = handle.path().resolve("data/", BaseDirectory::Resource).unwrap();
+    let people_name_dir = data_dir.join("names/");
+    let flag_dir = data_dir.join("flags/");
 
-    *JSON_DIR.lock().unwrap() = json_dir.clone().to_str().unwrap().to_string();
-    *PEOPLE_NAME_DIR.lock().unwrap() = people_name_dir.to_str().unwrap().to_string();
-    *COUNTRY_FLAG_DIR.lock().unwrap() = flag_dir.to_str().unwrap().to_string();
+    let directories = Directories {
+        names: people_name_dir.to_str().unwrap().to_string(),
+        flags: flag_dir.to_str().unwrap().to_string(),
+    };
+
+    let db = setup(&data_dir.as_path()).await;
+    return AppData::build(db, directories);
 }
 
 // Add competitions.
 // NOTE: Season window of the parent competition MUST go at least one day past the last day of the last stage.
 // Otherwise some contracts might expire before the last match day is played.
-fn add_competition_data(today: &Date, rng: &mut ThreadRng) {
-    // 1: Liiga
+async fn add_competition_data(db: &Db, rng: &mut ThreadRng) {
     Competition::build_and_save(
+        db,
         "PHL",
         vec![
-            Team::build_and_save("Ruiske"),     // 1
-            Team::build_and_save("Atomi"),      // 2
-            Team::build_and_save("Uupuneet"),   // 3
-            Team::build_and_save("SantaClaus"), // 4
-            Team::build_and_save("HardCore"),   // 5
-            Team::build_and_save("Ikirouta"),   // 6
-            Team::build_and_save("Kelarotat"),  // 7
-            Team::build_and_save("Vety"),       // 8
-            Team::build_and_save("Saappaat"),   // 9
-            Team::build_and_save("Siat"),       // 10
-            Team::build_and_save("Turmio"),     // 11
-            Team::build_and_save("Sirkus"),     // 12
-            Team::build_and_save("Polkka"),     // 13
-            Team::build_and_save("Teurastus"),  // 14
+            Team::build("Ruiske"),     // 1
+            Team::build("Atomi"),      // 2
+            Team::build("Uupuneet"),   // 3
+            Team::build("SantaClaus"), // 4
+            Team::build("HardCore"),   // 5
+            Team::build("Ikirouta"),   // 6
+            Team::build("Kelarotat"),  // 7
+            Team::build("Vety"),       // 8
+            Team::build("Saappaat"),   // 9
+            Team::build("Siat"),       // 10
+            Team::build("Turmio"),     // 11
+            Team::build("Sirkus"),     // 12
+            Team::build("Polkka"),     // 13
+            Team::build("Teurastus"),  // 14
         ],
         AnnualWindow::build(
             AnnualDate::build(9, 1),
@@ -174,52 +175,49 @@ fn add_competition_data(today: &Date, rng: &mut ThreadRng) {
         0,
         None,
         vec![RankCriteria::ChildCompRanking],
-        vec![2, 3],
-        today
-    );
-    // 2: Liiga Regular Season.
-    Competition::build_and_save(
-        "Regular Season",
-        Vec::new(),
-        AnnualWindow::build(
-            AnnualDate::build(9, 1),
-            AnnualDate::build(3, 31)
-        ),
-        vec![CompConnection::build([1, 10], 3, Seed::GetFromPosition, false)],
-        14,
-        format::Format::build(
-            Some(format::round_robin::RoundRobin::build(4, 0, 3, 2, 1, 1, 0)),
-            None,
-            match_event::Rules::build(3, 1200, 300, false)
-        ),
         vec![
-            RankCriteria::Points,
-            RankCriteria::GoalDifference,
-            RankCriteria::GoalsScored,
-            RankCriteria::TotalWins,
-            RankCriteria::RegularWins,
-            RankCriteria::OvertimeWins,
-            RankCriteria::Draws,
-            RankCriteria::RegularLosses,
+            Competition::build_and_save(
+                db,
+                "Regular Season",
+                Vec::new(),
+                AnnualWindow::build(
+                    AnnualDate::build(9, 1),
+                    AnnualDate::build(3, 31)
+                ),
+                Vec::new(),
+                14,
+                format::Format::build(
+                    Some(format::round_robin::RoundRobin::build(4, 0, 3, 2, 1, 1, 0)),
+                    None,
+                    match_event::Rules::build(3, 1200, 300, false)
+                ),
+                vec![
+                    RankCriteria::Points,
+                    RankCriteria::GoalDifference,
+                    RankCriteria::GoalsScored,
+                    RankCriteria::TotalWins,
+                    RankCriteria::RegularWins,
+                    RankCriteria::OvertimeWins,
+                    RankCriteria::Draws,
+                    RankCriteria::RegularLosses,
+                ],
+                Vec::new(),
+            ).await,
+            knockout_generator::build(
+                db, rng,
+                "Playoffs",
+                vec!["Pity Round"],
+                AnnualWindow::build(
+                    AnnualDate::build(4, 1),
+                    AnnualDate::build(5, 31)
+                ),
+                vec![match_event::Rules::build(3, 1200, 0, true)],
+                vec![2, 4],
+                vec![10],
+                1,
+                vec![CompConnection::build(1, 1, 10, Seed::GetFromPosition, false)],
+                vec![RankCriteria::Seed],
+            ).await
         ],
-        Vec::new(),
-        today
-    );
-    // 3: Liiga Playoffs.
-    knockout_generator::build(
-        "Playoffs",
-        vec!["Pity Round"],
-        AnnualWindow::build(
-            AnnualDate::build(4, 1),
-            AnnualDate::build(5, 31)
-        ),
-        vec![match_event::Rules::build(3, 1200, 0, true)],
-        vec![2, 4],
-        vec![10],
-        1,
-        Vec::new(),
-        vec![RankCriteria::Seed],
-        today,
-        rng
-    );
+    ).await;
 }

@@ -1,3 +1,4 @@
+mod app_data;
 mod commands;
 mod competition;
 mod country;
@@ -25,7 +26,12 @@ pub fn run() {
 
     tauri::Builder::default()
         .setup(|app| {
-            database::initialise(app.handle());
+            let handle = app.handle();
+            tauri::async_runtime::block_on(async move {
+                let data = database::initialise(handle).await;
+                handle.manage(data);
+            });
+
             #[cfg(debug_assertions)] {
                 let window = app.get_webview_window("main").unwrap();
                 window.open_devtools();
@@ -35,15 +41,15 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::continue_game::go_to_next_day,
-            commands::get_top_bar_package,
-            commands::get_comp_select_package,
-            commands::get_team_select_package,
-            commands::get_comp_screen_package,
-            commands::get_team_screen_package,
-            commands::get_player_package,
+            commands::top_bar_package,
+            commands::comp_select_package,
+            commands::team_select_package,
+            commands::comp_screen_package,
+            commands::team_screen_package,
+            commands::player_package,
             commands::create_human_manager,
-            commands::get_human_package,
-            commands::get_free_agents_package,
+            commands::human_package,
+            commands::free_agents_package,
             commands::offer_contract,
         ])
         .run(tauri::generate_context!())

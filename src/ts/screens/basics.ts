@@ -44,7 +44,7 @@ const resetCompSelect = (comps: HTMLSelectElement) => {
 export const updateTopBar = async () => {
     initialiseTopBar();
 
-    const topBarPackage: TopBarPackage = await invoke("get_top_bar_package");
+    const topBarPackage: TopBarPackage = await invoke("top_bar_package");
     displayDate(topBarPackage.date);
     displayActionsRemaining(topBarPackage.human.team);
 
@@ -81,7 +81,7 @@ const displayActionsRemaining = (team: HumanTeamPackage | null) => {
 };
 
 export const createTopLevelCompSelect = async (parent: Element): Promise<HTMLSelectElement> => {
-    const comps: Array<[number, string]> = await invoke("get_comp_select_package");
+    const comps: Array<[number, string]> = await invoke("comp_select_package");
     const compSelect = createCompSelect(comps, parent);
     // compSelect.id = "comps";
     return compSelect;

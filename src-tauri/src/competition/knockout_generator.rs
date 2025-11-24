@@ -2,12 +2,13 @@
 
 use ordinal::ToOrdinal as _;
 use rand::{Rng, rngs::ThreadRng};
-use time::{Date, Duration};
+use time::Duration;
 
-use crate::{competition::{self, CompConnection, Competition, Seed, format::{self, knockout_round::KnockoutRound as KnockoutRoundFormat}, season::ranking::RankCriteria}, database::COMPETITIONS, match_event, time::{AnnualDate, AnnualWindow, get_dates}, types::{CompetitionId, convert}};
+use crate::{competition::{self, CompConnection, Competition, Seed, format::{self, knockout_round::KnockoutRound as KnockoutRoundFormat}, season::ranking::RankCriteria}, match_event, time::{AnnualDate, AnnualWindow, get_dates}, types::{CompetitionId, Db, convert}};
 
 // Generate a knockout competition with each round being represented as its own competition element.
-pub fn build(
+pub async fn build(
+    db: &Db, rng: &mut ThreadRng,
     name: &str, // Name of the knockout competition itself.
     round_names: Vec<&str>, // Names for the rounds to be generated. If there are more rounds than names, the remaining round will have automatically generated names.
     season_window: AnnualWindow, // Time when this competition is played.
@@ -16,16 +17,18 @@ pub fn build(
     mut teams_in_rounds: Vec<u8>,   // Number of teams the knockout competition has on each round.
     teams_at_end: u8,   // Number of teams the knockout competition ends with.
     connections: Vec<CompConnection>,    // Connections to other competitions; where to move which teams after the knockout is over.
-    rank_criteria: Vec<RankCriteria>, today: &Date, rng: &mut ThreadRng
-) {
-    let mut parent_comp = Competition::build_and_save(name, Vec::new(), season_window, connections, teams_in_rounds[0], None, Vec::new(), Vec::new(), today);
-    parent_comp.competition_type = competition::Type::Tournament;
+    rank_criteria: Vec<RankCriteria>
+) -> Competition {
+    let mut parent_comp = Competition::build_and_save(db, name, Vec::new(), season_window, connections, teams_in_rounds[0], None, vec![RankCriteria::ChildCompRanking], Vec::new()).await;
+    parent_comp.comp_type = competition::Type::Tournament;
 
     get_teams_in_rounds(&mut teams_in_rounds, teams_at_end);
-    let mut rounds = create_rounds(round_names, match_rules, wins_required, teams_in_rounds, rank_criteria, parent_comp.id);
+    let mut rounds = create_rounds(db, round_names, match_rules, wins_required, teams_in_rounds, rank_criteria, parent_comp.id).await;
 
-    set_date_boundaries(&mut rounds, &parent_comp.season_window, rng);
-    finalise_rounds(&mut parent_comp, &mut rounds, today);
+    set_date_boundaries(rng, &mut rounds, &parent_comp.season_window);
+    finalise_rounds(db, &mut parent_comp, &mut rounds).await;
+
+    return parent_comp;
 }
 
 // Get how many teams each round should actually have.
@@ -38,7 +41,7 @@ fn get_teams_in_rounds(teams_in_rounds: &mut Vec<u8>, teams_at_end: u8) {
     }
 
     // Return the no of teams for each round here if there is no need for special rounds.
-    if &next_teams == teams_in_rounds.last().unwrap() {
+    if next_teams == *teams_in_rounds.last().unwrap() {
         last_rounds.reverse();
         teams_in_rounds.append(&mut last_rounds);
         return;
@@ -54,11 +57,10 @@ fn get_teams_in_rounds(teams_in_rounds: &mut Vec<u8>, teams_at_end: u8) {
 }
 
 // Build a single competition round.
-fn build_round(round_names: &[&str], match_rules: &[match_event::Rules], wins_required: &[u8], teams_in_rounds: &[u8], rank_criteria: &Vec<RankCriteria>, parent_comp_id: CompetitionId, round_size: u8, i: usize) -> Competition {
+async fn build_round(db: &Db, round_names: &[&str], match_rules: &[match_event::Rules], wins_required: &[u8], teams_in_rounds: &[u8], rank_criteria: &Vec<RankCriteria>, parent_comp_id: CompetitionId, round_size: u8, i: usize) -> Competition {
     // Create the round and add as many values to it as I can.
     let mut round = Competition {
-        id: convert::int::<usize, CompetitionId>(COMPETITIONS.lock().unwrap().len() + 1),
-        parent_comp_id: parent_comp_id,
+        id: Competition::next_id(db).await,
         min_no_of_teams: round_size,
         rank_criteria: rank_criteria.clone(),
         format: format::Format::build(
@@ -77,15 +79,17 @@ fn build_round(round_names: &[&str], match_rules: &[match_event::Rules], wins_re
         _ => assign_default_name(&mut round, i, teams_in_rounds.len())
     };
 
+    round.save(db).await;
+    round.save_parent_id(db, parent_comp_id).await;
     return round;
 }
 
 // Create rounds.
-fn create_rounds(round_names: Vec<&str>, match_rules: Vec<match_event::Rules>, wins_required: Vec<u8>, teams_in_rounds: Vec<u8>, rank_criteria: Vec<RankCriteria>, parent_comp_id: CompetitionId) -> Vec<Competition> {
+async fn create_rounds(db: &Db, round_names: Vec<&str>, match_rules: Vec<match_event::Rules>, wins_required: Vec<u8>, teams_in_rounds: Vec<u8>, rank_criteria: Vec<RankCriteria>, parent_comp_id: CompetitionId) -> Vec<Competition> {
     let mut rounds = Vec::new();
 
     for (i, round_size) in teams_in_rounds.iter().enumerate() {
-        let round = build_round(&round_names, &match_rules, &wins_required, &teams_in_rounds, &rank_criteria, parent_comp_id, *round_size, i);
+        let round = build_round(db, &round_names, &match_rules, &wins_required, &teams_in_rounds, &rank_criteria, parent_comp_id, *round_size, i).await;
         rounds.push(round);
     }
 
@@ -105,10 +109,10 @@ fn assign_default_name(round: &mut Competition, round_index: usize, total_rounds
 }
 
 // Give each round's games a proportionate time window.
-fn set_date_boundaries(rounds: &mut Vec<Competition>, season_duration: &AnnualWindow, rng: &mut ThreadRng) {
+fn set_date_boundaries(rng: &mut ThreadRng, rounds: &mut Vec<Competition>, season_duration: &AnnualWindow) {
     // Let's get our example dates from a year that was not a leap year.
     let (start_date, end_date) = season_duration.get_dates_from_start_year(1900);
-    let available_days = get_dates(&start_date, &end_date);
+    let available_days = get_dates(start_date, end_date);
 
     let round_durations = get_round_durations(rounds, convert::int::<usize, u8>(available_days.len()), rng);
 
@@ -159,27 +163,32 @@ fn get_from_index_or_last<T: Clone>(vector: &[T], index: usize) -> T {
 }
 
 // Finalise the rounds.
-fn finalise_rounds(parent_comp: &mut Competition, rounds: &mut Vec<Competition>, today: &Date) {
+async fn finalise_rounds(db: &Db, parent_comp: &mut Competition, rounds: &mut Vec<Competition>) {
     let rounds_clone = rounds.clone();
     let mut connections = vec![0; rounds.len()];
 
     let teams = Vec::new();
     for (i, round) in rounds.iter_mut().enumerate() {
-        round.save_new(&teams, today);
-        parent_comp.child_comp_ids.push(round.id);
+        round.create_new_season(db, &teams).await;
 
+        // The last round does not connect anywhere.
         if i == rounds_clone.len() - 1 { continue; }
 
         // Doing connections.
-        create_connections(i.clone(), round, &rounds_clone, &mut connections);
-        round.save();
+        create_connections(db, i.clone(), round, &rounds_clone, &mut connections).await;
     }
 
-    parent_comp.save();
+    // We need to do this because of that type addition after initialisation.
+    sqlx::query(
+        "UPDATE Competition SET comp_type = $1
+        WHERE id = $2"
+    ).bind(parent_comp.comp_type)
+    .bind(parent_comp.id)
+    .execute(db).await.unwrap();
 }
 
 // Create connections between knockout rounds.
-fn create_connections(i: usize, round: &mut Competition, rounds: &[Competition], connections: &mut Vec<u8>) {
+async fn create_connections(db: &Db, i: usize, round: &mut Competition, rounds: &[Competition], connections: &mut Vec<u8>) {
     let mut advancing_teams = convert::int::<u8, i8>(round.min_no_of_teams / 2);
 
     let mut last;
@@ -193,7 +202,9 @@ fn create_connections(i: usize, round: &mut Competition, rounds: &[Competition],
         first = (advancing_teams - convert::int::<u8, i8>(space_in_next_round) + 1).clamp(1, i8::MAX);
         let added_teams = last - first + 1;
 
-        round.connections.push(CompConnection::build([first as u8, last as u8], round.id + iteration, Seed::Preserve, false));
+        let connection = CompConnection::build(round.id + iteration, first as u8, last as u8, Seed::Preserve, false);
+        connection.save(db, round.id).await;
+
         connections[i] += added_teams as u8;
         advancing_teams -= added_teams;
     }

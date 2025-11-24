@@ -52,10 +52,10 @@ fn get_previous(a: &TeamScheduleData, b: &TeamScheduleData, prev_schedule_map: &
 }
 
 // Get the indexes of sort_functions in the wanted order.
-fn get_sort_order(sort_type: &MatchGenType, rng: &mut ThreadRng ) -> [usize; 2] {
+fn get_sort_order(rng: &mut ThreadRng, sort_type: &MatchGenType) -> [usize; 2] {
     match sort_type {
-        MatchGenType::MatchCount => [1, 0],
-        MatchGenType::Random => {
+        MatchGenType::_MatchCount => [1, 0],
+        MatchGenType::_Random => {
             let mut indexes = [0, 1];
             indexes.shuffle(rng);
             indexes
@@ -67,8 +67,8 @@ fn get_sort_order(sort_type: &MatchGenType, rng: &mut ThreadRng ) -> [usize; 2] 
 }
 
 // Sort the schedule data according to various customisable options.
-fn sort_with_options(schedule_data: &mut Vec<TeamScheduleData>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>, sort_type: &MatchGenType, rng: &mut ThreadRng, sort_functions: &[CmpFunc; 2]) {
-    let indexes = get_sort_order(sort_type, rng);
+fn sort_with_options(rng: &mut ThreadRng, schedule_data: &mut Vec<TeamScheduleData>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>, sort_type: &MatchGenType, sort_functions: &[CmpFunc; 2]) {
+    let indexes = get_sort_order(rng, sort_type);
 
     schedule_data.sort_by(|a: &TeamScheduleData, b: &TeamScheduleData| {
         let (prev_a, prev_b) = get_previous(a, b, prev_schedule_map);
@@ -79,19 +79,19 @@ fn sort_with_options(schedule_data: &mut Vec<TeamScheduleData>, prev_schedule_ma
 }
 
 // Prioritise teams that need any game.
-pub fn sort_default(sort_type: &MatchGenType, schedule_data: &mut Vec<TeamScheduleData>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>, rng: &mut ThreadRng) {
+pub fn sort_default(rng: &mut ThreadRng, sort_type: &MatchGenType, schedule_data: &mut Vec<TeamScheduleData>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>) {
     let sort_functions = [compare_home_away_abs, compare_match_count];
-    sort_with_options(schedule_data, prev_schedule_map, sort_type, rng, &sort_functions);
+    sort_with_options(rng, schedule_data, prev_schedule_map, sort_type, &sort_functions);
 }
 
 // Prioritise teams that need a home game.
-pub fn sort_home(sort_type: &MatchGenType, schedule_data: &mut Vec<TeamScheduleData>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>, rng: &mut ThreadRng) {
+pub fn sort_home(rng: &mut ThreadRng, sort_type: &MatchGenType, schedule_data: &mut Vec<TeamScheduleData>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>) {
     let sort_functions = [compare_home_away, compare_match_count];
-    sort_with_options(schedule_data, prev_schedule_map, sort_type, rng, &sort_functions);
+    sort_with_options(rng, schedule_data, prev_schedule_map, sort_type, &sort_functions);
 }
 
 // Prioritise teams that need an away game.
-pub fn sort_away(sort_type: &MatchGenType, schedule_data: &mut Vec<TeamScheduleData>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>, rng: &mut ThreadRng) {
+pub fn sort_away(rng: &mut ThreadRng, sort_type: &MatchGenType, schedule_data: &mut Vec<TeamScheduleData>, prev_schedule_map: &HashMap<TeamId, TeamScheduleData>) {
     let sort_functions = [compare_away_home, compare_match_count];
-    sort_with_options(schedule_data, prev_schedule_map, sort_type, rng, &sort_functions);
+    sort_with_options(rng, schedule_data, prev_schedule_map, sort_type, &sort_functions);
 }

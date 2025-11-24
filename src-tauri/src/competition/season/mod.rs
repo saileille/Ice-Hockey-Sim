@@ -5,51 +5,72 @@ pub mod knockout_round;
 pub mod ranking;
 mod schedule_generator;
 
-use rand::rngs::ThreadRng;
 use serde_json::json;
+use sqlx::FromRow;
 use time::Date;
 
-use crate::{competition::{Competition, season::{knockout_round::KnockoutRound as KnockoutRoundSeason, round_robin::RoundRobin as RoundRobinSeason, team::TeamCompData}}, database::SEASONS, match_event::Game, team::Team, time::{date_to_db_string, db_string_to_date}, types::{CompetitionId, TeamId, convert}};
+use crate::{competition::{Competition, season::{knockout_round::KnockoutRound as KnockoutRoundSeason, round_robin::RoundRobin as RoundRobinSeason, team::TeamSeason}}, match_event::Game, types::{CompetitionId, Db, SeasonId, TeamId}};
 
 #[derive(Debug)]
-#[derive(Default, Clone)]
+#[derive(Clone)]
+#[derive(FromRow)]
 pub struct Season {
-    index: usize,   // For easier saving of the season.
-    comp_id: CompetitionId,
+    pub id: SeasonId,
+    pub comp_id: CompetitionId,
+    #[sqlx(rename = "season_name")]
     name: String,   // Years during which the season takes place.
-    pub teams: Vec<TeamCompData>,
-    start_date: String,
-    pub end_date: String,
+    start_date: Date,
+    pub end_date: Date,
+    #[sqlx(json(nullable))]
     pub round_robin: Option<RoundRobinSeason>,
+    #[sqlx(json(nullable))]
     pub knockout_round: Option<KnockoutRoundSeason>,
-
-    pub upcoming_games: Vec<Game>,  // Upcoming games are stored with earliest LAST.
-    pub played_games: Vec<Game>,    // Played games are stored with earliest FIRST.
 
     // Helper for easily checking if the season is over.
     pub is_over: bool,
 }
 
+impl Default for Season {
+    fn default() -> Self {
+        Self {
+            id: SeasonId::default(),
+            comp_id: CompetitionId::default(),
+            name: String::default(),
+            start_date: Date::MIN,
+            end_date: Date::MIN,
+            round_robin: None,
+            knockout_round: None,
+            is_over: bool::default(),
+        }
+    }
+}
+
 impl Season {
+    // Get the next ID to use.
+    async fn next_id(db: &Db) -> SeasonId {
+        let max: Option<SeasonId> = sqlx::query_scalar("SELECT max(id) FROM Season").fetch_one(db).await.unwrap();
+        match max {
+            Some(n) => n + 1,
+            _ => 1,
+        }
+    }
+
     // Build an element.
-    fn build(comp: &Competition, teams: &[TeamId], today: &Date) -> Self {
+    async fn build(db: &Db, comp: &Competition) -> Self {
         let mut season = Self {
+            id: Self::next_id(db).await,
             comp_id: comp.id,
-            teams: teams.iter().map(|id | TeamCompData::build(*id, 0)).collect(),
+            start_date: comp.season_window.get_next_start_date(db).await,
+            end_date: comp.season_window.get_next_end_date(db).await,
+
             ..Default::default()
         };
 
-        let start_date = comp.season_window.get_next_start_date(today);
-        let end_date = comp.season_window.get_next_end_date(today);
-
-        season.start_date = date_to_db_string(&start_date);
-        season.end_date = date_to_db_string(&end_date);
-
-        season.name = if start_date.year() == end_date.year() {
-            start_date.year().to_string()
+        season.name = if season.start_date.year() == season.end_date.year() {
+            season.start_date.year().to_string()
         }
         else {
-            format!("{}-{}", start_date.year(), end_date.year())
+            format!("{}-{}", season.start_date.year(), season.end_date.year())
         };
 
 
@@ -71,233 +92,274 @@ impl Season {
 
     // Build a season and save it to the database.
     // Also build seasons for all possible child competitions.
-    pub fn build_and_save(comp: &Competition, teams: &[TeamId], today: &Date) -> Self {
-        let mut season = Self::build(comp, teams, today);
+    pub async fn build_and_save(db: &Db, comp: &Competition, teams: &[TeamId]) -> Self {
+        let mut season = Self::build(db, comp).await;
 
-        season.save_new();
+        season.save_new(db, teams).await;
         return season;
     }
 
-    pub fn fetch_from_db(comp_id: &CompetitionId, index: usize) -> Self {
-        SEASONS.lock().unwrap().get(comp_id)
-            .expect(&format!("no Competition with id {comp_id}"))[index].clone()
-    }
-
     // Save a season to the database for the first time.
-    fn save_new(&mut self) {
-        self.index = SEASONS.lock().unwrap().get(&self.comp_id)
-            .expect(&format!("no Competition with id {}", self.comp_id)).len();
+    async fn save_new(&mut self, db: &Db, teams: &[TeamId]) {
+        self.save(db).await;
 
-        SEASONS.lock().unwrap().get_mut(&self.comp_id).unwrap().push(self.clone());
+        for id in teams {
+            sqlx::query(
+                "INSERT INTO TeamSeason
+                (team_id, season_id, seed, rank, regular_wins, ot_wins, draws, ot_losses, regular_losses, goals_scored, goals_conceded)
+                VALUES ($1, $2, 0, 1, 0, 0, 0, 0, 0, 0, 0)"
+            ).bind(id)
+            .bind(self.id)
+            .execute(db).await.unwrap();
+        }
     }
 
-    // Update the Season to database.
-    pub fn save(&self) {
-        SEASONS.lock().unwrap().get_mut(&self.comp_id)
-            .expect(&format!("no Competition with id {}", self.comp_id))[self.index] = self.clone();
+    // Save the Season to database.
+    pub async fn save(&self, db: &Db) {
+        sqlx::query(
+            "INSERT INTO Season
+            (id, comp_id, season_name, start_date, end_date, round_robin, knockout_round, is_over)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
+        ).bind(self.id)
+        .bind(self.comp_id)
+        .bind(&self.name)
+        .bind(self.start_date)
+        .bind(self.end_date)
+        .bind(&self.round_robin)
+        .bind(&self.knockout_round)
+        .bind(self.is_over)
+        .execute(db).await.unwrap();
     }
 
     // Get the competition of the season.
-    fn get_competition(&self) -> Competition {
-        Competition::fetch_from_db(&self.comp_id)
+    async fn competition(&self, db: &Db) -> Competition {
+        Competition::fetch_from_db(db, self.comp_id).await
     }
 
     // Get the full name of the season, with all parent competition names included.
-    fn get_full_name(&self) -> String {
-        let comp_name = self.get_competition().get_full_name("");
+    async fn _full_name(&self, db: &Db) -> String {
+        let comp_name = self.competition(db).await.full_name(db).await;
         format!("{} {}", comp_name, self.name)
     }
 
     // Get some nice JSON for a competition screen.
-    pub fn get_comp_screen_package(&self, comp: &Competition) -> serde_json::Value {
-        let teams: Vec<serde_json::Value> = self.teams.iter().enumerate().map(|(i, a)| a.get_comp_screen_package(comp, i)).collect();
-        let upcoming_games: Vec<serde_json::Value> = self.upcoming_games.iter().map(|a| a.get_comp_screen_package()).collect();
-        let played_games: Vec<serde_json::Value> = self.played_games.iter().map(|a| a.get_comp_screen_package()).collect();
+    pub async fn comp_screen_package(&self, db: &Db, comp: &Competition) -> serde_json::Value {
+        let mut teams = Vec::new();
+        for team in self.teams(db).await {
+            teams.push(team.get_comp_screen_package(db, comp).await);
+        }
+
+        let future_games = self.today_and_future_games(db).await;
+        let mut future_games_json = Vec::new();
+        for game in future_games {
+            future_games_json.push(game.comp_screen_package(db).await);
+        }
+
+        let played_games = self.past_games(db).await;
+        let mut played_games_json = Vec::new();
+        for game in played_games {
+            played_games_json.push(game.comp_screen_package(db).await);
+        }
+
+        let knockout_round = if self.knockout_round.is_none() {
+            serde_json::Value::Null
+        }
+        else {
+            self.knockout_round.as_ref().unwrap().get_comp_screen_json(db).await
+        };
 
         json!({
             "name": self.name,
             "teams": teams,
-            "knockout_round": if self.knockout_round.is_none() {
-                serde_json::Value::Null
-            }
-            else {
-                self.knockout_round.as_ref().unwrap().get_comp_screen_json()
-            },
-            "upcoming_games": upcoming_games,
-            "played_games": played_games
+            "knockout_round": knockout_round,
+            "upcoming_games": future_games_json,
+            "played_games": played_games_json,
         })
     }
 
     // Get all teams participating in the season.
-    pub fn get_teams(&self) -> Vec<Team> {
-        self.teams.iter().map(|a | Team::fetch_from_db(&a.team_id)).collect()
+    pub async fn teams(&self, db: &Db) -> Vec<TeamSeason> {
+        sqlx::query_as(
+            "SELECT * FROM TeamSeason
+            WHERE season_id = $1
+            ORDER BY rank ASC"
+        ).bind(self.id)
+        .fetch_all(db).await.unwrap()
     }
 
-    // Check if the season has enough teams to begin.
-    // min_no_of_teams must be the competition's min_no_of_teams field.
-    pub fn has_enough_teams(&self, min_no_of_teams: u8) -> bool {
-        convert::int::<usize, u8>(self.teams.len()) >= min_no_of_teams
+    pub async fn team_ids(&self, db: &Db) -> Vec<TeamId> {
+        sqlx::query_scalar(
+            "SELECT team_id FROM TeamSeason
+            WHERE season_id = $1
+            ORDER BY rank ASC"
+        ).bind(self.id)
+        .fetch_all(db).await.unwrap()
+    }
+
+    // Get the season data of a team with the given ID.
+    pub async fn team_with_id(&self, db: &Db, id: TeamId) -> TeamSeason {
+        sqlx::query_as(
+            "SELECT * FROM TeamSeason
+            WHERE team_id = $1 AND season_id = $2"
+        ).bind(id)
+        .bind(self.id)
+        .fetch_one(db).await.unwrap()
+    }
+
+    // Get the amount of teams in the season.
+    pub async fn no_of_teams(&self, db: &Db) -> u8 {
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM TeamSeason WHERE season_id = $1"
+        ).bind(self.id)
+        .fetch_one(db).await.unwrap()
+    }
+
+    // Get all games for this competition that are played today.
+    async fn games_today(&self, db: &Db) -> Vec<Game> {
+        sqlx::query_as(
+            "SELECT * FROM Game
+            WHERE date = (
+                SELECT value_data FROM KeyValue WHERE key_name = 'today'
+            ) AND season_id = $1"
+        ).bind(self.id)
+        .fetch_all(db).await.unwrap()
+    }
+
+    // Get all games that have been played on past dates.
+    pub async fn past_games(&self, db: &Db) -> Vec<Game> {
+        sqlx::query_as(
+            "SELECT * FROM Game
+            WHERE unixepoch(date) < (
+                SELECT unixepoch(value_data) FROM KeyValue WHERE key_name = 'today'
+            ) AND season_id = $1
+            ORDER BY unixepoch(date) DESC"
+        ).bind(self.id)
+        .fetch_all(db).await.unwrap()
+    }
+
+    // Get all games that are played on future dates.
+    async fn future_games(&self, db: &Db) -> Vec<Game> {
+        sqlx::query_as(
+            "SELECT * FROM Game
+            WHERE unixepoch(date) > (
+                SELECT unixepoch(value_data) FROM KeyValue WHERE key_name = 'today'
+            ) AND season_id = $1"
+        ).bind(self.id)
+        .fetch_all(db).await.unwrap()
+    }
+
+    pub async fn today_and_future_games(&self, db: &Db) -> Vec<Game> {
+        sqlx::query_as(
+            "SELECT * FROM Game
+            WHERE unixepoch(date) >= (
+                SELECT unixepoch(value_data) FROM KeyValue WHERE key_name = 'today'
+            ) AND season_id = $1
+            ORDER BY unixepoch(date) ASC"
+        ).bind(self.id)
+        .fetch_all(db).await.unwrap()
     }
 
     // Finalise the creation of a season for a particular competition.
-    pub fn setup(&mut self, comp: &Competition, rng: &mut ThreadRng) {
-        // The order of the teams becomes correct by reversing.
-        self.teams.reverse();
-
-        // Kind of extra, but this allows the match generator to access the TeamCompData elements.
-        // Which in turn allows passing teams' seeds to games.
-        self.save();
-
+    pub async fn setup(&mut self, db: &Db, comp: &Competition) {
         if self.round_robin.is_some() {
-            self.setup_round_robin(comp, rng);
+            self.setup_round_robin(db, comp).await;
         }
         else if self.knockout_round.is_some() {
-            self.setup_knockout(comp, rng);
+            self.setup_knockout(db, comp, self.id).await;
         }
 
         // In this case the competition must have child competitions, so set them up instead.
         else {
+            let children = comp.children(db).await;
             let mut teams = Vec::new();
-            for (i, id) in comp.child_comp_ids.iter().enumerate() {
+            for (i, comp) in children.into_iter().enumerate() {
                 if i == 0 {
                     // Set up all the teams here if the child competition is the first one.
                     // Teams that cannot be added will go to the next rounds.
                     // Does not support group competitions yet.
-                    teams = self.teams.clone();
+                    teams = self.teams(db).await;
                 }
-                Competition::fetch_from_db(id).setup_season(&mut teams, rng);
+                comp.setup_season(db, &mut teams).await;
             }
         }
     }
 
     // Set up a round robin season.
-    fn setup_round_robin(&mut self, comp: &Competition, rng: &mut ThreadRng) {
-        self.generate_schedule(comp, rng);
+    async fn setup_round_robin(&mut self, db: &Db, comp: &Competition) {
+        self.generate_schedule(db, comp).await;
     }
 
     // Set up a knockout season.
-    fn setup_knockout(&mut self, comp: &Competition, rng: &mut ThreadRng) {
-        let teams = &self.teams;
-        let start = &self.start_date;
-        let end = &self.end_date;
-
-        self.upcoming_games = self.knockout_round.as_mut().unwrap().setup(teams, start, end, comp, rng);
-    }
-
-    // Update the teamdata to this season and all parent competition seasons.
-    pub fn update_teamdata(&mut self, comp: &Competition, games: &[Game], rng: &mut ThreadRng) {
-        for team in self.teams.iter_mut() {
-            for game in games.iter() {
-                if team.team_id == game.home.team_id {
-                    team.update(&game.home, &game.away, game.has_overtime());
-                }
-                else if team.team_id == game.away.team_id {
-                    team.update(&game.away, &game.home, game.has_overtime());
-                }
-            }
-        }
-
-        // In case this is a knockout round, we need to update the pairs as well.
-        if self.knockout_round.is_some() {
-            self.knockout_round.as_mut().unwrap().update_teamdata(games);
-        }
-
-        self.check_if_over(comp, rng);
-        self.rank_teams(comp, rng);
-
-        // We are not saving the season here, because we are doing it after updating the played_games vector.
-        // self.save();
-
-        // Update all parent competitions as well.
-        if comp.parent_comp_id != 0 {
-            let parent_comp = Competition::fetch_from_db(&comp.parent_comp_id);
-
-            let mut season = Season::fetch_from_db(&parent_comp.id, parent_comp.get_seasons_amount() - 1);
-            season.update_teamdata(&parent_comp, games, rng);
-            season.save();
-        }
-    }
-
-    // Get the team's index in self.teams.
-    fn get_team_index(&self, id: TeamId) -> usize {
-        self.teams.iter().position(|a | a.team_id == id).unwrap()
-    }
-
-    // Get all games of this season (not including sub or parent competitions).
-    pub fn get_all_games(&self) -> Vec<Game> {
-        let mut games: Vec<Game> = self.upcoming_games.iter().cloned().collect();
-        games.append(&mut self.played_games.clone());
-        return games;
+    async fn setup_knockout(&mut self, db: &Db, comp: &Competition, season_id: SeasonId) {
+        let teams = comp.current_season_teamdata(db).await;
+        self.knockout_round.as_mut().unwrap().setup(db, &teams, self.start_date, self.end_date, comp, season_id).await;
     }
 
     // Simulate the games for this day.
-    pub fn simulate_day(&mut self, comp: &Competition, today: &Date, rng: &mut ThreadRng) {
-        let mut games = Vec::new();
+    pub async fn simulate_day(&self, db: &Db) {
+        let games = self.games_today(db).await;
+        if games.is_empty() { return }
 
-        while !self.upcoming_games.is_empty() {
-            let mut game = self.upcoming_games.swap_remove(self.upcoming_games.len() - 1);
-
-            // Play the game if it happens today.
-            if db_string_to_date(&game.date) == *today {
-                game.play(rng);
-                games.push(game);
-            }
-
-            // Otherwise return the game back to the upcoming games and exit the loop.
-            else {
-                self.upcoming_games.push(game);
-                break;
-            }
+        for mut game in games {
+            game.play(db).await;
         }
 
-        if games.is_empty() { return; }
+        let mut o_comp = Some(self.competition(db).await);
+        for i in 0.. {
+            let comp = o_comp.as_ref().unwrap();
+            let mut season = match i {
+                0 => self.clone(),
+                _ => comp.current_season(db).await,
+            };
 
-        self.update_teamdata(comp, &games, rng);
-        self.played_games.append(&mut games);
-        self.save();
+            season.check_if_over(db, &comp).await;
+            season.rank_teams(db, &comp).await;
+            season.save(db).await;
+
+            o_comp = comp.parent(db).await;
+            if o_comp.is_none() { return }
+        }
     }
 
     // Check if the season has ended, and react appropriately.
     // Return whether over or not.
-    pub fn check_if_over(&mut self, comp: &Competition, rng: &mut ThreadRng) -> bool {
+    pub async fn check_if_over(&mut self, db: &Db, comp: &Competition) -> bool {
         // No need to do more.
         if self.is_over { return true; }
 
+        let upcoming_games = self.future_games(db).await;
         if self.round_robin.is_some() {
-            if !self.upcoming_games.is_empty() { return false; }
+            if !upcoming_games.is_empty() { return false; }
         }
 
         else if self.knockout_round.is_some() {
-            if !self.knockout_round.as_mut().unwrap().check_if_over(comp, &mut self.upcoming_games) {
+            if !self.knockout_round.as_mut().unwrap().check_if_over(db, comp).await {
                 return false;
             }
         }
 
         // Check for a parent competition.
+        // TODO: Make an async recursion happen somehow...?
         else {
-            for id in comp.child_comp_ids.iter() {
-                let child_comp = Competition::fetch_from_db(id);
-                let mut season = Season::fetch_from_db(&child_comp.id, child_comp.get_seasons_amount() - 1);
-                if !season.check_if_over(&child_comp, rng) {
+            for child_comp in comp.children(db).await {
+                let mut season = child_comp.current_season(db).await;
+                if !Box::pin(season.check_if_over(db, &child_comp)).await {
                     return false;
                 }
             }
-
         }
 
         self.is_over = true;
-        self.do_post_season_tasks(comp, rng);
-
-        self.save();
+        self.do_post_season_tasks(db, comp).await;
 
         return true;
     }
 
     // Do post-season tasks for any kind of competition.
-    fn do_post_season_tasks(&mut self, comp: &Competition, rng: &mut ThreadRng) {
-        self.rank_teams(comp, rng);
-        for connection in comp.connections.iter() {
-            connection.send_teams(&self.teams, rng);
+    async fn do_post_season_tasks(&mut self, db: &Db, comp: &Competition) {
+        self.rank_teams(db, comp).await;
+        for connection in comp.connections_to(db).await {
+            connection.send_teams(db, &self.teams(db).await).await;
         }
     }
 }

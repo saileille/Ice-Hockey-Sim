@@ -1,9 +1,10 @@
-use rand::{rngs::ThreadRng, Rng};
-
-use crate::database::POSITIONS;
+use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 
 #[derive(Eq, Hash, PartialEq)]
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Copy, Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(sqlx::Type)]
 #[repr(u8)]
 pub enum PositionId {
     #[default]
@@ -18,7 +19,7 @@ pub enum PositionId {
 
 impl PositionId {
     // Get a random position, weighted by need.
-    pub fn get_random(rng: &mut ThreadRng) -> Self {
+    pub fn get_random() -> Self {
         let weights = vec![
             (Self::Goalkeeper, 2),
             (Self::LeftDefender, 4),
@@ -29,7 +30,7 @@ impl PositionId {
         ];
 
         let total_weight: u8 = weights.iter().map(|(_, a)| a).sum();
-        let random = rng.random_range(0..total_weight);
+        let random = rand::random_range(0..total_weight);
 
         let mut counter = 0;
         for (id, weight) in weights {
@@ -44,27 +45,9 @@ impl PositionId {
 }
 
 #[derive(Default, Clone)]
-pub struct Position {
+#[derive(FromRow)]
+pub struct _Position {
     pub id: PositionId,
     pub abbreviation: String,
     pub offensive_value: u8,
-}
-
-impl Position {
-    pub fn build(id: PositionId, abbreviation: &str, offensive_value: u8) -> Self {
-        Self {
-            id: id,
-            abbreviation: abbreviation.to_string(),
-            offensive_value: offensive_value,
-        }
-    }
-
-    pub fn fetch_from_db(id: &PositionId) -> Self {
-        POSITIONS.get(id).expect(&format!("no Position with id {id:#?}")).clone()
-    }
-
-    // Get the defensive value of the position as absence of offence.
-    fn get_defensive_value(&self) -> u8 {
-        u8::MAX - self.offensive_value
-    }
 }

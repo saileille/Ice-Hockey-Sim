@@ -1,62 +1,85 @@
 // Countries and such.
 use std::collections::HashMap;
 use rand::{Rng, rngs::ThreadRng};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sqlx::FromRow;
 
-use crate::{database::COUNTRIES, io::{get_flag_path, load_country_names}, person::Gender, types::{CountryId, CountryNamePool, convert}};
+use crate::{app_data::Directories, io::{get_flag_path, load_country_names}, person::Gender, types::{CountryId, CountryNamePool, Db}};
 
 #[derive(Default, Clone)]
+#[derive(FromRow)]
 pub struct Country {
     pub id: CountryId,
+    #[sqlx(rename = "country_name")]
     pub name: String,
+    #[sqlx(json)]
     names: CountryNamePool,
     flag_path: Option<String>,
 }
 
 // Basics.
 impl Country {
+    // Get the next ID to use.
+    async fn next_id(db: &Db) -> CountryId {
+        let max: Option<CountryId> = sqlx::query_scalar("SELECT max(id) FROM Country").fetch_one(db).await.unwrap();
+        match max {
+            Some(n) => n + 1,
+            _ => 1,
+        }
+    }
+
     // Build a country element.
-    fn build(name: &str) -> Self {
+    async fn build(directories: &Directories, db: &Db, name: &str) -> Self {
         let mut country = Self {
-            id: convert::int::<usize, CountryId>(COUNTRIES.lock().unwrap().len() + 1),
+            id: Self::next_id(db).await,
             name: name.to_string(),
-            flag_path: get_flag_path(name),
+            flag_path: get_flag_path(directories, name),
+
             ..Default::default()
         };
 
-        country.assign_names();
+        country.assign_names(directories);
         return country;
     }
 
     // Build a Country element and store it in the database. Return the created element.
-    pub fn build_and_save(name: &str) -> Self {
-        let country = Self::build(name);
-        country.save();
+    pub async fn build_and_save(directories: &Directories, db: &Db, name: &str) -> Self {
+        let country = Self::build(directories, db, name).await;
+        country.save(db).await;
         return country;
     }
 
     // Get a Country from the database.
-    pub fn fetch_from_db(id: &CountryId) -> Self {
-        COUNTRIES.lock().unwrap().get(id).expect(&format!("no Country with id {id}")).clone()
+    pub async fn fetch_from_db(db: &Db, id: CountryId) -> Self {
+        sqlx::query_as(
+            "SELECT * FROM Country WHERE id = $1"
+        ).bind(id)
+        .fetch_one(db).await.unwrap()
     }
 
-    // Update the Country to database.
-    pub fn save(&self) {
-        COUNTRIES.lock().unwrap().insert(self.id, self.clone());
+    // Fetch ALL from the database.
+    pub async fn fetch_all(db: &Db) -> Vec<Self> {
+        sqlx::query_as(
+            "SELECT * FROM Country"
+        )
+        .fetch_all(db).await.unwrap()
     }
 
-    // Get a Country from the database with the given name.
-    pub fn fetch_from_db_with_name(name: &str) -> Self {
-        for country in COUNTRIES.lock().unwrap().values() {
-            if country.name == name {
-                return country.clone();
-            }
-        }
-
-        panic!("country with name {name} does not exist!");
+    // Save the Country to database.
+    pub async fn save(&self, db: &Db) {
+        sqlx::query(
+            "INSERT INTO Country
+            (id, country_name, names, flag_path)
+            VALUES ($1, $2, $3, $4)"
+        ).bind(self.id)
+        .bind(&self.name)
+        .bind(serde_json::to_string(&self.names).unwrap())
+        .bind(&self.flag_path)
+        .execute(db).await.unwrap();
     }
 
-    pub fn get_name_and_flag_package(&self) -> serde_json::Value {
+    pub fn name_and_flag_package(&self) -> serde_json::Value {
         json!({
             "name": self.name,
             "flag_path": self.flag_path,
@@ -66,8 +89,8 @@ impl Country {
 
 impl Country {
     // Assign surnames and forenames to the country.
-    fn assign_names(&mut self) {
-        let json = load_country_names(&self.name);
+    fn assign_names(&mut self, directories: &Directories) {
+        let json = load_country_names(directories, &self.name);
         for (gender, gender_data) in json.iter() {
             let gender_enum;
             match gender.as_ref() {
@@ -89,9 +112,10 @@ impl Country {
     }
 
     // Generate a name from the country's name databases.
-    pub fn generate_name(&self, gender: &Gender, rng: &mut ThreadRng) -> (String, String) {
-        let forename = self.names.get(gender).unwrap().get("forenames").unwrap().draw_name(rng);
-        let surname = self.names.get(gender).unwrap().get("surnames").unwrap().draw_name(rng);
+    pub fn generate_name(&self, gender: Gender) -> (String, String) {
+        let mut rng = rand::rng();
+        let forename = self.names.get(&gender).unwrap().get("forenames").unwrap().draw_name(&mut rng);
+        let surname = self.names.get(&gender).unwrap().get("surnames").unwrap().draw_name(&mut rng);
 
         (forename, surname)
     }
@@ -107,11 +131,13 @@ impl Country {
 
 // Namepool with names and weights.
 #[derive(Default, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct NamePool {
     names: Vec<String>,
     weights: Vec<u16>,
     pub total_weight: u32,
 }
+
 // Basics.
 impl NamePool {
     pub fn build(names: HashMap<String, u16>) -> Self {

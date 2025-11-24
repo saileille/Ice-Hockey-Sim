@@ -11,7 +11,7 @@ type PlayerFilter = "all" | "not-approached";
 
 // Draw the player search screen.
 export const drawScreen: Listener = async (_e: Event) => {
-    const players: Array<Player> = await invoke("get_free_agents_package");
+    const players: Array<Player> = await invoke("free_agents_package");
     const screen = initialiseContentScreen();
 
     const playerFilter = createElement("select", {}, [
@@ -63,7 +63,7 @@ const onChangePlayerFilter: Listener = async (e: Event) => {
     const element = e.target as HTMLSelectElement;
     const tbody = document.querySelector("#players") as HTMLTableSectionElement;
 
-    const humanPackage: HumanPackage = await invoke("get_human_package");
+    const humanPackage: HumanPackage = await invoke("human_package");
     await changePlayerFilter(element.value as PlayerFilter, tbody, humanPackage);
 };
 

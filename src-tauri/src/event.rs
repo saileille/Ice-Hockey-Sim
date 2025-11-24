@@ -61,7 +61,7 @@ impl Type {
     }
 
     // Get an outcome of the event that is either true or false.
-    pub fn get_outcome(&mut self, modifier: f64, rng: &mut ThreadRng) -> bool {
+    pub fn get_outcome(&mut self, rng: &mut ThreadRng, modifier: f64) -> bool {
         return rng.random_bool(self.calculate_likelihood(modifier))
     }
 }

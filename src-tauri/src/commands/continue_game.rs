@@ -1,95 +1,86 @@
 // Commands and helper functions that have to do with continuing the game.
 
-use std::collections::{HashMap, HashSet};
+use tauri::Manager as TauriManager;
 
-use rand::rngs::ThreadRng;
-use time::Date;
-
-use crate::{competition::season::Season, country::Country, database::{COMPETITIONS, COUNTRIES, MANAGERS, PLAYERS, TODAY}, person::player::Player, team::Team, time::db_string_to_date, types::{CountryId, TeamId}};
+use crate::{app_data::AppData, competition::Competition, database, person::{Contract, manager::Manager, player::Player}, team::Team, types::Db};
 
 
 // Advance the time with one day.
 #[tauri::command]
-pub fn go_to_next_day() {
-    let mut rng = rand::rng();
-    let today = TODAY.lock().unwrap().clone();
-    let countries = COUNTRIES.lock().unwrap().clone();
+pub async fn go_to_next_day(handle: tauri::AppHandle) {
+    let db = &handle.state::<AppData>().db;
 
-    handle_players(&today, &mut rng);
-    handle_managers_and_teams(&countries, &today, &mut rng);
+    Contract::delete_expired(db).await;
+    handle_players(db).await;
+    handle_managers_and_teams(db).await;
 
     // Games are simulated here - this must be the last one!
-    handle_comps(&today, &mut rng);
+    handle_comps(db).await;
 
-    *TODAY.lock().unwrap() = today.next_day().unwrap();
+    database::next_day(db).await;
 }
 
 // Do the daily tasks of competitions.
-fn handle_comps(today: &Date, rng: &mut ThreadRng) {
-    let mut comps = COMPETITIONS.lock().unwrap().clone();
-    for comp in comps.values_mut() {
-        let mut season = Season::fetch_from_db(&comp.id, comp.get_seasons_amount() - 1);
+async fn handle_comps(db: &Db) {
+    let today = database::get_today(db).await;
+
+    let comps_with_games = Competition::fetch_comps_with_games(db).await;
+    let parents = Competition::fetch_parents(db).await;
+    for comp in comps_with_games {
+        let season = comp.current_season(db).await;
 
         // Simulate all games that happen today.
-        if comp.format.is_some() {
-            season.simulate_day(&comp, &today, rng);
-        }
+        season.simulate_day(db).await;
+    }
+
+    for comp in parents {
+        let season = comp.current_season(db).await;
 
         // Create new seasons for parent competitions whose seasons are over.
-        if comp.parent_comp_id == 0 && *today > db_string_to_date(&season.end_date) {
+        if today > season.end_date {
             // Cannot change teams between seasons, for now.
-            let teams: Vec<TeamId> = season.teams.iter().map(|a | a.team_id).collect();
-            comp.create_and_setup_seasons(&teams, today, rng);
+            let teams = season.team_ids(db).await;
+            comp.create_and_setup_seasons(db, &teams).await;
         }
     }
 }
 
 // Do the daily tasks of managers (and teams, they are connected).
-fn handle_managers_and_teams(countries: &HashMap<CountryId, Country>, today: &Date, rng: &mut ThreadRng) {
-    let mut managers = MANAGERS.lock().unwrap().clone();
-    let mut teams_visited = HashSet::new();
+async fn handle_managers_and_teams(db: &Db) {
+    let managers = Manager::fetch_active(db).await;
+    for manager in managers.into_iter() {
+        let o_contract= manager.person.contract(db).await;
 
-    for manager in managers.values_mut() {
         // TODO: have the manager look for a job or something.
-        if manager.person.contract.is_none() {
+        if o_contract.is_none() {
             continue;
         }
+        let contract = o_contract.unwrap();
+        let mut team = Team::fetch_from_db(db, contract.team_id).await;
 
-        let mut team = Team::fetch_from_db(&manager.person.contract.as_ref().unwrap().team_id);
-        teams_visited.insert(team.id);
-
-        // Initial evaluation here.
+        // Initial AI evaluation here.
         // Done for human managers as well so the players can evaluate the contract offers they receive.
-        team.evaluate_player_needs();
+        team.evaluate_player_needs(db).await;
 
         // Do not do anything on behalf of the human.
         if manager.is_human {
-            team.return_actions_to_full();
-            team.season_end_checker(countries, today, rng);
-            team.save();
+            team.return_actions_to_full(db).await;
+            team.season_end_checker(db).await;
             continue;
         }
 
-
-        let mut has_changes = false;
         while team.actions_remaining > 0 {
-            let contract_offered = team.offer_contract(today, rng);
+            let contract_offered = team.offer_contract(db).await;
             if !contract_offered {
                 break;
             }
             else {
-                has_changes = true;
+                team.evaluate_player_needs(db).await;
             }
         }
 
-        // Another evaluation used for players' decision-making.
-        if has_changes {
-            team.evaluate_player_needs();
-        }
-
-        team.return_actions_to_full();
-        team.season_end_checker(countries, today, rng);
-        team.save();
+        team.return_actions_to_full(db).await;
+        team.season_end_checker(db).await;
     }
 
     // TODO: teams without managers should do tasks specific to them.
@@ -102,41 +93,24 @@ fn handle_managers_and_teams(countries: &HashMap<CountryId, Country>, today: &Da
 }
 
 // Do the daily tasks of players.
-fn handle_players(today: &Date, rng: &mut ThreadRng) {
-    let mut players: Vec<Player> = PLAYERS.lock().unwrap().iter().filter_map(|(_, a)| match a.person.is_active {
-        true => Some(a.clone()),
-        _ => None,
-    }).collect();
+async fn handle_players(db: &Db) {
+    let players = Player::fetch_active(db).await;
 
-    for player in players.iter_mut() {
-        // Check if the player's contract has expired.
-        let expired = player.person.check_if_contract_expired(today);
-        if expired {
-            let mut team = Team::fetch_from_db(&player.person.contract.as_ref().unwrap().team_id);
-            player.person.contract = None;
-
-            team.roster.retain(|id| *id != player.id);
-            team.save();
-        }
-
-        player.check_expired_offers(today);
-
-        let signs_contract = player.person.decide_to_sign(today, rng);
+    for mut player in players.into_iter() {
+        let signs_contract = player.person.decide_to_sign(db).await;
         if signs_contract {
-            player.choose_contract(today, rng);
+            player.choose_contract(db).await;
         }
 
         // Player thinks about retiring
-        if player.retires(rng) {
-            player.reject_contracts();
-            player.person.is_active = false;
+        if player.retires(db).await {
+            player.person.retire(db).await;
             continue;
         }
 
         // Training after choosing the contract sounds most fair,
         // as then the player will choose their contract based on the most recent
         // information available to the managers, both human and AI.
-        player.daily_training(today, rng);
-        player.save();
+        player.daily_training(db).await;
     }
 }

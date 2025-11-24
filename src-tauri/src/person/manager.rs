@@ -1,80 +1,91 @@
-// This is what a player is!
+// This is what the player (user) is!
 
-use std::collections::HashMap;
-
-use rand::rngs::ThreadRng;
 use serde_json::json;
-use time::Date;
+use sqlx::{Row, FromRow, sqlite::SqliteRow};
 
-use crate::{country::Country, database::MANAGERS, person::{Gender, Person}, types::{CountryId, ManagerId, convert}};
+use crate::{person::{Gender, Person}, types::Db};
 
 #[derive(Default, Clone)]
 pub struct Manager {
-    pub id: ManagerId,
     pub person: Person,
     pub is_human: bool,
 }
 
+impl FromRow<'_, SqliteRow> for Manager {
+    fn from_row(row: &SqliteRow) -> sqlx::Result<Self> {
+        Ok(Self {
+            person: Person::from_row(row)?,
+            is_human: row.try_get("is_human")?,
+        })
+    }
+}
+
 impl Manager {
     // Build a manager.
-    fn build(person: Person) -> Self {
+    fn build(person: Person, is_human: bool) -> Self {
         Self {
-            id: convert::int::<usize, ManagerId>(MANAGERS.lock().unwrap().len() + 1),
-            person: person,
-            ..Default::default()
+            person,
+            is_human,
         }
     }
 
     // Create a manager and store it in the database. Return a clone of the Manager.
-    fn build_and_save(person: Person) -> Self {
-        let manager = Self::build(person);
-        manager.save();
+    async fn build_and_save(db: &Db, person: Person, is_human: bool) -> Self {
+        let manager = Self::build(person, is_human);
+        manager.save(db).await;
         return manager;
     }
 
     // Build a random manager.
-    pub fn build_and_save_random(countries: &HashMap<CountryId, Country>, today: &Date, rng: &mut ThreadRng) -> Self {
-        let person = Person::create(countries, today, rng, 30, 60, Gender::Male);
-        return Self::build_and_save(person);
+    pub async fn build_and_save_random(db: &Db, is_human: bool) -> Self {
+        let person = Person::create(db, 30, 60, Gender::Male).await;
+        return Self::build_and_save(db, person, is_human).await;
     }
 
-    // Get a manager from the database.
-    pub fn fetch_from_db(id: &ManagerId) -> Option<Self> {
-        MANAGERS.lock().unwrap().get(id).cloned()
+    // Get all active managers.
+    pub async fn fetch_active(db: &Db) -> Vec<Self> {
+        sqlx::query_as(
+            "SELECT Person.*, Manager.is_human FROM Person
+            INNER JOIN Manager ON Person.id = Manager.person_id
+            WHERE Person.is_active"
+        ).fetch_all(db).await.unwrap()
     }
 
     // Update the manager to database.
-    pub fn save(&self) {
-        MANAGERS.lock().unwrap().insert(self.id, self.clone());
+    pub async fn save(&self, db: &Db) {
+        sqlx::query(
+            "INSERT INTO Manager
+            (person_id, is_human)
+            VALUES ($1, $2)"
+        ).bind(self.person.id)
+        .bind(self.is_human)
+        .execute(db).await.unwrap();
     }
 
-    // Delete the manager from the database.
-    pub fn delete_from_db(&self) {
-        MANAGERS.lock().unwrap().remove(&self.id);
-    }
-
-    // Get the human manager.
-    pub fn get_human() -> Option<Self> {
-        for manager in MANAGERS.lock().unwrap().values() {
-            if manager.is_human { return Some(manager.clone()); }
-        }
-
-        return None;
+    // Get the human managers.
+    pub async fn humans(db: &Db) -> Vec<Self> {
+        sqlx::query_as(
+            "SELECT Manager.is_human, Person.* FROM Manager
+            INNER JOIN Person
+            ON Manager.person_id = Person.id
+            WHERE Manager.is_human = TRUE"
+        )
+        .fetch_all(db).await.unwrap()
     }
 
     // Get relevant information to the team screen.
-    pub fn get_team_screen_package(&self, today: &Date) -> serde_json::Value {
+    pub async fn team_screen_package(&self, db: &Db) -> serde_json::Value {
         json!({
-            "person": self.person.get_package(today)
+            "person": self.person.package(db).await
         })
     }
 
     // Get a package of information that is used in game interaction.
     // For human players only.
-    pub fn get_package(&self) -> serde_json::Value {
+    pub async fn package(&self, db: &Db) -> serde_json::Value {
         json!({
-            "team": match self.person.contract.as_ref() {
-                Some(contract) => Some(contract.get_team().get_manager_package()),
+            "team": match self.person.contract(db).await {
+                Some(contract) => Some(contract.team(db).await.manager_package(db).await),
                 _ => None
             }
         })

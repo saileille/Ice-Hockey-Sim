@@ -1,18 +1,7 @@
 // Input/output logic.
 use std::{collections::HashMap, fs::{self, ReadDir}, io::{self, Read}, path::PathBuf};
 
-
-use crate::database::{COUNTRY_FLAG_DIR, PEOPLE_NAME_DIR};
-
-/*static PATHS: [&str; 2] = [
-    "./json/names", // Windows
-    "..usr/lib/ice-hockey-sim/json/names",  // Linux
-];*/
-
-// Get a file, or error if it does not exist.
-fn get_file(path: &str) -> io::Result<fs::File> {
-    return fs::File::open(path);
-}
+use crate::app_data::Directories;
 
 // Read a JSON file and return it as a string.
 fn read_json_file(path: &PathBuf) -> io::Result<String> {
@@ -28,16 +17,16 @@ fn read_json_file(path: &PathBuf) -> io::Result<String> {
 }
 
 // Load names of a specific country.
-pub fn load_country_names(country: &str) -> HashMap<String, HashMap<String, HashMap<String, u16>>> {
-    let path_buf = PathBuf::from(PEOPLE_NAME_DIR.lock().unwrap().clone()).join(format!("{country}.json"));
+pub fn load_country_names(directories: &Directories, country: &str) -> HashMap<String, HashMap<String, HashMap<String, u16>>> {
+    let path_buf = PathBuf::from(directories.names.as_str()).join(format!("{country}.json"));
 
     let json = read_json_file(&path_buf).unwrap();
     return serde_json::from_str(&json).unwrap();
 }
 
 // Get the flag path for a country.
-pub fn get_flag_path(country: &str) -> Option<String> {
-    let path_buf = PathBuf::from(COUNTRY_FLAG_DIR.lock().unwrap().clone()).join(format!("{country}.svg"));
+pub fn get_flag_path(directories: &Directories, country: &str) -> Option<String> {
+    let path_buf = PathBuf::from(directories.flags.as_str()).join(format!("{country}.svg"));
     match path_buf.exists() {
         true => Some(path_buf.to_str().unwrap().to_string()),
         _ => None,
@@ -51,8 +40,8 @@ pub fn get_read_dir(path: &PathBuf) -> ReadDir {
 
 // Function for listing all JSON files in the names folder.
 // Used for generating countries in the database.
-pub fn get_countries_from_name_files() -> Vec<String> {
-    let path_buf = PathBuf::from(PEOPLE_NAME_DIR.lock().unwrap().clone());
+pub fn get_countries_from_name_files(directories: &Directories) -> Vec<String> {
+    let path_buf = PathBuf::from(directories.names.as_str());
 
     let dir = get_read_dir(&path_buf);
     let mut countries = Vec::new();

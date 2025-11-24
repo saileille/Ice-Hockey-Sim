@@ -31,8 +31,8 @@ const getTitle = (player: Player): HTMLHeadingElement => {
 
 // Draw the screen of a given player.
 export const drawScreen = async (id: number) => {
-    const player: Player = await invoke("get_player_package", { id: id });
-    const humanPackage: HumanPackage = await invoke("get_human_package");
+    const player: Player = await invoke("player_package", { id: id });
+    const humanPackage: HumanPackage = await invoke("human_package");
 
     const screen = initialiseContentScreen();
     screen.append(
@@ -158,7 +158,7 @@ const offerContractToPlayer: Listener = async (e: Event) => {
         return;
     }
 
-    const humanPackage: HumanPackage = await invoke("get_human_package");
+    const humanPackage: HumanPackage = await invoke("human_package");
     const years = Number((document.querySelector("#years") as HTMLSelectElement).value);
     await invoke("offer_contract", { playerId: playerId, teamId: (humanPackage.team as HumanTeamPackage).id, years: years });
 

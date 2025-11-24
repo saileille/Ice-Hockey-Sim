@@ -11,6 +11,7 @@
  ## Changelist:
  - Fixed the player page title when player is under contract.
  - Added country flags.
+ - Changed the maximum age of a generated player from 37 to 35.
 
  ### [0.1.3-A](https://github.com/saileille/Ice-Hockey-Sim/releases/tag/0.1.3-A):
   - Players grow older.

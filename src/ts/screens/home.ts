@@ -7,7 +7,7 @@ import { Listener } from "../types/dom";
 
 export const drawScreen = async () => {
     const screen = initialiseContentScreen();
-    const humanPackage: HumanPackage = await invoke("get_human_package");
+    const humanPackage: HumanPackage = await invoke("human_package");
 
     if (humanPackage.team !== null) {
         screen.appendChild(drawRosterOverview(humanPackage.team.roster_overview))

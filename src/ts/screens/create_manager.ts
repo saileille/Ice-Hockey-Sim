@@ -39,7 +39,7 @@ const onChangeCompSelect: Listener = (e: Event) => {
 
 const updateTeamSelection = async (id: Number) => {
     const teamSelect = document.querySelector("#teams") as HTMLSelectElement;
-    const optionData: Array<[string, string]> = await invoke("get_team_select_package", { id: id });
+    const optionData: Array<[string, string]> = await invoke("team_select_package", { id: id });
 
     while (teamSelect.lastChild) { teamSelect.removeChild(teamSelect.lastChild); }
 

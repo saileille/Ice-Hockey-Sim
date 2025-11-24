@@ -103,7 +103,7 @@ type Competition = {
 
 // Draw any competition screen.
 export const drawScreen = async (id: number) => {
-    const comp: Competition = await invoke("get_comp_screen_package", { id: id });
+    const comp: Competition = await invoke("comp_screen_package", { id: id });
 
     const screen = initialiseContentScreen();
 

@@ -1,10 +1,12 @@
 // Time-related operations.
 use std::fmt::Debug;
 
+use serde::{Deserialize, Serialize};
+use sqlx::{Decode, Encode, Sqlite, encode::IsNull, error::BoxDynError, sqlite::{SqliteArgumentValue, SqliteTypeInfo, SqliteValueRef}};
 use time::{
     format_description::BorrowedFormatItem, macros::format_description, Date
 };
-use crate::types::convert;
+use crate::{database, types::{Db, convert}};
 
 // Use this format for formatting and parsing dates.
 static DB_DATE_FORMAT: &[BorrowedFormatItem<'_>] = format_description!("[year]-[month]-[day]");
@@ -13,11 +15,34 @@ static DB_DATE_FORMAT: &[BorrowedFormatItem<'_>] = format_description!("[year]-[
 static DAYS_IN_YEAR: f64 = 365.2425;
 
 // A struct that represents an annual time period with fixed start and end dates. Both start and end are given as [month, day].
-#[derive(Debug, serde::Serialize)]
 #[derive(Default, Clone)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AnnualWindow {
     start: AnnualDate,
     pub end: AnnualDate,
+}
+
+impl sqlx::Type<Sqlite> for AnnualWindow {
+    fn type_info() -> SqliteTypeInfo {
+        <String as sqlx::Type<Sqlite>>::type_info()
+    }
+}
+
+impl<'q> Encode<'q, Sqlite> for AnnualWindow {
+    fn encode(self, buf: &mut Vec<SqliteArgumentValue<'q>>) -> Result<IsNull, BoxDynError> {
+        Encode::<Sqlite>::encode(serde_json::to_string(&self).unwrap(), buf)
+    }
+
+    fn encode_by_ref(&self, buf: &mut Vec<SqliteArgumentValue<'q>>) -> Result<IsNull, BoxDynError> {
+        Encode::<Sqlite>::encode(serde_json::to_string(self).unwrap(), buf)
+    }
+}
+
+impl<'r> Decode<'r, Sqlite> for AnnualWindow {
+    fn decode(value: SqliteValueRef<'r>) -> Result<Self, BoxDynError> {
+        let json = <serde_json::Value as Decode<Sqlite>>::decode(value)?;
+        Ok(serde_json::from_value(json)?)
+    }
 }
 
 impl AnnualWindow {
@@ -25,52 +50,52 @@ impl AnnualWindow {
     pub fn build(start: AnnualDate, end: AnnualDate) -> Self {
         AnnualWindow { start: start, end: end }
     }
-}
 
-impl AnnualWindow {
     // Check if the current date is between the start and the end date.
-    fn is_active(&self, today: &Date) -> bool {
-        self.get_next_start_date(today) > self.get_next_end_date(today)
+    async fn _is_active(&self, db: &Db) -> bool {
+        self.get_next_start_date(db).await > self.get_next_end_date(db).await
     }
 
     // Check if the current date is the first day of the window.
-    fn is_first_day(&self, today: &Date) -> bool {
+    async fn _is_first_day(&self, db: &Db) -> bool {
+        let today = database::get_today(db).await;
         self.start.day == today.day() &&
         self.start.month == today.month() as u8
     }
 
     // Check if the current date is the last day of the window.
-    pub fn is_last_day(&self, today: &Date) -> bool {
+    pub async fn is_last_day(&self, db: &Db) -> bool {
+        let today = database::get_today(db).await;
         self.end.day == today.day() &&
         self.end.month == today.month() as u8
     }
 
     // Get the previous earliest match date as a date object.
-    fn get_previous_start_date(&self, today: &Date) -> Date {
-        self.start.get_previous_annual_date(today)
+    async fn _get_previous_start_date(&self, db: &Db) -> Date {
+        self.start.get_previous_annual_date(db).await
     }
 
     // Get the previous latest match date as a date object.
-    fn get_previous_end_date(&self, today: &Date) -> Date {
-        self.end.get_previous_annual_date(today)
+    async fn _get_previous_end_date(&self, db: &Db) -> Date {
+        self.end.get_previous_annual_date(db).await
     }
 
     // Get the next earliest match date as a date object.
-    pub fn get_next_start_date(&self, today: &Date) -> Date {
-        self.start.get_next_annual_date(today)
+    pub async fn get_next_start_date(&self, db: &Db) -> Date {
+        self.start.get_next_annual_date(db).await
     }
 
     // Get the next latest match date as a date object.
-    pub fn get_next_end_date(&self, today: &Date) -> Date {
-        self.end.get_next_annual_date(today)
+    pub async fn get_next_end_date(&self, db: &Db) -> Date {
+        self.end.get_next_annual_date(db).await
     }
 
     // Get the start and end dates for this season if ongoing, or the next if over.
-    fn get_next_or_ongoing_window_boundaries(&self, today: &Date) -> (Date, Date) {
-        let end = self.get_next_end_date(today);
-        let mut start = self.get_next_start_date(today);
+    async fn _get_next_or_ongoing_window_boundaries(&self, db: &Db) -> (Date, Date) {
+        let end = self.get_next_end_date(db).await;
+        let mut start = self.get_next_start_date(db).await;
         if start > end {
-            start = self.get_previous_start_date(today);
+            start = self._get_previous_start_date(db).await;
         }
 
         return (start, end);
@@ -89,7 +114,7 @@ impl AnnualWindow {
     }
 
     // Get start and end date from a given end year.
-    fn get_dates_from_end_year(&self, year: i32) -> (Date, Date) {
+    fn _get_dates_from_end_year(&self, year: i32) -> (Date, Date) {
         let mut start_date = self.start.get_date(year);
         let end_date = self.end.get_date(year);
 
@@ -102,7 +127,7 @@ impl AnnualWindow {
 }
 
 // Functions for getting dates out of annual date.
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[derive(Default, Clone)]
 pub struct AnnualDate {
     pub month: u8,
@@ -127,18 +152,19 @@ impl AnnualDate {
     }
 
     // Get a Date object for the next time specific day and month will occur.
-    fn get_next_annual_date(&self, today: &Date) -> Date {
+    async fn get_next_annual_date(&self, db: &Db) -> Date {
+        let today = database::get_today(db).await;
         let date = self.get_date(today.year());
-
-        if date < *today { return date.replace_year(date.year() + 1).unwrap()}
+        if date < today { return date.replace_year(date.year() + 1).unwrap()}
         return date;
     }
 
     // Get a Date object for the previous time specific day and month occurred.
-    fn get_previous_annual_date(&self, today: &Date) -> Date {
+    async fn get_previous_annual_date(&self, db: &Db) -> Date {
+        let today = database::get_today(db).await;
         let date = self.get_date(today.year());
 
-        if date > *today {
+        if date > today {
             return date.replace_year(date.year() - 1).unwrap();
         }
 
@@ -147,24 +173,24 @@ impl AnnualDate {
 
     // Get a date this many years into the future or the past from the next event.
     // 0 returns the next year it happens.
-    pub fn get_next_date_with_year_offset(&self, years: i32, today: &Date) -> Date {
-        let date = self.get_next_annual_date(today);
+    pub async fn _get_next_date_with_year_offset(&self, db: &Db, years: i32) -> Date {
+        let date = self.get_next_annual_date(db).await;
         return self.get_date(date.year() + years);
     }
 
     // Get a date this many years into the future or the past since last event.
     // 0 returns the most recent time it happened.
-    pub fn get_previous_date_with_year_offset(&self, years: i32, today: &Date) -> Date {
-        let date = self.get_previous_annual_date(today);
+    pub async fn get_previous_date_with_year_offset(&self, db: &Db, years: i32) -> Date {
+        let date = self.get_previous_annual_date(db).await;
         return self.get_date(date.year() + years);
     }
 }
 
 // Get a vector of dates between two Date objects, inclusive.
-pub fn get_dates(start: &Date, end: &Date) -> Vec<Date> {
+pub fn get_dates(start: Date, end: Date) -> Vec<Date> {
     let mut dates = Vec::new();
     let mut date = start.clone();
-    while date <= *end {
+    while date <= end {
         dates.push(date);
         date = date.next_day().unwrap();
     }
@@ -173,18 +199,18 @@ pub fn get_dates(start: &Date, end: &Date) -> Vec<Date> {
 }
 
 // Convert a Date object to database string.
-pub fn date_to_db_string(date: &Date) -> String {
+pub fn date_to_string(date: Date) -> String {
     date.format(&DB_DATE_FORMAT).unwrap()
 }
 
 // Convert a database string to Date object.
-pub fn db_string_to_date(date: &str) -> Date {
+pub fn _string_to_date(date: &str) -> Date {
     Date::parse(date, DB_DATE_FORMAT).unwrap()
 }
 
 // Get how many years there are in-between the two dates.
 // Gives positive values if date2 is later than date1.
-pub fn get_years_between(date1: &Date, date2: &Date) -> i8 {
+pub fn get_years_between(date1: Date, date2: Date) -> i8 {
     let years = convert::int::<i32, i8>(date2.year() - date1.year());
 
     match date2.month() as i8 - date1.month() as i8 {
