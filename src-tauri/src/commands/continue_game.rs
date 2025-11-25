@@ -2,7 +2,7 @@
 
 use tauri::Manager as TauriManager;
 
-use crate::{app_data::AppData, competition::Competition, database, person::{Contract, manager::Manager, player::Player}, team::Team, types::Db};
+use crate::{app_data::AppData, competition::Competition, database, person::{Contract, Person, manager::Manager, player::Player}, team::Team, types::Db};
 
 
 // Advance the time with one day.
@@ -48,6 +48,8 @@ async fn handle_comps(db: &Db) {
 // Do the daily tasks of managers (and teams, they are connected).
 async fn handle_managers_and_teams(db: &Db) {
     let managers = Manager::fetch_active(db).await;
+    let (total_weight, country_weights) = Person::country_weights(db).await;
+
     for manager in managers.into_iter() {
         let o_contract= manager.person.contract(db).await;
 
@@ -65,7 +67,7 @@ async fn handle_managers_and_teams(db: &Db) {
         // Do not do anything on behalf of the human.
         if manager.is_human {
             team.return_actions_to_full(db).await;
-            team.season_end_checker(db).await;
+            team.season_end_checker(db, &country_weights, total_weight).await;
             continue;
         }
 
@@ -80,7 +82,7 @@ async fn handle_managers_and_teams(db: &Db) {
         }
 
         team.return_actions_to_full(db).await;
-        team.season_end_checker(db).await;
+        team.season_end_checker(db, &country_weights, total_weight).await;
     }
 
     // TODO: teams without managers should do tasks specific to them.

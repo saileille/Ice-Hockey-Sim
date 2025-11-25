@@ -9,7 +9,7 @@ use crate::{
     database, person::{Contract, ContractRole, manager::Manager, player::
         Player
     }, team::ai::PlayerNeed, time::AnnualWindow, types::{
-        CompetitionId, Db, PersonId, TeamId
+        CompetitionId, CountryId, Db, PersonId, TeamId
     }
 };
 use self::lineup::LineUp;
@@ -247,29 +247,29 @@ impl Team {
 
 impl Team {
     // Create a manager out of thin air.
-    async fn create_manager(&mut self, db: &Db) {
-        let manager = Manager::build_and_save_random(db, false).await;
+    async fn create_manager(&mut self, db: &Db, country_weights: &[(CountryId, u32)], total_weight: u32) {
+        let manager = Manager::build_and_save_random(db, country_weights, total_weight, false).await;
         Contract::build_and_save(db, manager.person.id, self.id, database::get_today(db).await, date!(2125-06-01), ContractRole::Manager, true).await;
     }
 
     // Set up the team when initialising a game.
-    pub async fn setup(&mut self, db: &Db) {
-        self.create_manager(db).await;
+    pub async fn setup(&mut self, db: &Db, country_weights: &[(CountryId, u32)], total_weight: u32) {
+        self.create_manager(db, country_weights, total_weight).await;
         self.return_actions_to_full(db).await;
-        self.promote_junior_players(db).await;
+        self.promote_junior_players(db, country_weights, total_weight).await;
     }
 
     // Give a few junior players to the team at the end of the season.
-    async fn promote_junior_players(&mut self, db: &Db) {
+    async fn promote_junior_players(&mut self, db: &Db, country_weights: &[(CountryId, u32)], total_weight: u32) {
         for _ in 0..rand::random_range(1..=3) {
-            let player = Player::build_and_save(db, 16, 19).await;
+            let player = Player::build_and_save(db, country_weights, total_weight, 16, 19).await;
             Contract::build_from_years(db, player.person.id, self, 4, ContractRole::Player, true).await;
         }
     }
 
-    pub async fn season_end_checker(&mut self, db: &Db) {
+    pub async fn season_end_checker(&mut self, db: &Db, country_weights: &[(CountryId, u32)], total_weight: u32) {
         if self.is_season_end_date(db).await {
-            self.promote_junior_players(db).await;
+            self.promote_junior_players(db, country_weights, total_weight).await;
         }
     }
 }

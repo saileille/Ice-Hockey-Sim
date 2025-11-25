@@ -6,7 +6,7 @@ use rand::rngs::ThreadRng;
 use serde_json::json;
 use sqlx::{Row, FromRow, sqlite::SqliteRow};
 
-use crate::{person::{Gender, attribute::{AttributeId, PersonAttribute}}, types::{Db, PersonId, TeamId}};
+use crate::{person::{Gender, attribute::{AttributeId, PersonAttribute}}, types::{CountryId, Db, PersonId, TeamId}};
 use super::Person;
 use self::position::PositionId;
 
@@ -40,15 +40,15 @@ impl Player {
     }
 
     // Create a player and store it in the database. Return a clone of the Player.
-    pub async fn build_and_save(db: &Db, min_age: u8, max_age: u8) -> Self {
-        let player = Self::create(db, min_age, max_age).await;
+    pub async fn build_and_save(db: &Db, country_weights: &[(CountryId, u32)], total_weight: u32, min_age: u8, max_age: u8) -> Self {
+        let player = Self::create(db, country_weights, total_weight, min_age, max_age).await;
         player.save(db).await;
         return player;
     }
 
     // Just like build and save, but minimal arguments.
-    pub async fn create(db: &Db, min_age: u8, max_age: u8) -> Self {
-        let person = Person::create(db, min_age, max_age, Gender::Male).await;
+    pub async fn create(db: &Db, country_weights: &[(CountryId, u32)], total_weight: u32, min_age: u8, max_age: u8) -> Self {
+        let person = Person::create(db, country_weights, total_weight, min_age, max_age, Gender::Male).await;
         let position_id = PositionId::get_random();
 
         let mut player = Self::build(person, position_id);

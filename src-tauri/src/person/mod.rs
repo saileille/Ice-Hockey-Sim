@@ -75,16 +75,10 @@ impl Person {
         };
     }
 
-    // Make a random person.
-    pub async fn create(db: &Db, min_age: u8, max_age: u8, gender: Gender) -> Self {
-        let min_days = years_to_days(min_age);
-        let max_days = years_to_days(max_age);
-
-        let age = rand::random_range(min_days..=max_days);
-
+    // Get the total weight and weight of each country.
+    pub async fn country_weights(db: &Db) -> (u32, Vec<(CountryId, u32)>) {
         let countries = Country::fetch_all(db).await;
 
-        // First determining the person's nationality with weighted random.
         let mut country_weights = Vec::new();
         let mut total_weight = 0;
         for country in countries {
@@ -98,6 +92,16 @@ impl Person {
             country_weights.push((country.id, weight));
         }
 
+        return (total_weight, country_weights);
+    }
+
+    // Make a random person.
+    pub async fn create(db: &Db, country_weights: &[(CountryId, u32)], total_weight: u32, min_age: u8, max_age: u8, gender: Gender) -> Self {
+        let min_days = years_to_days(min_age);
+        let max_days = years_to_days(max_age);
+
+        let age = rand::random_range(min_days..=max_days);
+
         let random = rand::random_range(0..total_weight);
         let mut counter = 0;
         let mut country_id = 0;
@@ -105,7 +109,7 @@ impl Person {
             counter += weight;
 
             if random < counter {
-                country_id = id;
+                country_id = *id;
                 break;
             }
         }

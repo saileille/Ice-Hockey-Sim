@@ -3,7 +3,7 @@
 use serde_json::json;
 use sqlx::{Row, FromRow, sqlite::SqliteRow};
 
-use crate::{person::{Gender, Person}, types::Db};
+use crate::{person::{Gender, Person}, types::{CountryId, Db}};
 
 #[derive(Default, Clone)]
 pub struct Manager {
@@ -37,8 +37,8 @@ impl Manager {
     }
 
     // Build a random manager.
-    pub async fn build_and_save_random(db: &Db, is_human: bool) -> Self {
-        let person = Person::create(db, 30, 60, Gender::Male).await;
+    pub async fn build_and_save_random(db: &Db, country_weights: &[(CountryId, u32)], total_weight: u32, is_human: bool) -> Self {
+        let person = Person::create(db, country_weights, total_weight, 30, 60, Gender::Male).await;
         return Self::build_and_save(db, person, is_human).await;
     }
 

@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 use crate::{
     app_data::{AppData, Directories}, competition::{
         CompConnection, Competition, Seed, format::{self}, knockout_generator, season::ranking::RankCriteria
-    }, country::Country, event, io, match_event, person::{attribute::{Attribute, AttributeId}, player::
+    }, country::Country, event, io, match_event, person::{Person, attribute::{Attribute, AttributeId}, player::
         Player
     }, team::Team, time::{AnnualDate, AnnualWindow}, types::Db
 };
@@ -75,12 +75,13 @@ lazy_static! {
     };
 }
 
-pub async fn setup(dir: &Path) -> Db {
+pub async fn setup(_dir: &Path) -> Db {
     // let canonised = dunce::canonicalize(dir).unwrap();
     // let path = canonised.to_str().unwrap();
     // println!("{path}");
     // Sqlite::create_database(format!("sqlite://{path}/db.db?mode=rwc").as_str()).await.unwrap();
     // let db = SqlitePoolOptions::new().connect(format!("sqlite://{path}/db.db").as_str()).await.unwrap();
+
     Sqlite::create_database(format!("sqlite::memory:").as_str()).await.unwrap();
     let db = SqlitePoolOptions::new().connect(format!("sqlite::memory:").as_str()).await.unwrap();
     sqlx::migrate!("./sql/migrations").run(&db).await.unwrap();
@@ -116,14 +117,15 @@ pub async fn initialise(handle: &AppHandle) -> AppData {
     }
 
     let teams = Team::fetch_all(&data.db).await;
+    let (total_weight, country_weights) = Person::country_weights(&data.db).await;
     // Generate 50 players per team.
     for _ in 0..teams.len() * 50 {
-        Player::build_and_save(&data.db, 16, 35).await;
+        Player::build_and_save(&data.db, &country_weights, total_weight, 16, 35).await;
     }
 
     // Set up the teams.
     for mut team in teams.into_iter() {
-        team.setup(&data.db).await;
+        team.setup(&data.db, &country_weights, total_weight).await;
     }
 
     return data
