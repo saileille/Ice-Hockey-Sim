@@ -6,7 +6,10 @@ CREATE TABLE IF NOT EXISTS Competition (
     format TEXT,    -- Option<Format> struct
     rank_criteria TEXT NOT NULL, -- Vec<RankCriteria> struct
     comp_type TEXT NOT NULL,    -- competition::Type enum
-    parent_id INTEGER NOT NULL
+    -- Must have the option to be NULL to indicate that there is no parent.
+    parent_id INTEGER,
+
+    FOREIGN KEY (parent_id) REFERENCES Competition(id)
 );
 
 CREATE TABLE IF NOT EXISTS CompConnection (

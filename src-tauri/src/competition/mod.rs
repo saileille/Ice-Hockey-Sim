@@ -3,9 +3,9 @@ pub mod season;
 pub mod format;
 pub mod knockout_generator;
 
-use std::{cmp::Ordering, iter::zip};
+use std::{cmp::Ordering, iter::zip, num::NonZero};
 
-use sqlx::FromRow;
+use sqlx::{FromRow, Row, sqlite::SqliteRow};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -24,19 +24,33 @@ pub enum Type {
 
 #[derive(Debug)]
 #[derive(Default, Clone)]
-#[derive(FromRow)]
 pub struct Competition {
     pub id: CompetitionId,
-    #[sqlx(rename = "comp_name")]
     pub name: String,
     pub season_window: AnnualWindow,  // Dates between which this competition is played.
     min_no_of_teams: u8,
-    #[sqlx(json(nullable))]
     pub format: Option<Format>,
-    #[sqlx(json)]
     rank_criteria: Vec<RankCriteria>,
     pub comp_type: Type,
-    parent_id: CompetitionId,
+    parent_id: CompetitionId,   // TODO: Some conversion between NULL in the database and 0 in the code.
+}
+
+impl FromRow<'_, SqliteRow> for Competition {
+    fn from_row(row: &SqliteRow) -> sqlx::Result<Self> {
+        Ok(Self {
+            id: row.try_get("id")?,
+            name: row.try_get("comp_name")?,
+            season_window: row.try_get("season_window")?,
+            min_no_of_teams: row.try_get("min_no_of_teams")?,
+            format: row.try_get("format")?,
+            rank_criteria: serde_json::from_value(row.try_get("rank_criteria")?).unwrap(),
+            comp_type: row.try_get("comp_type")?,
+            parent_id: match row.try_get("parent_id")? {
+                Some(v) => v,
+                None => 0
+            },
+        })
+    }
 }
 
 // Database stuff.
@@ -72,7 +86,7 @@ impl Competition {
             INNER JOIN Competition ON Competition.id = Season.comp_id
             WHERE Competition.id = $1
             GROUP BY Season.comp_id
-            ORDER BY Competition.id ASC"
+            ORDER BY Competition.id ASC, Season.id DESC"
         ).bind(self.id)
         .fetch_all(db).await.unwrap()
     }
@@ -155,7 +169,7 @@ impl Competition {
     async fn save_parent_id(&self, db: &Db, parent_id: CompetitionId) {
         sqlx::query(
             "UPDATE Competition SET parent_id = $1 WHERE id = $2"
-        ).bind(parent_id)
+        ).bind(NonZero::new(parent_id).unwrap())
         .bind(self.id)
         .execute(db).await.unwrap();
     }
@@ -164,16 +178,15 @@ impl Competition {
     pub async fn save(&self, db: &Db) {
         sqlx::query(
             "INSERT INTO Competition
-            (id, comp_name, season_window, min_no_of_teams, format, rank_criteria, comp_type, parent_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
-        ).bind(self.id)
+            (id, comp_name, season_window, min_no_of_teams, format, rank_criteria, comp_type)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"
+        ).bind(NonZero::new(self.id).unwrap())
         .bind(self.name.as_str())
         .bind(&self.season_window)
         .bind(self.min_no_of_teams)
         .bind(&self.format)
         .bind(json!(self.rank_criteria))
         .bind(self.comp_type)
-        .bind(self.parent_id)
         .execute(db).await.unwrap();
     }
 
@@ -181,7 +194,7 @@ impl Competition {
     pub async fn fetch_parents(db: &Db) -> Vec<Competition> {
         sqlx::query_as(
             "SELECT * FROM Competition
-            WHERE parent_id = 0"
+            WHERE parent_id IS NULL"
         ).fetch_all(db).await.unwrap()
     }
 
@@ -189,7 +202,7 @@ impl Competition {
     pub async fn fetch_parent_id_and_name(db: &Db) -> Vec<(CompetitionId, String)> {
         sqlx::query_as(
             "SELECT id, comp_name FROM Competition
-            WHERE parent_id = 0
+            WHERE parent_id IS NULL
             ORDER BY id ASC"
         ).fetch_all(db).await.unwrap()
     }
@@ -381,7 +394,7 @@ impl Competition {
     async fn get_sibling_package(&self, db: &Db) -> Vec<(CompetitionId, String)> {
         let mut select_data = match self.parent(db).await {
             Some(parent) => parent.get_child_package(db, &parent.name).await,
-            _ => vec![self.get_name_and_id()]
+            _ => vec![self.name_and_id()]
         };
 
         select_data.sort_by(|(a, _), (b, _)| a.cmp(&b));
@@ -400,7 +413,7 @@ impl Competition {
     // Get the IDs and names of child competitions.
     async fn get_child_package(&self, db: &Db, self_name: &str) -> Vec<(CompetitionId, String)> {
         let mut children: Vec<(CompetitionId, String)> = self.children(db).await.iter().map(|comp| {
-            comp.get_name_and_id()
+            comp.name_and_id()
         }).collect();
 
         // Adding this competition so selecting a child becomes possible.
@@ -409,12 +422,12 @@ impl Competition {
     }
 
     // Get the name and ID of the competition.
-    fn get_name_and_id(&self) -> (CompetitionId, String) {
+    fn name_and_id(&self) -> (CompetitionId, String) {
         return (self.id, self.name.clone());
     }
 
     // Get relevant information for a competition screen.
-    pub async fn get_comp_screen_package(&self, db: &Db) -> serde_json::Value {
+    pub async fn comp_screen_package(&self, db: &Db) -> serde_json::Value {
         let format = if self.format.is_none() {
             serde_json::Value::Null
         } else {
@@ -432,7 +445,7 @@ impl Competition {
     }
 
     // Get relevant information for a tournament tree competition screen.
-    pub async fn get_tournament_comp_screen_package(&self, db: &Db) -> serde_json::Value {
+    pub async fn tournament_comp_screen_package(&self, db: &Db) -> serde_json::Value {
         let mut future_games = Vec::new();
         let mut past_games = Vec::new();
         let mut rounds = Vec::new();
@@ -440,7 +453,9 @@ impl Competition {
             future_games.append(&mut season.today_and_future_games(db).await);
             past_games.append(&mut season.past_games(db).await);
 
-            let mut round = season.knockout_round.as_ref().unwrap().get_comp_screen_json(db).await;
+            let mut round = season.knockout_round.as_ref().expect(format!(
+                "no knockout round for {}: {}", comp.id, comp.name
+            ).as_str()).comp_screen_package(db).await;
             round["name"] = json!(comp.name);
             rounds.push(round);
         }
@@ -452,15 +467,15 @@ impl Competition {
         // past_games.sort_by(|a, b| a.date.cmp(&b.date));
 
         // Using the default competition package as base.
-        let mut comp_json = self.get_comp_screen_package(db).await;
+        let mut comp_json = self.comp_screen_package(db).await;
 
         let mut future_games_json = Vec::new();
-        for game in future_games {
+        for mut game in future_games {
             future_games_json.push(game.comp_screen_package(db).await);
         }
 
         let mut past_games_json = Vec::new();
-        for game in past_games {
+        for mut game in past_games {
             past_games_json.push(game.comp_screen_package(db).await);
         }
 
@@ -517,8 +532,8 @@ impl CompConnection {
             "INSERT INTO CompConnection
             (origin_id, destination_id, highest_position, lowest_position, team_seeds, stats_carry_over)
             VALUES ($1, $2, $3, $4, $5, $6)"
-        ).bind(self.origin_id)
-        .bind(destination_id)
+        ).bind(NonZero::new(self.origin_id).unwrap())
+        .bind(NonZero::new(destination_id).unwrap())
         .bind(self.highest_position)
         .bind(self.lowest_position)
         .bind(self.team_seeds)

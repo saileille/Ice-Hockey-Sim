@@ -1,5 +1,5 @@
 // Countries and such.
-use std::collections::HashMap;
+use std::{collections::HashMap, num::NonZero};
 use rand::{Rng, rngs::ThreadRng};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -72,9 +72,9 @@ impl Country {
             "INSERT INTO Country
             (id, country_name, names, flag_path)
             VALUES ($1, $2, $3, $4)"
-        ).bind(self.id)
+        ).bind(NonZero::new(self.id).unwrap())
         .bind(&self.name)
-        .bind(serde_json::to_string(&self.names).unwrap())
+        .bind(json!(self.names))
         .bind(&self.flag_path)
         .execute(db).await.unwrap();
     }

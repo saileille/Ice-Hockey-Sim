@@ -2,6 +2,8 @@ pub mod lineup;
 pub mod ai;
 
 
+use std::num::NonZero;
+
 use serde_json::json;
 use sqlx::FromRow;
 use time::macros::date;
@@ -81,11 +83,11 @@ impl Team {
         sqlx::query(
             "INSERT INTO Team (id, full_name, lineup, primary_comp_id, player_needs, actions_remaining)
             VALUES ($1, $2, $3, $4, $5, $6)"
-        ).bind(self.id)
-        .bind(&self.full_name)
+        ).bind(NonZero::new(self.id).unwrap())
+        .bind(self.full_name.as_str())
         .bind(&self.lineup)
-        .bind(self.primary_comp_id)
-        .bind(serde_json::to_string(&self.player_needs).unwrap())
+        .bind(NonZero::new(self.primary_comp_id).unwrap())
+        .bind(json!(self.player_needs))
         .bind(self.actions_remaining)
         .execute(db).await.unwrap();
     }

@@ -1,5 +1,7 @@
 // Data for teams.
 
+use std::num::NonZero;
+
 use ordinal::ToOrdinal;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -44,8 +46,8 @@ impl TeamSeason {
             "INSERT INTO TeamSeason
             (team_id, season_id, seed, rank, regular_wins, ot_wins, draws, ot_losses, regular_losses, goals_scored, goals_conceded)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"
-        ).bind(self.team_id)
-        .bind(self.season_id)
+        ).bind(NonZero::new(self.team_id).unwrap())
+        .bind(NonZero::new(self.season_id).unwrap())
         .bind(self.seed)
         .bind(self.rank)
         .bind(self.regular_wins)

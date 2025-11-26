@@ -2,13 +2,15 @@ pub mod event;
 pub mod team;
 mod cache;
 
+use std::num::NonZero;
+
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::{Decode, Encode, FromRow, Sqlite, encode::IsNull, error::BoxDynError, sqlite::{SqliteArgumentValue, SqliteTypeInfo, SqliteValueRef}};
 use time::Date;
 
-use crate::{competition::{Competition, format::Format, season::team::TeamSeason}, event as logic_event, match_event::{cache::{Attacker, GameCache}, event::Shot}, time::date_to_string, types::{Db, GameId, SeasonId, TeamId, convert}};
+use crate::{competition::{Competition, format::Format, season::team::TeamSeason}, event as logic_event, match_event::{cache::{Attacker, GameCache}, event::Shot, team::TeamGame}, time::date_to_string, types::{Db, GameId, SeasonId, TeamId, convert}};
 
 #[derive(Debug, Clone)]
 #[derive(FromRow)]
@@ -75,13 +77,18 @@ impl Game {
             "INSERT INTO Game
             (id, date, home_id, away_id, clock, season_id)
             VALUES ($1, $2, $3, $4, $5, $6)"
-        ).bind(self.id)
+        ).bind(NonZero::new(self.id).unwrap())
         .bind(self.date)
-        .bind(self.home_id)
-        .bind(self.away_id)
+        .bind(NonZero::new(self.home_id).unwrap())
+        .bind(NonZero::new(self.away_id).unwrap())
         .bind(self.clock)
-        .bind(self.season_id)
+        .bind(NonZero::new(self.season_id).unwrap())
         .execute(db).await.unwrap();
+
+        let home = TeamGame::build(self.id, self.home_id);
+        let away = TeamGame::build(self.id, self.away_id);
+        home.save(db).await;
+        away.save(db).await;
     }
 
     // Get the game rules.
@@ -107,7 +114,9 @@ impl Game {
     }
 
     // Get nice data for a competition screen.
-    pub async fn comp_screen_package(&self, db: &Db) -> serde_json::Value {
+    pub async fn comp_screen_package(&mut self, db: &Db) -> serde_json::Value {
+        self.cache = GameCache::build(db, self.id, self.home_id, self.away_id, self.rules(db).await).await;
+
         json!({
             "home": self.cache.home.game_data.comp_screen_package(db).await,
             "away": self.cache.away.game_data.comp_screen_package(db).await,
@@ -145,6 +154,10 @@ impl Game {
 
     // Do everything that needs to be done after the game is concluded.
     async fn do_post_game_tasks(&mut self, db: &Db) {
+        // Saving the TeamGame data into the database.
+        self.cache.home.game_data.overwrite(db).await;
+        self.cache.away.game_data.overwrite(db).await;
+
         let mut o_comp = Some(self.competition(db).await);
         let (home_data, away_data) = TeamSeason::season_data_from_game(&self.cache.home.game_data, &self.cache.away.game_data, self.has_overtime());
 

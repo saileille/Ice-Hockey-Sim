@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use rand::seq::IndexedRandom;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use crate::{person::{Contract, ContractRole, player::{Player, position::PositionId}}, team::Team, types::{Db, PersonId, convert}};
 
@@ -16,7 +17,7 @@ pub struct PlayerNeed {
     // Abilities of the players, from highest to lowest.
     pub abilities: Vec<f64>,
 
-    // Calculated and set in get_urgency
+    // Calculated and set in urgency()
     // f64::MAX: Must have this type of player at all costs.
     // Negative: Will not acquire a player of this type (unless maybe if one is *really* good).
     urgency: f64,
@@ -38,6 +39,8 @@ impl PlayerNeed {
 
     // Get the average ability of the players.
     fn avg_ability(&self) -> f64 {
+        if self.abilities.len() == 0 { return 0.0 }
+
         let total: f64 = self.abilities.iter().sum();
         return total / convert::usize_to_f64(self.abilities.len());
     }
@@ -88,7 +91,7 @@ impl PlayerNeed {
             return;
         }
 
-        let total_position_ability: f64 = needs.iter().map(|a| a.avg_ability()).sum();
+        let total_position_ability: f64 = needs.iter().map(|need| need.avg_ability()).sum();
         let avg_position_ability = total_position_ability / convert::usize_to_f64(needs.len());
 
         // The lower the quality in position, the bigger the modifier.
@@ -100,6 +103,13 @@ impl PlayerNeed {
         else {
             avg_position_ability / self.avg_ability()
         };
+
+        if ability_modifier.is_nan() {
+            panic!(
+                "ability modifier is nan\n\ntotal_position_ability: {}\navg_position_ability: {}\nself.avg_ability(): {}",
+                total_position_ability, avg_position_ability, self.avg_ability()
+            )
+        }
 
         // Could have more stuff baked into it, but this should do for now.
         self.urgency = ability_modifier;
@@ -143,14 +153,7 @@ impl Team {
         }
 
         self.player_needs.sort_by(|a, b| b.urgency.total_cmp(&a.urgency));
-
-        // Save the player needs to the database.
-        sqlx::query(
-            "UPDATE Team SET player_needs = $1
-            WHERE id = $2"
-        ).bind(serde_json::to_string(&self.player_needs).unwrap())
-        .bind(self.id)
-        .execute(db).await.unwrap();
+        self.save_player_needs(db).await;
     }
 
     // Offer contract to a player, if the team needs one.
@@ -218,7 +221,7 @@ impl Team {
 
     // Get a player shortlist of possible hirelings.
     async fn player_shortlist(&self, db: &Db) -> Vec<Player> {
-        let mut positions = vec![&self.player_needs[0].position];
+        let mut positions = vec![self.player_needs[0].position];
         let highest_urgency = self.player_needs[0].urgency;
 
         // No players returned if all urgencies are negative.
@@ -226,7 +229,7 @@ impl Team {
 
         for need in &self.player_needs[1..self.player_needs.len()] {
             if need.urgency == highest_urgency || need.urgency >= 10000.0 {
-                positions.push(&need.position);
+                positions.push(need.position);
             }
         }
 
@@ -234,6 +237,24 @@ impl Team {
         free_agents.sort_by(|a, b| b.ability.display().cmp(&a.ability.display()));
 
         return free_agents;
+    }
+
+    // Save the player needs to the database.
+    async fn save_player_needs(&self, db: &Db) {
+        let json = json!(self.player_needs);
+
+        sqlx::query(
+            "UPDATE Team SET player_needs = $1
+            WHERE id = $2"
+        ).bind(&json)
+        .bind(self.id)
+        .execute(db).await.unwrap();
+
+        let _player_needs: Vec<PlayerNeed> = serde_json::from_value(json.clone()).expect(format!(
+            "null value in player_needs_json\n
+            json: {:#?}\n
+            vec: {:#?}", json.to_string(), self.player_needs
+        ).as_str());
     }
 }
 

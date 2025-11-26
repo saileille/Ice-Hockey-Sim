@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS Contract (
     team_id INTEGER NOT NULL,
     begin_date TEXT NOT NULL,
     end_date TEXT NOT NULL,
-    role TEXT NOT NULL,  -- ContractRole enum
+    role TEXT NOT NULL, -- ContractRole enum
     is_signed INTEGER NOT NULL,  -- Boolean. Difference between a contract and a contract offer.
 
     PRIMARY KEY (person_id, team_id),

@@ -75,16 +75,22 @@ lazy_static! {
     };
 }
 
-pub async fn setup(_dir: &Path) -> Db {
-    // let canonised = dunce::canonicalize(dir).unwrap();
-    // let path = canonised.to_str().unwrap();
-    // println!("{path}");
-    // Sqlite::create_database(format!("sqlite://{path}/db.db?mode=rwc").as_str()).await.unwrap();
-    // let db = SqlitePoolOptions::new().connect(format!("sqlite://{path}/db.db").as_str()).await.unwrap();
+pub async fn setup(dir: &Path) -> Db {
+    // Database in resource folder.
+    let canonised = dunce::canonicalize(dir).unwrap();
+    let path = canonised.to_str().unwrap();
+    Sqlite::create_database(format!("sqlite://{path}/db.db?mode=rwc").as_str()).await.unwrap();
+    let db = SqlitePoolOptions::new().connect(format!("sqlite://{path}/db.db").as_str()).await.unwrap();
 
-    Sqlite::create_database(format!("sqlite::memory:").as_str()).await.unwrap();
-    let db = SqlitePoolOptions::new().connect(format!("sqlite::memory:").as_str()).await.unwrap();
-    sqlx::migrate!("./sql/migrations").run(&db).await.unwrap();
+    // Database in memory
+    // Sqlite::create_database(format!("sqlite::memory:").as_str()).await.unwrap();
+    // let db = SqlitePoolOptions::new().connect(format!("sqlite::memory:").as_str()).await.unwrap();
+
+    // Database in src folder (testing only).
+    // Sqlite::create_database(format!("sqlite://data/db.db?mode=rwc").as_str()).await.unwrap();
+    // let db = SqlitePoolOptions::new().connect(format!("sqlite://data/db.db").as_str()).await.unwrap();
+
+    sqlx::migrate!("sql/migrations").run(&db).await.unwrap();
 
     return db;
 }

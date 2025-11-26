@@ -2,6 +2,8 @@ pub mod position;
 mod ai;
 
 
+use std::num::NonZero;
+
 use rand::rngs::ThreadRng;
 use serde_json::json;
 use sqlx::{Row, FromRow, sqlite::SqliteRow};
@@ -92,7 +94,7 @@ impl Player {
             "INSERT INTO Player
             (person_id, ability, position_id)
             VALUES ($1, $2, $3)"
-        ).bind(self.person.id)
+        ).bind(NonZero::new(self.person.id).unwrap())
         .bind(self.ability.value)
         .bind(self.position_id)
         .execute(db).await.unwrap();
@@ -108,7 +110,7 @@ impl Player {
     }
 
     // Get all free agents from the database with given positions, which the given team has not approached yet.
-    pub async fn free_agents_for_team(db: &Db, positions: Vec<&PositionId>, team_id: TeamId) -> Vec<Self> {
+    pub async fn free_agents_for_team(db: &Db, positions: Vec<PositionId>, team_id: TeamId) -> Vec<Self> {
         let mut position_query = String::new();
         for position in positions {
             match position_query.is_empty() {
@@ -116,7 +118,7 @@ impl Player {
                 false => position_query.push_str(" OR ")
             }
 
-            position_query.push_str(format!("Player.position_id = {}", *position as u8).as_str());
+            position_query.push_str(format!("Player.position_id = {}", position as u8).as_str());
         }
 
         position_query.push_str(")");

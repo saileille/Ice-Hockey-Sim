@@ -1,5 +1,4 @@
 // Functions for generating knockout competitions.
-
 use ordinal::ToOrdinal as _;
 use rand::{Rng, rngs::ThreadRng};
 use time::Duration;

@@ -5,6 +5,8 @@ pub mod knockout_round;
 pub mod ranking;
 mod schedule_generator;
 
+use std::num::NonZero;
+
 use serde_json::json;
 use sqlx::FromRow;
 use time::Date;
@@ -108,8 +110,8 @@ impl Season {
                 "INSERT INTO TeamSeason
                 (team_id, season_id, seed, rank, regular_wins, ot_wins, draws, ot_losses, regular_losses, goals_scored, goals_conceded)
                 VALUES ($1, $2, 0, 1, 0, 0, 0, 0, 0, 0, 0)"
-            ).bind(id)
-            .bind(self.id)
+            ).bind(NonZero::new(*id).unwrap())
+            .bind(NonZero::new(self.id).unwrap())
             .execute(db).await.unwrap();
         }
     }
@@ -120,9 +122,9 @@ impl Season {
             "INSERT INTO Season
             (id, comp_id, season_name, start_date, end_date, round_robin, knockout_round, is_over)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
-        ).bind(self.id)
-        .bind(self.comp_id)
-        .bind(&self.name)
+        ).bind(NonZero::new(self.id).unwrap())
+        .bind(NonZero::new(self.comp_id).unwrap())
+        .bind(self.name.as_str())
         .bind(self.start_date)
         .bind(self.end_date)
         .bind(&self.round_robin)
@@ -151,13 +153,13 @@ impl Season {
 
         let future_games = self.today_and_future_games(db).await;
         let mut future_games_json = Vec::new();
-        for game in future_games {
+        for mut game in future_games {
             future_games_json.push(game.comp_screen_package(db).await);
         }
 
         let played_games = self.past_games(db).await;
         let mut played_games_json = Vec::new();
-        for game in played_games {
+        for mut game in played_games {
             played_games_json.push(game.comp_screen_package(db).await);
         }
 
@@ -165,7 +167,7 @@ impl Season {
             serde_json::Value::Null
         }
         else {
-            self.knockout_round.as_ref().unwrap().get_comp_screen_json(db).await
+            self.knockout_round.as_ref().unwrap().comp_screen_package(db).await
         };
 
         json!({

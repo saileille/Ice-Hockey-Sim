@@ -3,6 +3,8 @@ pub mod manager;
 pub mod attribute;
 
 
+use std::num::NonZero;
+
 use rand::{self};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -124,11 +126,11 @@ impl Person {
             "INSERT INTO Person
             (id, forename, surname, gender, country_id, birthday, is_active)
             VALUES ($1, $2, $3, $4, $5, $6, $7)"
-        ).bind(self.id)
+        ).bind(NonZero::new(self.id).unwrap())
         .bind(self.forename.as_str())
         .bind(self.surname.as_str())
         .bind(self.gender)
-        .bind(self.country_id)
+        .bind(NonZero::new(self.country_id).unwrap())
         .bind(self.birthday)
         .bind(self.is_active)
         .execute(db).await.unwrap();
@@ -137,9 +139,8 @@ impl Person {
     // Change the person entry in the database to inactive and remove all contracts and offers.
     pub async fn retire(&self, db: &Db) {
         sqlx::raw_sql(format!(
-            "UPDATE Person SET is_active = FALSE
-            WHERE id = {};
-            DELETE FROM Contracts WHERE person_id = {}", self.id, self.id
+            "UPDATE Person SET is_active = FALSE WHERE id = {};
+            DELETE FROM Contract WHERE person_id = {}", self.id, self.id
         ).as_str())
         .execute(db).await.unwrap();
     }
@@ -285,8 +286,8 @@ impl Contract {
             "INSERT INTO Contract
             (person_id, team_id, begin_date, end_date, role, is_signed)
             VALUES ($1, $2, $3, $4, $5, $6)"
-        ).bind(self.person_id)
-        .bind(self.team_id)
+        ).bind(NonZero::new(self.person_id).unwrap())
+        .bind(NonZero::new(self.team_id).unwrap())
         .bind(self.start_date)
         .bind(self.end_date)
         .bind(self.role)

@@ -53,7 +53,7 @@ impl KnockoutRound {
     }
 
     // Get relevant information for a competition screen.
-    pub async fn get_comp_screen_json(&self, db: &Db) -> serde_json::Value {
+    pub async fn comp_screen_package(&self, db: &Db) -> serde_json::Value {
         let mut pairs = Vec::new();
         for pair in self.pairs.iter() {
             pairs.push(pair.get_comp_screen_json(db).await);

@@ -58,10 +58,10 @@ pub async fn comp_screen_package(handle: tauri::AppHandle, id: CompetitionId) ->
     let comp = Competition::fetch_from_db(db, id).await;
 
     if comp.comp_type == competition::Type::Tournament {
-        return comp.get_tournament_comp_screen_package(db).await;
+        return comp.tournament_comp_screen_package(db).await;
     }
     else {
-        return comp.get_comp_screen_package(db).await;
+        return comp.comp_screen_package(db).await;
     }
 }
 

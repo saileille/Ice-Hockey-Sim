@@ -1,5 +1,7 @@
 // This is what the player (user) is!
 
+use std::num::NonZero;
+
 use serde_json::json;
 use sqlx::{Row, FromRow, sqlite::SqliteRow};
 
@@ -57,7 +59,7 @@ impl Manager {
             "INSERT INTO Manager
             (person_id, is_human)
             VALUES ($1, $2)"
-        ).bind(self.person.id)
+        ).bind(NonZero::new(self.person.id).unwrap())
         .bind(self.is_human)
         .execute(db).await.unwrap();
     }

@@ -1,5 +1,7 @@
 pub mod cache;
 
+use std::num::NonZero;
+
 use serde_json::json;
 use sqlx::FromRow;
 
@@ -9,7 +11,7 @@ use crate::{match_event::event::Shot, team::lineup::LineUp, types::{Db, GameId, 
 #[derive(Default, Clone)]
 #[derive(FromRow)]
 pub struct TeamGame {
-    _game_id: GameId,
+    game_id: GameId,
     pub team_id: TeamId,
     #[sqlx(json)]
     pub shots: Vec<Shot>,
@@ -18,6 +20,37 @@ pub struct TeamGame {
 
 // Basics.
 impl TeamGame {
+    pub fn build(game_id: GameId, team_id: TeamId) -> Self {
+        Self {
+            game_id,
+            team_id,
+
+            ..Default::default()
+        }
+    }
+
+    pub async fn save(&self, db: &Db) {
+        sqlx::query(
+            "INSERT INTO TeamGame
+            (game_id, team_id, shots, lineup)
+            VALUES ($1, $2, $3, $4)"
+        ).bind(NonZero::new(self.game_id).unwrap())
+        .bind(NonZero::new(self.team_id).unwrap())
+        .bind(json!(self.shots))
+        .bind(&self.lineup)
+        .execute(db).await.unwrap();
+    }
+
+    pub async fn overwrite(&self, db: &Db) {
+        sqlx::query(
+            "UPDATE TeamGame SET shots = $1
+            WHERE game_id = $2 AND team_id = $3"
+        ).bind(json!(self.shots))
+        .bind(NonZero::new(self.game_id).unwrap())
+        .bind(NonZero::new(self.team_id).unwrap())
+        .execute(db).await.unwrap();
+    }
+
     async fn fetch_from_db(db: &Db, game_id: GameId, team_id: TeamId) -> Self {
         sqlx::query_as(
             "SELECT * FROM TeamGame
@@ -30,10 +63,12 @@ impl TeamGame {
     // Get the team name.
     async fn team_name(&self, db: &Db) -> String {
         sqlx::query_scalar(
-            "SELECT team_name FROM Team
+            "SELECT full_name FROM Team
             WHERE id = $1"
         ).bind(self.team_id)
-        .fetch_one(db).await.unwrap()
+        .fetch_one(db).await.expect(format!(
+            "id: {}", self.team_id
+        ).as_str())
     }
 
     async fn team_seed(&self, db: &Db) -> u8 {
@@ -41,11 +76,13 @@ impl TeamGame {
             "SELECT seed FROM TeamSeason
             INNER JOIN Season
             ON Season.id = TeamSeason.season_id
-            INNER JOIN Game
-            ON Game.season_id = Season.id
             WHERE TeamSeason.team_id = $1
-            AND Game.id = $2"
+            AND Season.id = (
+                SELECT season_id FROM Game
+                WHERE id = $2
+            )"
         ).bind(self.team_id)
+        .bind(self.game_id)
         .fetch_one(db).await.unwrap()
     }
 
