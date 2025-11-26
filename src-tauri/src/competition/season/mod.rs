@@ -148,7 +148,7 @@ impl Season {
     pub async fn comp_screen_package(&self, db: &Db, comp: &Competition) -> serde_json::Value {
         let mut teams = Vec::new();
         for team in self.teams(db).await {
-            teams.push(team.get_comp_screen_package(db, comp).await);
+            teams.push(team.comp_screen_package(db, comp).await);
         }
 
         let future_games = self.today_and_future_games(db).await;

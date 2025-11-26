@@ -84,7 +84,7 @@ impl Competition {
         sqlx::query_as(
             "SELECT Season.* FROM Season
             INNER JOIN Competition ON Competition.id = Season.comp_id
-            WHERE Competition.id = $1
+            WHERE Competition.parent_id = $1
             GROUP BY Season.comp_id
             ORDER BY Competition.id ASC, Season.id DESC"
         ).bind(self.id)
@@ -454,7 +454,7 @@ impl Competition {
             past_games.append(&mut season.past_games(db).await);
 
             let mut round = season.knockout_round.as_ref().expect(format!(
-                "no knockout round for {}: {}", comp.id, comp.name
+                "no knockout round for {}: {} (season comp id: {})", comp.id, comp.name, season.comp_id
             ).as_str()).comp_screen_package(db).await;
             round["name"] = json!(comp.name);
             rounds.push(round);

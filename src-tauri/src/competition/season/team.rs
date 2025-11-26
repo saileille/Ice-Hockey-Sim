@@ -68,7 +68,7 @@ impl TeamSeason {
     }
 
     // Get relevant information for a competition screen.
-    pub async fn get_comp_screen_package(&self, db: &Db, comp: &Competition) -> serde_json::Value {
+    pub async fn comp_screen_package(&self, db: &Db, comp: &Competition) -> serde_json::Value {
         json!({
             "id": self.team_id,
             "name": self.team_name(db).await,
