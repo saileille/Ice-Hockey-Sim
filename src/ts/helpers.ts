@@ -20,6 +20,21 @@ export const createEventListener = (query: Query, event: EventType, listener: Li
     }
 };
 
+// Do not touch anything, It Just Works™.
+export const createEventListenerAsync = (query: Query, event: EventType, listener: any) => {
+    const elements = document.querySelectorAll(query);
+    if (elements.length === 0) {
+        console.error(`${query} not found`);
+        return;
+    }
+
+    for (const element of elements) {
+        element.addEventListener(event, async (e) => {
+            await listener(e);
+        });
+    }
+};
+
 // Create an HTML element, give it values that you want and return it.
 export const createElement = (elementType: TagName, attributes: any, children: Array<Element | string>) => {
     const element: any = document.createElement(elementType);
@@ -55,7 +70,7 @@ export const createTextImage = (country: CountryNameAndFlag): HTMLSpanElement | 
 };
 
 // A dynamic link listener function that makes it possible to create listeners without having the associated element in the document.
-export const linkListener: Listener = (e: Event) => {
+export const linkListener: Listener = async (e: Event) => {
     const element = e.target as Element;
 
     // Getting rid of possible bad actors early.
@@ -69,15 +84,15 @@ export const linkListener: Listener = (e: Event) => {
 
     switch (link[0]) {
         case "comp": {
-            drawCompScreen(link[1]);
+            await drawCompScreen(link[1]);
             return;
         }
         case "team": {
-            drawTeamScreen(link[1]);
+            await drawTeamScreen(link[1]);
             return;
         }
         case "player": {
-            drawPlayerScreen(link[1]);
+            await drawPlayerScreen(link[1]);
             return;
         }
         default: {

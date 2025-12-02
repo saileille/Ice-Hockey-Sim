@@ -8,8 +8,12 @@ import { drawScreen as drawPlayerSearchScreen } from "./player_search.ts";
 import { HumanTeamPackage, TopBarPackage } from "../types/team.ts";
 import { Listener } from "../types/dom.ts";
 
+// Empty the screen so the user cannot do anything stoopid while things are going on.
+export const clearScreen = () => {
+    document.body.innerHTML = "";
+};
 
-const initialiseTopBar = () => {
+const initialiseTopBar = async () => {
     // Check if the top bar has already been initialised.
     if (document.querySelector("#top-bar") !== null) { return; }
 
@@ -29,7 +33,7 @@ const initialiseTopBar = () => {
     ]);
 
     document.body.insertBefore(topBar, document.body.firstChild);
-    createTopLevelCompSelect(topBar);
+    await createTopLevelCompSelect(topBar);
 
     continueButton.addEventListener("click", toNextDay);
     homeScreenButton.addEventListener("click", onClickHomeScreen);
@@ -42,7 +46,7 @@ const resetCompSelect = (comps: HTMLSelectElement) => {
 
 // Update the date and stuff in the top bar.
 export const updateTopBar = async () => {
-    initialiseTopBar();
+    await initialiseTopBar();
 
     const topBarPackage: TopBarPackage = await invoke("top_bar_package");
     displayDate(topBarPackage.date);
@@ -114,13 +118,14 @@ export const createCompNav = (element: HTMLDivElement, compNav: Array<Array<[num
 };
 
 const toNextDay: Listener = async (_e: Event) => {
+    clearScreen();
     await invoke("go_to_next_day");
-    updateTopBar();
-    drawHomeScreen();
+    await updateTopBar();
+    await drawHomeScreen();
 };
 
 // Go to a given competition.
-const onCompSelectChange: Listener = (e: Event) => {
+const onCompSelectChange: Listener = async (e: Event) => {
     const compSelect = e.target as HTMLSelectElement;
     const id = Number(compSelect.value);
 
@@ -128,5 +133,5 @@ const onCompSelectChange: Listener = (e: Event) => {
     if (id === 0) { return; }
 
     resetCompSelect(compSelect);
-    drawCompScreen(id);
+    await drawCompScreen(id);
 };

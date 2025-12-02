@@ -25,11 +25,13 @@ serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 rand = "*"
 lazy_static = "*"
-time = {version = "*", features = ["formatting", "parsing", "macros", "serde"] }
+time = { version = "*", features = ["formatting", "parsing", "macros", "serde"] }
 ordinal = "*"
 sqlx = { version = "*", features = [ "sqlite", "migrate", "runtime-tokio", "time", "json" ] }
 futures = "*"
 dunce = "*"
+futures-util = "*"
+tokio = { version = "*", features = ["macros"] }
 
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.

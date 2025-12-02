@@ -1,7 +1,7 @@
 // The manager creation screen.
 import { invoke } from "@tauri-apps/api/core";
 import { createTopLevelCompSelect, initialiseContentScreen, updateTopBar} from "./basics";
-import { createElement, createEventListener, linkListener } from "../helpers";
+import { createElement, createEventListenerAsync, linkListener } from "../helpers";
 import { drawScreen as drawHomeScreen } from "./home";
 import { Listener } from "../types/dom";
 
@@ -13,7 +13,6 @@ const drawScreen = async () => {
         createElement("h1", { "textContent": "Choose your competition and team" }, [])
     );
 
-    // This function must be awaited.
     const compSelect = await createTopLevelCompSelect(screen);
 
     // Removing the default option because we do not need it.
@@ -26,15 +25,15 @@ const drawScreen = async () => {
         createElement("button", { "id": "done", "textContent": "Done!" }, [])
     );
 
-    updateTeamSelection(Number(compSelect.value));
+    await updateTeamSelection(Number(compSelect.value));
     compSelect.addEventListener("change", onChangeCompSelect);
-    createEventListener("#done", "click", createManager);
+    createEventListenerAsync("#done", "click", createManager);
 };
 
-const onChangeCompSelect: Listener = (e: Event) => {
+const onChangeCompSelect: Listener = async (e: Event) => {
     const compSelect = e.target as HTMLSelectElement;
     const compId = Number(compSelect.value);
-    updateTeamSelection(compId);
+    await updateTeamSelection(compId);
 };
 
 const updateTeamSelection = async (id: Number) => {
@@ -56,13 +55,15 @@ const updateTeamSelection = async (id: Number) => {
 
 const createManager: Listener = async (_e: Event) => {
     const teamSelect = document.querySelector("#teams") as HTMLSelectElement;
-    await invoke("create_human_manager", { id: Number(teamSelect.value) });
+    const id = Number(teamSelect.value);
 
-    updateTopBar();
-    drawHomeScreen();
+    await invoke("create_human_manager", { id: id });
+
+    await updateTopBar();
+    await drawHomeScreen();
 };
 
 // This line of code needs to be in whatever TypeScript gets called first.
 document.addEventListener("click", linkListener)
 
-drawScreen();
+await drawScreen();

@@ -1,1 +1,0 @@
-// Methods for validating match schedules.

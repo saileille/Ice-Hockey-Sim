@@ -90,6 +90,6 @@ const drawRosterOverview = (overview: RosterOverview): HTMLTableElement => {
 };
 
 // Listener of home screen button.
-export const onClickHomeScreen: Listener = (_e: Event) => {
-    drawScreen();
+export const onClickHomeScreen: Listener = async (_e: Event) => {
+    await drawScreen();
 };

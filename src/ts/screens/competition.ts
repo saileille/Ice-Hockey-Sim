@@ -3,35 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen, createCompNav } from "./basics";
 import { createElement, createLink } from "../helpers";
 
-type Format = {
-    round_robin: RoundRobinFormat | null,
-    knockout_round: KnockoutRoundFormat | null,
-    match_rules: MatchRules,
-    type: string
-};
-
-type CompetitionType = "Null" | "Tournament";
-
-type RoundRobinFormat = {
-    rounds: number,
-    extra_matches: number,
-    points_for_win: number,
-    points_for_ot_win: number,
-    points_for_draw: number,
-    points_for_ot_loss: number,
-    points_for_loss: number,
-};
-
-type KnockoutRoundFormat = {
-    wins_required: number
-};
-
-type MatchRules = {
-    periods: number,
-    period_length: number,
-    overtime_length: number,
-    continuous_overtime: boolean
-};
+type CompetitionType = "Null" | "RoundRobin" | "KnockoutRound" | "Tournament";
 
 type Team = {
     id: number,
@@ -86,8 +58,7 @@ type GameTeam = {
 type Season = {
     name: string,
     teams: Array<Team>,
-    knockout_round: KnockoutRound | null,
-    rounds: Array<KnockoutRound> | undefined,
+    knockout_rounds: Array<KnockoutRound>,
     upcoming_games: Array<Game>,
     played_games: Array<Game>
 };
@@ -95,7 +66,6 @@ type Season = {
 type Competition = {
     name: string,
     full_name: string,
-    format: Format | null,
     season: Season,
     comp_nav: Array<Array<[number, string]>>,
     competition_type: CompetitionType
@@ -104,31 +74,27 @@ type Competition = {
 // Draw any competition screen.
 export const drawScreen = async (id: number) => {
     const comp: Competition = await invoke("comp_screen_package", { id: id });
-
     const screen = initialiseContentScreen();
 
+    console.dir(comp.season);
+
     // If the competition is something like playoffs.
-    if (comp.season.rounds !== undefined) {
-        drawScreenTournament(screen, comp, comp.season.rounds);
+    if (comp.competition_type === "Tournament" || comp.competition_type === "KnockoutRound") {
+        drawScreenTournament(screen, comp, comp.season.knockout_rounds as KnockoutRound[]);
     }
 
-    else if (comp.format === null) {
+    else if (comp.competition_type === "Null") {
         drawScreenParent(screen, comp);
     }
-    else if (comp.format.type === "RoundRobin") {
-        drawScreenRoundRobin(screen, comp);
-    }
 
-    // Individual knockout rounds.
-    else {
-        drawScreenKnockoutRound(screen, comp);
+    else if (comp.competition_type === "RoundRobin") {
+        drawScreenRoundRobin(screen, comp);
     }
 };
 
 // Draw a screen for tournament-type competitions.
 const drawScreenTournament = (screen: HTMLDivElement, comp: Competition, rounds: Array<KnockoutRound>) => {
     createCompNav(screen, comp.comp_nav);
-
     screen.append(
         drawTournamentTree(rounds),
         drawSchedule(comp.season, true)
@@ -165,16 +131,6 @@ const drawScreenRoundRobin = (screen: HTMLDivElement, comp: Competition) => {
     screen.append(
         drawRoundRobinStandings(comp.season.teams),
         drawSchedule(comp.season, false)
-    );
-};
-
-// Draw a screen for a knockout round.
-const drawScreenKnockoutRound = (screen: HTMLDivElement, comp: Competition) => {
-    createCompNav(screen, comp.comp_nav);
-
-    screen.append(
-        drawRoundPairs((comp.season.knockout_round as KnockoutRound).pairs),
-        drawSchedule(comp.season, true)
     );
 };
 
@@ -244,16 +200,13 @@ const drawGameDay = (isPast: boolean, gameList: Array<Game>, displaySeed: boolea
     if (displaySeed) dateColumns = 5;
 
     const matches = [];
-    for (let i = gameList.length - 1; i >= 0; i--) {
-        const match = gameList[i];
+    for (const match of gameList) {
         if (date === "") { date = match.date; }
         else if (date !== match.date) { break; }
 
         matches.push(drawGame(isPast, match, displaySeed));
     }
 
-    // We need to reverse the games if the date is in the past.
-    if (isPast) matches.reverse();
     tbody.append(...matches);
 
     if (date === "") {

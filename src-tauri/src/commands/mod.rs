@@ -5,8 +5,7 @@ use std::cmp::Ordering;
 use serde_json::json;
 use tauri::Manager as TauriManager;
 
-use crate::{app_data::AppData, competition::{self, Competition}, database, person::{Contract, ContractRole, Person, manager::Manager, player::Player}, team::Team, time::date_to_string, types::{CompetitionId, PersonId, TeamId}};
-
+use crate::{db::get_today, logic::{app_data::AppData, competition::Competition, person::{contract::{Contract, ContractRole}, manager::Manager, player::Player}, team::Team, time::date_to_string, types::{CompetitionId, PersonId, TeamId}}, packages::{competition_screen::CompetitionPackage, player_search_screen::PlayerPackage}};
 
 // Get name and ID of all competitions that are not part of another competition.
 #[tauri::command]
@@ -53,38 +52,34 @@ pub async fn team_select_package(handle: tauri::AppHandle, id: CompetitionId) ->
 
 // Get all the info for a competition screen in a JSON string.
 #[tauri::command]
-pub async fn comp_screen_package(handle: tauri::AppHandle, id: CompetitionId) -> serde_json::Value {
+pub async fn comp_screen_package(handle: tauri::AppHandle, id: CompetitionId) -> CompetitionPackage {
     let db = &handle.state::<AppData>().db;
-    let comp = Competition::fetch_from_db(db, id).await;
-
-    if comp.comp_type == competition::Type::Tournament {
-        return comp.tournament_comp_screen_package(db).await;
-    }
-    else {
-        return comp.comp_screen_package(db).await;
-    }
+    let today = get_today(db).await;
+    CompetitionPackage::build(db, today, id).await
 }
 
 // Get all info for a team screen in a JSON string.
 #[tauri::command]
 pub async fn team_screen_package(handle: tauri::AppHandle, id: TeamId) -> serde_json::Value {
     let db = &handle.state::<AppData>().db;
-    Team::fetch_from_db(db, id).await.team_screen_package(db).await
+    let today = get_today(db).await;
+    Team::fetch_from_db(db, id).await.team_screen_package(db, today).await
 }
 
 // Get info for a player screen in a JSON string.
 #[tauri::command]
 pub async fn player_package(handle: tauri::AppHandle, id: PersonId) -> serde_json::Value {
     let db = &handle.state::<AppData>().db;
-    Player::fetch_from_db(db, id).await.unwrap().package(db).await
+    let today = get_today(db).await;
+    Player::fetch_from_db(db, id).await.unwrap().package(db, today).await
 }
 
 // Create a human manager in the game.
 #[tauri::command]
 pub async fn create_human_manager(handle: tauri::AppHandle, id: TeamId) {
-    let db = &handle.state::<AppData>().db;
-    let (total_weight, country_weights) = Person::country_weights(db).await;
-    let mut human = Manager::build_and_save_random(db, &country_weights, total_weight, true).await;
+    let data = handle.state::<AppData>();
+    let today = get_today(&data.db).await;
+    let mut human = Manager::build_and_save_random(&data, today, true).await;
     human.is_human = true;
 
     // human.person.forename = "Human".to_string();
@@ -95,8 +90,8 @@ pub async fn create_human_manager(handle: tauri::AppHandle, id: TeamId) {
         println!("Started as unemployed.");
         return;
     }
-    let team = Team::fetch_from_db(db, id).await;
-    Contract::build_from_years(db, human.person.id, &team, 100, ContractRole::Manager, true).await;
+    let team = Team::fetch_from_db(&data.db, id).await;
+    Contract::build_from_years(&data.db, today, human.person.id, &team, 100, ContractRole::Manager, true).await;
 
     println!("Took control of {}.", team.full_name);
 }
@@ -111,18 +106,25 @@ pub async fn human_package(handle: tauri::AppHandle) -> serde_json::Value {
 
 // Get all free agents.
 #[tauri::command]
-pub async fn free_agents_package(handle: tauri::AppHandle) -> Vec<serde_json::Value> {
+pub async fn free_agents_package(handle: tauri::AppHandle) -> Vec<PlayerPackage> {
+    let now = std::time::Instant::now();
+
     let db = &handle.state::<AppData>().db;
-    Player::free_agents_package(db).await
+    let today = get_today(db).await;
+    let package = PlayerPackage::free_agents(db, today).await;
+
+    println!("Free agents fetched in {:.2?}", now.elapsed());
+    return package;
 }
 
 // Offer a contract to a player.
 #[tauri::command]
 pub async fn offer_contract(handle: tauri::AppHandle, player_id: PersonId, team_id: TeamId, years: i32) {
     let db = &handle.state::<AppData>().db;
+    let today = get_today(db).await;
 
     let mut team = Team::fetch_from_db(db, team_id).await;
-    team.send_contract_offer(db, player_id, years, ContractRole::Player).await;
+    team.send_contract_offer(db, today, player_id, years, ContractRole::Player).await;
 
     // This is for players to evaluate this team's attractiveness.
     team.evaluate_player_needs(db).await;
@@ -133,7 +135,7 @@ pub async fn offer_contract(handle: tauri::AppHandle, player_id: PersonId, team_
 pub async fn top_bar_package(handle: tauri::AppHandle) -> serde_json::Value {
     let db = &handle.state::<AppData>().db;
     json!({
-        "date": date_to_string(database::get_today(db).await),
+        "date": date_to_string(get_today(db).await),
         "human": human_package(handle).await,
     })
 }

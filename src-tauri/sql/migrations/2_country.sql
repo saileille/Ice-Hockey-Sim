@@ -1,6 +1,6 @@
-CREATE TABLE IF NOT EXISTS Country (
+CREATE TABLE Country (
     id INTEGER PRIMARY KEY,
     country_name TEXT NOT NULL,
-    names TEXT NOT NULL,
+    names TEXT NOT NULL,    -- NamePool structs
     flag_path TEXT NOT NULL
 );

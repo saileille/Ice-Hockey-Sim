@@ -1,17 +1,19 @@
 // Player search screen, only free agents for now.
 
 import { invoke } from "@tauri-apps/api/core";
-import { initialiseContentScreen } from "./basics";
+import { initialiseContentScreen, updateTopBar } from "./basics";
 import { createTextImage, createElement, createLink, extractIdFromElement } from "../helpers";
 import { Listener } from "../types/dom";
-import { Player } from "../types/person";
 import { HumanPackage } from "../types/team";
+import { Player } from "../types/packages/player_search";
 
 type PlayerFilter = "all" | "not-approached";
 
 // Draw the player search screen.
 export const drawScreen: Listener = async (_e: Event) => {
     const players: Array<Player> = await invoke("free_agents_package");
+
+    await updateTopBar();
     const screen = initialiseContentScreen();
 
     const playerFilter = createElement("select", {}, [
@@ -48,12 +50,12 @@ export const drawScreen: Listener = async (_e: Event) => {
 // Get a row of a single player.
 const drawPlayer = (player: Player): HTMLTableRowElement => {
     const row = createElement("tr", {}, [
-        createElement("td", {}, [createLink("span", "player", player.id, player.person.name)]),
+        createElement("td", {}, [createLink("span", "player", player.person.id, player.person.full_name)]),
         createElement("td", {}, [createTextImage(player.person.country)]),
         createElement("td", { "textContent": player.position }, []),
         createElement("td", { "textContent": player.person.age }, []),
         createElement("td", { "textContent": player.ability }, []),
-        createElement("td", { "textContent": player.person.offers.length }, []),
+        createElement("td", { "textContent": player.person.no_of_offers }, []),
     ]);
 
     return row;

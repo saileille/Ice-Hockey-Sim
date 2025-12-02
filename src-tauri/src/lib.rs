@@ -1,20 +1,11 @@
-mod app_data;
 mod commands;
-mod competition;
-mod country;
-mod types;
-mod database;
-mod event;
-mod match_event;
-mod io;
-mod person;
-mod team;
-mod time;
-mod tests;
-mod misc;
+mod db;
+mod logic;
+mod packages;
 
 use tauri::Manager;
 
+use crate::db::initialise;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -28,7 +19,7 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle();
             tauri::async_runtime::block_on(async move {
-                let data = database::initialise(handle).await;
+                let data = initialise(handle).await;
                 handle.manage(data);
             });
 

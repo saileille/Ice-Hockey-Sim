@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { initialiseContentScreen, updateTopBar } from "./basics";
-import { createElement, createEventListener, createTextImage, createLink } from "../helpers";
+import { createElement, createEventListenerAsync, createTextImage, createLink } from "../helpers";
 import { drawScreen as drawHomeScreen } from "./home";
 import { Contract, Player } from "../types/person";
 import { HumanPackage, HumanTeamPackage } from "../types/team";
@@ -49,7 +49,7 @@ export const drawScreen = async (id: number) => {
         humanPackage.team.actions_remaining > 0    // ...and human team has actions remaining.
     ) {
         screen.appendChild(createElement("button", { "id": `offer-contract${id}`, "textContent": "Offer Contract" }, []));
-        createEventListener(`#offer-contract${id}`, "click", drawNegotiationScreen);
+        createEventListenerAsync(`#offer-contract${id}`, "click", drawNegotiationScreen);
     }
 };
 
@@ -111,7 +111,7 @@ const drawOffers = (offers: Array<Contract>): Array<HTMLTableRowElement> => {
 const drawNegotiationScreen: Listener = async (e: Event) => {
     const playerId = getPlayerIdFromContractOfferButton(e.target);
     if (playerId === 0) {
-        drawHomeScreen();
+        await drawHomeScreen();
         return;
     }
 
@@ -124,7 +124,7 @@ const drawNegotiationScreen: Listener = async (e: Event) => {
         }, [])
     );
 
-    createEventListener(`#offer-contract${playerId}`, "click", offerContractToPlayer);
+    createEventListenerAsync(`#offer-contract${playerId}`, "click", offerContractToPlayer);
 };
 
 // Draw the year selection element.
@@ -152,18 +152,16 @@ const drawYearSelection = (): Array<HTMLElement> => {
 const offerContractToPlayer: Listener = async (e: Event) => {
     const playerId = getPlayerIdFromContractOfferButton(e.target);
     if (playerId === 0) {
-
         // Top bar should be updated here if actions remaining are displayed there...
-        drawHomeScreen();
+        await drawHomeScreen();
         return;
     }
-
-    const humanPackage: HumanPackage = await invoke("human_package");
     const years = Number((document.querySelector("#years") as HTMLSelectElement).value);
+    const humanPackage: HumanPackage = await invoke("human_package");
     await invoke("offer_contract", { playerId: playerId, teamId: (humanPackage.team as HumanTeamPackage).id, years: years });
 
-    updateTopBar(); // Needs to be updated as one action is used here.
-    drawScreen(playerId);
+    await updateTopBar(); // Needs to be updated as one action is used here.
+    await drawScreen(playerId);
 };
 
 const getPlayerIdFromContractOfferButton = (target: EventTarget | null): number => {

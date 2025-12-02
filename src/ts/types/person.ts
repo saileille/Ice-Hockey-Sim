@@ -1,7 +1,8 @@
 import { CountryNameAndFlag } from "./team";
 
 type Person = {
-    name: string,
+    id: number,
+    full_name: string,
     country: CountryNameAndFlag,
     age: number,
     birthday: string,
@@ -25,7 +26,6 @@ export type Contract = {
 
 export type Player = {
     person: Person,
-    id: number,
     position: Position,
     ability: number,
     real_ability: number,
