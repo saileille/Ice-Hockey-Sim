@@ -22,6 +22,9 @@ impl FromRow<'_, SqliteRow> for Competition {
                 Some(v) => v,
                 None => 0
             },
+            rr_id: row.try_get("rr_format_id")?,
+            kr_id: row.try_get("kr_format_id")?,
+            game_rules_id: row.try_get("game_rules_id")?,
         })
     }
 }
@@ -68,22 +71,25 @@ impl Competition {
     pub async fn save(&mut self, db: &Db) {
         self.id = sqlx::query_scalar(
             "INSERT INTO Competition
-            (comp_name, season_window, min_no_of_teams, rank_criteria, comp_type)
-            VALUES ($1, $2, $3, $4, $5)
+            (comp_name, season_window, min_no_of_teams, rank_criteria, comp_type, rr_format_id, kr_format_id, game_rules_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING id"
         ).bind(self.name.as_str())
         .bind(&self.season_window)
         .bind(self.min_no_of_teams)
         .bind(json!(self.rank_criteria))
         .bind(self.comp_type)
+        .bind(self.rr_id)
+        .bind(self.kr_id)
+        .bind(self.game_rules_id)
         .fetch_one(db).await.unwrap();
     }
 
     pub async fn save_with_parent_id(&mut self, db: &Db) {
         self.id = sqlx::query_scalar(
             "INSERT INTO Competition
-            (comp_name, season_window, min_no_of_teams, rank_criteria, comp_type, parent_id)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            (comp_name, season_window, min_no_of_teams, rank_criteria, comp_type, parent_id, rr_format_id, kr_format_id, game_rules_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING id"
         ).bind(self.name.as_str())
         .bind(&self.season_window)
@@ -91,6 +97,9 @@ impl Competition {
         .bind(json!(self.rank_criteria))
         .bind(self.comp_type)
         .bind(self.parent_id)
+        .bind(self.rr_id)
+        .bind(self.kr_id)
+        .bind(self.game_rules_id)
         .fetch_one(db).await.unwrap();
     }
 
@@ -123,8 +132,8 @@ impl Competition {
 
     async fn match_rules(&self, db: &Db) -> game::Rules {
         sqlx::query_as(
-            "SELECT * FROM MatchRules WHERE comp_id = $1"
-        ).bind(self.id)
+            "SELECT * FROM GameRules WHERE id = $1"
+        ).bind(self.game_rules_id)
         .fetch_one(db).await.unwrap()
     }
 
@@ -132,24 +141,24 @@ impl Competition {
     pub async fn round_robin_format(&self, db: &Db) -> Option<RoundRobinFormat> {
         sqlx::query_as(
             "SELECT * FROM RoundRobinFormat
-            WHERE comp_id = $1"
-        ).bind(self.id)
+            WHERE id = $1"
+        ).bind(self.rr_id)
         .fetch_optional(db).await.unwrap()
     }
 
     pub async fn knockout_round_format(&self, db: &Db) -> Option<KnockoutRoundFormat> {
         sqlx::query_as(
             "SELECT * FROM KnockoutRoundFormat
-            WHERE comp_id = $1"
-        ).bind(self.id)
+            WHERE id = $1"
+        ).bind(self.rr_id)
         .fetch_optional(db).await.unwrap()
     }
 
     pub async fn knockout_round_maximum_games(&self, db: &Db) -> Option<u8> {
         sqlx::query_scalar(
             "SELECT maximum_games FROM KnockoutRoundFormat
-            WHERE comp_id = $1"
-        ).bind(self.id)
+            WHERE id = $1"
+        ).bind(self.kr_id)
         .fetch_optional(db).await.unwrap()
     }
 

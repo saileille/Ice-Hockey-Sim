@@ -9,8 +9,8 @@ type CmpFunc = fn (&TeamScheduleData, &TeamScheduleData, &TeamScheduleData, &Tea
 
 // Compare the home-away difference. Team with more need for a home game comes first.
 fn compare_home_away(a: &TeamScheduleData, b: &TeamScheduleData, prev_a: &TeamScheduleData, prev_b: &TeamScheduleData) -> Ordering {
-    let a_diff = a.get_home_away_difference(prev_a);
-    let b_diff = b.get_home_away_difference(prev_b);
+    let a_diff = a.home_away_difference(prev_a);
+    let b_diff = b.home_away_difference(prev_b);
 
     return b_diff.cmp(&a_diff);
 }
@@ -22,16 +22,16 @@ fn compare_away_home(a: &TeamScheduleData, b: &TeamScheduleData, prev_a: &TeamSc
 
 // Compare the absolute value of home-away difference Team with more need for either home or away game comes first.
 fn compare_home_away_abs(a: &TeamScheduleData, b: &TeamScheduleData, prev_a: &TeamScheduleData, prev_b: &TeamScheduleData) -> Ordering {
-    let a_diff = a.get_home_away_difference(prev_a).abs();
-    let b_diff = b.get_home_away_difference(prev_b).abs();
+    let a_diff = a.home_away_difference(prev_a).abs();
+    let b_diff = b.home_away_difference(prev_b).abs();
 
     return b_diff.cmp(&a_diff);
 }
 
 // Compare the match count.
 fn compare_match_count(a: &TeamScheduleData, b: &TeamScheduleData, prev_a: &TeamScheduleData, prev_b: &TeamScheduleData) -> Ordering {
-    let a_total = convert::int::<u8, i8>(a.get_match_count(prev_a));
-    let b_total = convert::int::<u8, i8>(b.get_match_count(prev_b));
+    let a_total = convert::int::<u8, i8>(a.match_count(prev_a));
+    let b_total = convert::int::<u8, i8>(b.match_count(prev_b));
 
     return a_total.cmp(&b_total);
 }

@@ -182,8 +182,8 @@ async fn add_competitions(db: &Db, rng: &mut ThreadRng, today: Date) {
                 ),
                 Vec::new(),
                 14,
-                Some(match_event::Rules::build(3, 1200, 300, false)),
-                Some(RoundRobinFormat::build(4, 0, 3, 2, 1, 1, 0)),
+                Some(match_event::Rules::build_and_save(db, 3, 1200, 300, false).await),
+                Some(RoundRobinFormat::build_and_save(db, 4, 0, 3, 2, 1, 1, 0).await),
                 None,
                 vec![
                     RankCriteria::Points,
@@ -205,7 +205,7 @@ async fn add_competitions(db: &Db, rng: &mut ThreadRng, today: Date) {
                     AnnualDate::build(4, 1),
                     AnnualDate::build(5, 31)
                 ),
-                vec![match_event::Rules::build(3, 1200, 0, true)],
+                vec![match_event::Rules::build_and_save(db, 3, 1200, 0, true).await],
                 vec![2, 4],
                 vec![10],
                 1,

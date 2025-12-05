@@ -12,8 +12,8 @@ impl Season {
         for id in teams {
             sqlx::query(
                 "INSERT INTO TeamSeason
-                (team_id, season_id, seed, ranking, regular_wins, ot_wins, draws, ot_losses, regular_losses, goals_scored, goals_conceded)
-                VALUES ($1, $2, 0, 1, 0, 0, 0, 0, 0, 0, 0)"
+                (team_id, season_id, seed)
+                VALUES ($1, $2, 0)"
             ).bind(id)
             .bind(self.id)
             .execute(db).await.unwrap();
@@ -24,15 +24,14 @@ impl Season {
     pub async fn save(&mut self, db: &Db) {
         self.id = sqlx::query_scalar(
             "INSERT INTO Season
-            (comp_id, season_name, start_date, end_date, round_robin, knockout_round, is_over)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            (comp_id, season_name, start_date, end_date, round_robin, is_over)
+            VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING id"
         ).bind(self.comp_id)
         .bind(self.name.as_str())
         .bind(self.start_date)
         .bind(self.end_date)
         .bind(&self.round_robin)
-        .bind(&self.knockout_round)
         .bind(self.is_over)
         .fetch_one(db).await.unwrap();
     }

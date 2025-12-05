@@ -12,7 +12,7 @@ use std::cmp::Ordering;
 use serde::{Deserialize, Serialize};
 use time::Date;
 
-use crate::logic::{competition::{comp_connection::CompConnection, knockout_round::KnockoutRound as KnockoutRoundFormat, round_robin::RoundRobin as RoundRobinFormat, season::{Season, ranking::{RankCriteria, get_sort_functions}, team::TeamSeason}}, game, team::Team, time::AnnualWindow, types::{CompetitionId, Db, TeamId}};
+use crate::logic::{competition::{comp_connection::CompConnection, knockout_round::KnockoutRound as KnockoutRoundFormat, round_robin::RoundRobin as RoundRobinFormat, season::{Season, ranking::{RankCriteria, get_sort_functions}, team::TeamSeason}}, game, team::Team, time::AnnualWindow, types::{CompetitionId, Db, GameRulesId, KnockoutRoundFormatId, RoundRobinFormatId, TeamId}};
 
 #[derive(Debug, PartialEq)]
 #[derive(Default, Clone, Copy, Serialize, Deserialize)]
@@ -34,18 +34,24 @@ pub struct Competition {
     pub min_no_of_teams: u8,
     pub rank_criteria: Vec<RankCriteria>,
     pub comp_type: Type,
-    pub parent_id: CompetitionId,   // TODO: Some conversion between NULL in the database and 0 in the code.
+    pub parent_id: CompetitionId,
+    pub rr_id: Option<RoundRobinFormatId>,
+    pub kr_id: Option<KnockoutRoundFormatId>,
+    pub game_rules_id: Option<GameRulesId>,
 }
 
 // Basics.
 impl Competition {
     // Build a Competition element.
-    fn build(name: &str, no_of_teams: u8, season_window: AnnualWindow,
-    min_no_of_teams: u8, rank_criteria: Vec<RankCriteria>) -> Self {
+    fn build(name: &str, no_of_teams: u8, season_window: AnnualWindow, min_no_of_teams: u8, rank_criteria: Vec<RankCriteria>,
+    rr_id: Option<RoundRobinFormatId>, kr_id: Option<KnockoutRoundFormatId>, game_rules_id: Option<GameRulesId>) -> Self {
         let comp = Self {
             name: name.to_string(),
             season_window,
             rank_criteria,
+            rr_id,
+            kr_id,
+            game_rules_id,
 
             min_no_of_teams: match min_no_of_teams {
                 0 => no_of_teams,
@@ -60,41 +66,22 @@ impl Competition {
 
     // Build a competition element and save it to the database.
     pub async fn build_and_save(db: &Db, today: Date, name: &str, teams: Vec<Team>, season_window: AnnualWindow, connections: Vec<CompConnection>, min_no_of_teams: u8,
-    match_rules: Option<game::Rules>, round_robin_format: Option<RoundRobinFormat>, knockout_round_format: Option<KnockoutRoundFormat>, rank_criteria: Vec<RankCriteria>,
+    game_rules: Option<game::Rules>, round_robin_format: Option<RoundRobinFormat>, knockout_round_format: Option<KnockoutRoundFormat>, rank_criteria: Vec<RankCriteria>,
     children: Vec<Competition>) -> Self {
-        let mut comp = Self::build(name, teams.len() as u8, season_window, min_no_of_teams, rank_criteria);
-        comp.save_new(db, today, teams, match_rules, round_robin_format, knockout_round_format, children, connections).await;
+        let mut comp = Self::build(
+            name, teams.len() as u8, season_window, min_no_of_teams, rank_criteria, round_robin_format.and_then(|a| Some(a.id)),
+            knockout_round_format.and_then(|a| Some(a.id)), game_rules.and_then(|a| Some(a.id))
+        );
+
+        comp.save_new(db, today, teams, children, connections).await;
 
         return comp;
     }
 
     // Save a competition to the database for the first time.
-    async fn save_new(&mut self, db: &Db, today: Date, mut teams: Vec<Team>, match_rules: Option<game::Rules>, round_robin_format: Option<RoundRobinFormat>,
-    knockout_round_format: Option<KnockoutRoundFormat>, children: Vec<Competition>, connections: Vec<CompConnection>) {
+    async fn save_new(&mut self, db: &Db, today: Date, mut teams: Vec<Team>,
+    children: Vec<Competition>, connections: Vec<CompConnection>) {
         self.save(db).await;
-
-        match match_rules {
-            Some(v) => v.save(db, self.id).await,
-            None => ()
-        };
-
-        match round_robin_format {
-            Some(v) => {
-                self.comp_type = Type::RoundRobin;
-                self.save_type(db).await;
-                v.save(db, self.id).await
-            },
-            None => ()
-        };
-
-        match knockout_round_format {
-            Some(v) => {
-                self.comp_type = Type::KnockoutRound;
-                self.save_type(db).await;
-                v.save(db, self.id).await
-            },
-            None => ()
-        };
 
         for team in teams.iter_mut() {
             team.primary_comp_id = self.id;

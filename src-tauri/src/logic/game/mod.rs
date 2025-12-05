@@ -5,7 +5,7 @@ use rand::rngs::ThreadRng;
 use sqlx::FromRow;
 use time::Date;
 
-use crate::logic::{self, competition::season::team::TeamSeason, event::Id, game::{event::Shot, team::TeamGame}, types::{CompetitionId, Db, GameId, GameSeconds, SeasonId, convert}};
+use crate::logic::{self, competition::season::team::TeamSeason, event::Id, game::{event::Shot, team::TeamGame}, types::{CompetitionId, Db, GameId, GameRulesId, GameSeconds, SeasonId, convert}};
 
 enum Attacker {
     Home,
@@ -253,7 +253,7 @@ impl Clock {
 #[derive(Debug, Default, Clone)]
 #[derive(FromRow)]
 pub struct Rules {
-    comp_id: CompetitionId,
+    pub id: GameRulesId,
     pub periods: u8,
     pub period_length: u16,
     pub overtime_length: u16,
@@ -261,15 +261,21 @@ pub struct Rules {
 }
 
 impl Rules {
-    pub fn build(periods: u8, period_length: u16, overtime_length: u16, continous_overtime: bool) -> Self {
+    fn build(periods: u8, period_length: u16, overtime_length: u16, continuous_overtime: bool) -> Self {
         Self {
-            periods: periods,
-            period_length: period_length,
-            overtime_length: overtime_length,
-            continuous_overtime: continous_overtime,
+            periods,
+            period_length,
+            overtime_length,
+            continuous_overtime,
 
             ..Default::default()
         }
+    }
+
+    pub async fn build_and_save(db: &Db, periods: u8, period_length: u16, overtime_length: u16, continuous_overtime: bool) -> Self {
+        let mut rules = Self::build(periods, period_length, overtime_length, continuous_overtime);
+        rules.save(db).await;
+        return rules;
     }
 
     // Get the total regular time of the game in seconds.

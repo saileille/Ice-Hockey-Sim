@@ -24,8 +24,6 @@ pub struct Season {
     pub end_date: Date,
     #[sqlx(json(nullable))]
     pub round_robin: Option<RoundRobin>,
-    #[sqlx(json(nullable))]
-    pub knockout_round: Option<KnockoutRound>,
 
     // Helper for easily checking if the season is over.
     pub is_over: bool,
@@ -40,7 +38,6 @@ impl Default for Season {
             start_date: Date::MIN,
             end_date: Date::MIN,
             round_robin: None,
-            knockout_round: None,
             is_over: bool::default(),
         }
     }
@@ -74,7 +71,7 @@ impl Season {
             season.round_robin = Some(RoundRobin::build());
         }
         else if comp.comp_type == competition::Type::KnockoutRound {
-            season.knockout_round = Some(KnockoutRound::build());
+
         }
         else {
             panic!("{}\nformat: {:?}", comp.name, comp.comp_type);
@@ -182,7 +179,6 @@ impl Season {
         }
 
         // Check for a parent competition.
-        // TODO: Make an async recursion happen somehow...?
         else {
             for child_comp in comp.children(db).await {
                 let mut season = child_comp.current_season(db).await;

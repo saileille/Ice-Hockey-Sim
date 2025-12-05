@@ -32,6 +32,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::continue_game::go_to_next_day,
+            commands::continue_game::skip_days,
             commands::top_bar_package,
             commands::comp_select_package,
             commands::team_select_package,

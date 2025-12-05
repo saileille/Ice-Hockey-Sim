@@ -5,7 +5,25 @@ import { initialiseContentScreen, updateTopBar } from "./basics";
 import { createTextImage, createElement, createLink, extractIdFromElement } from "../helpers";
 import { Listener } from "../types/dom";
 import { HumanPackage } from "../types/team";
-import { Player } from "../types/packages/player_search";
+
+type Player = {
+    person: Person,
+    position: string,
+    ability: number,
+};
+
+type Person = {
+    id: number,
+    full_name: string,
+    country: Country,
+    age: number,
+    no_of_offers: number,
+}
+
+type Country = {
+    name: string,
+    flag_path: string,
+};
 
 type PlayerFilter = "all" | "not-approached";
 

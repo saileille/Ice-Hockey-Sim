@@ -2,7 +2,7 @@
 use serde::Serialize;
 use sqlx::FromRow;
 
-use crate::logic::{competition::season::Season, types::{CompetitionId, Db}};
+use crate::logic::{competition::season::Season, types::{CompetitionId, Db, RoundRobinFormatId}};
 
 #[derive(Default, Clone, PartialEq, Debug)]
 pub enum MatchGenType {
@@ -16,7 +16,7 @@ pub enum MatchGenType {
 #[derive(FromRow)]
 #[derive(Serialize)]
 pub struct RoundRobin {
-    comp_id: CompetitionId,
+    pub id: RoundRobinFormatId,
     pub rounds: u8, // How many times each team plays one another.
     pub extra_matches: u8,  // How many matches should be scheduled in addition to rounds.
     pub points_for_win: u8,
@@ -29,7 +29,7 @@ pub struct RoundRobin {
 impl RoundRobin {
     pub const MATCH_GEN_TYPE: MatchGenType = MatchGenType::Alternating;
 
-    pub fn build(rounds: u8, extra_matches: u8, points_for_win: u8, points_for_ot_win: u8, points_for_draw: u8, points_for_ot_loss: u8, points_for_loss: u8) -> Self {
+    fn build(rounds: u8, extra_matches: u8, points_for_win: u8, points_for_ot_win: u8, points_for_draw: u8, points_for_ot_loss: u8, points_for_loss: u8) -> Self {
         Self {
             rounds: rounds,
             extra_matches: extra_matches,
@@ -41,6 +41,12 @@ impl RoundRobin {
 
             ..Default::default()
         }
+    }
+
+    pub async fn build_and_save(db: &Db, rounds: u8, extra_matches: u8, points_for_win: u8, points_for_ot_win: u8, points_for_draw: u8, points_for_ot_loss: u8, points_for_loss: u8) -> Self {
+        let mut rr = Self::build(rounds, extra_matches, points_for_win, points_for_ot_win, points_for_draw, points_for_ot_loss, points_for_loss);
+        rr.save(db).await;
+        return rr;
     }
 
     // Get how many matches each team should play.

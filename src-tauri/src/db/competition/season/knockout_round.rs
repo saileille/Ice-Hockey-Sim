@@ -37,7 +37,6 @@ impl KnockoutRound {
 
 impl KnockoutPair {
     // Remove any upcoming games from these two teams.
-    // Consider deleting the indexes on home_id and away_id once a better method has been developed?
     pub async fn clean_up_games(&self, db: &Db) {
         sqlx::query(
             "DELETE FROM Game

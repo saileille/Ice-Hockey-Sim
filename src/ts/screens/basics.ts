@@ -20,6 +20,7 @@ const initialiseTopBar = async () => {
     const continueButton = createElement("button", { "textContent": "Continue" }, []);
     const homeScreenButton = createElement("button", { "textContent": "Home Screen" }, []);
     const scoutButton = createElement("button", { "textContent": "Scouting" }, []);
+    const simulateButton = createElement("button", { "textContent": "Simulate" }, []);
 
     const topBar = createElement("div", { "id": "top-bar" }, [
         createElement("div", { "id": "date" }, []),
@@ -29,7 +30,12 @@ const initialiseTopBar = async () => {
         createElement("span", {}, [
             "Actions remaining: ",
             createElement("span", { "id": "actions-remaining" }, []),
-        ])
+        ]),
+        createElement("input", {
+            "type": "text",
+            "id": "simulate-days",
+        }, []),
+        simulateButton,
     ]);
 
     document.body.insertBefore(topBar, document.body.firstChild);
@@ -38,6 +44,7 @@ const initialiseTopBar = async () => {
     continueButton.addEventListener("click", toNextDay);
     homeScreenButton.addEventListener("click", onClickHomeScreen);
     scoutButton.addEventListener("click", drawPlayerSearchScreen);
+    simulateButton.addEventListener("click", skipDays);
 };
 
 const resetCompSelect = (comps: HTMLSelectElement) => {
@@ -118,8 +125,17 @@ export const createCompNav = (element: HTMLDivElement, compNav: Array<Array<[num
 };
 
 const toNextDay: Listener = async (_e: Event) => {
-    clearScreen();
     await invoke("go_to_next_day");
+    await updateTopBar();
+    await drawHomeScreen();
+};
+
+const skipDays: Listener = async (_e: Event) => {
+    const inputElement = document.querySelector("#simulate-days") as HTMLInputElement;
+    const days = Number(inputElement.value);
+
+    clearScreen();
+    await invoke("skip_days", { days: days });
     await updateTopBar();
     await drawHomeScreen();
 };

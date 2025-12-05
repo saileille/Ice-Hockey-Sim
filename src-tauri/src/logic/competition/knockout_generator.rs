@@ -20,8 +20,14 @@ pub async fn build(
 ) -> Competition {
     let mut parent_comp = Competition::build_and_save(db, today, name, Vec::new(), season_window, connections, teams_in_rounds[0], None, None, None, vec![RankCriteria::ChildCompRanking], Vec::new()).await;
 
+    let mut knockout_round_formats = Vec::new();
+    for item in wins_required {
+        let format = KnockoutRoundFormat::build_and_save(db, item).await;
+        knockout_round_formats.push(format);
+    }
+
     get_teams_in_rounds(&mut teams_in_rounds, teams_at_end);
-    let mut rounds = create_rounds(db, round_names, match_rules, wins_required, teams_in_rounds, rank_criteria, parent_comp.id).await;
+    let mut rounds = create_rounds(db, round_names, match_rules, knockout_round_formats, teams_in_rounds, rank_criteria, parent_comp.id).await;
 
     set_date_boundaries(db, rng, &mut rounds, &parent_comp.season_window).await;
     finalise_rounds(db, today, &mut parent_comp, &mut rounds).await;
@@ -55,7 +61,8 @@ fn get_teams_in_rounds(teams_in_rounds: &mut Vec<u8>, teams_at_end: u8) {
 }
 
 // Build a single competition round.
-async fn build_round(db: &Db, round_names: &[&str], match_rules: &[game::Rules], wins_required: &[u8], teams_in_rounds: &[u8], rank_criteria: &Vec<RankCriteria>, parent_comp_id: CompetitionId, round_size: u8, i: usize) -> Competition {
+async fn build_round(db: &Db, round_names: &[&str], game_rules: &[game::Rules], knockout_round_formats: &[KnockoutRoundFormat],
+teams_in_rounds: &[u8], rank_criteria: &Vec<RankCriteria>, parent_comp_id: CompetitionId, round_size: u8, i: usize) -> Competition {
     // Create the round and add as many values to it as I can.
     let mut round = Competition {
         min_no_of_teams: round_size,
@@ -71,24 +78,23 @@ async fn build_round(db: &Db, round_names: &[&str], match_rules: &[game::Rules],
         _ => assign_default_name(&mut round, i, teams_in_rounds.len())
     };
 
+    let round_format = get_from_index_or_last(knockout_round_formats, i);
+    let round_game_rules = get_from_index_or_last(game_rules, i);
+
+    round.kr_id = Some(round_format.id);
+    round.game_rules_id = Some(round_game_rules.id);
     round.parent_id = parent_comp_id;
     round.save_with_parent_id(db).await;
-
-    let round_match_rules = get_from_index_or_last(match_rules, i);
-    let round_format = KnockoutRoundFormat::build(get_from_index_or_last(wins_required, i));
-
-    round_match_rules.save(db, round.id).await;
-    round_format.save(db, round.id).await;
 
     return round;
 }
 
 // Create rounds.
-async fn create_rounds(db: &Db, round_names: Vec<&str>, match_rules: Vec<game::Rules>, wins_required: Vec<u8>, teams_in_rounds: Vec<u8>, rank_criteria: Vec<RankCriteria>, parent_comp_id: CompetitionId) -> Vec<Competition> {
+async fn create_rounds(db: &Db, round_names: Vec<&str>, match_rules: Vec<game::Rules>, knockout_round_formats: Vec<KnockoutRoundFormat>, teams_in_rounds: Vec<u8>, rank_criteria: Vec<RankCriteria>, parent_comp_id: CompetitionId) -> Vec<Competition> {
     let mut rounds = Vec::new();
 
     for (i, round_size) in teams_in_rounds.iter().enumerate() {
-        let round = build_round(db, &round_names, &match_rules, &wins_required, &teams_in_rounds, &rank_criteria, parent_comp_id, *round_size, i).await;
+        let round = build_round(db, &round_names, &match_rules, &knockout_round_formats, &teams_in_rounds, &rank_criteria, parent_comp_id, *round_size, i).await;
         rounds.push(round);
     }
 

@@ -1,5 +1,5 @@
 CREATE TABLE Team (
-    id INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY NOT NULL CHECK (id > 0),
     full_name TEXT UNIQUE NOT NULL,
     lineup TEXT NOT NULL,   -- LineUp struct
     primary_comp_id INTEGER,
@@ -8,4 +8,4 @@ CREATE TABLE Team (
 
     FOREIGN KEY (primary_comp_id) REFERENCES Competition(id)
     ON DELETE SET NULL ON UPDATE CASCADE
-);
+) STRICT;

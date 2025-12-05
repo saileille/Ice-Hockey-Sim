@@ -152,7 +152,7 @@ impl Season {
         let mut team1 = temp_schedule_data.swap_remove(0);
 
         // Remove every item in temp_schedule_data that already plays against team1.
-        let opponents = team1.get_all_opponents();
+        let opponents = team1.all_opponents();
         temp_schedule_data.retain(|team: &TeamScheduleData| !opponents.contains(&team.team_id));
 
         if temp_schedule_data.is_empty() {
@@ -172,7 +172,7 @@ impl Season {
             None => &TeamScheduleData::default(),
         };
 
-        let home_away_diff = team1.get_home_away_difference(prev_team1);
+        let home_away_diff = team1.home_away_difference(prev_team1);
         let mut team2;
 
         // team1 needs a home game.
@@ -303,33 +303,33 @@ pub struct TeamScheduleData {
 
 // Methods
 impl TeamScheduleData {
-    pub fn get_home_match_count(&self, prev: &Self) -> u8 {
+    pub fn home_match_count(&self, prev: &Self) -> u8 {
         convert::int::<usize, u8>(self.home_matches.len() + prev.home_matches.len())
     }
 
-    pub fn get_away_match_count(&self, prev: &Self) -> u8 {
+    pub fn away_match_count(&self, prev: &Self) -> u8 {
         convert::int::<usize, u8>(self.away_matches.len() + prev.away_matches.len())
     }
 
     // Add home and away matches together.
-    pub fn get_match_count(&self, prev: &Self) -> u8 {
-        self.get_home_match_count(prev) + self.get_away_match_count(prev)
+    pub fn match_count(&self, prev: &Self) -> u8 {
+        self.home_match_count(prev) + self.away_match_count(prev)
     }
 
     // Check if the team can have any more home games.
     fn can_have_home_games(&self, prev: &Self, matches: u8) -> bool {
-        let total_matches = matches + prev.get_match_count( &Self::default());
-        self.get_home_match_count(prev) < (total_matches + 1) / 2
+        let total_matches = matches + prev.match_count( &Self::default());
+        self.home_match_count(prev) < (total_matches + 1) / 2
     }
 
     // Check if the team can have any more away games.
     fn can_have_away_games(&self, prev: &Self, matches: u8) -> bool {
-        let total_matches = matches + prev.get_match_count( &Self::default());
-        self.get_away_match_count(prev) < (total_matches + 1) / 2
+        let total_matches = matches + prev.match_count( &Self::default());
+        self.away_match_count(prev) < (total_matches + 1) / 2
     }
 
     // Get a combined vector of home_matches and away_matches.
-    fn get_all_opponents(&self) -> Vec<TeamId> {
+    fn all_opponents(&self) -> Vec<TeamId> {
         let mut combined = Vec::new();
         combined.append(&mut self.home_matches.clone());
         combined.append(&mut self.away_matches.clone());
@@ -341,16 +341,16 @@ impl TeamScheduleData {
     // Get the difference between home and away matches.
     // Positive values indicate there are more home matches.
     // Negative values indicate there are more away matches.
-    pub fn get_home_away_difference(&self, prev: &Self) -> i8 {
-        let home_matches = convert::int::<u8, i8>(self.get_home_match_count(prev));
-        let away_matches = convert::int::<u8, i8>(self.get_away_match_count(prev));
+    pub fn home_away_difference(&self, prev: &Self) -> i8 {
+        let home_matches = convert::int::<u8, i8>(self.home_match_count(prev));
+        let away_matches = convert::int::<u8, i8>(self.away_match_count(prev));
 
         return home_matches - away_matches;
     }
 
     // Check if the schedule data is full (no more matches can be inserted).
     fn is_full(&self, matches: u8) -> bool {
-        self.get_match_count(&Self::default()) >= matches
+        self.match_count(&Self::default()) >= matches
     }
 }
 

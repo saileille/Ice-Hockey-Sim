@@ -26,7 +26,7 @@ impl FromRow<'_, SqliteRow> for Game {
 
 impl Game {
     pub const SELECT_QUERY: &str = "
-    SELECT MatchRules.*, Game.*, home_lineup, away_lineup FROM Game
+    SELECT GameRules.*, Game.*, home_lineup, away_lineup FROM Game
 
     LEFT JOIN (
         SELECT
@@ -41,7 +41,7 @@ impl Game {
     ) Away ON Away.game_id = Game.id AND Away.team_id = Game.away_id
 
     INNER JOIN Season ON Season.id = Game.season_id
-    INNER JOIN MatchRules ON MatchRules.comp_id = Season.comp_id";
+    INNER JOIN GameRules ON GameRules.comp_id = Season.comp_id";
 
     async fn build_from_db(db: &Db, id: GameId) -> Self {
         let query = Self::SELECT_QUERY;
@@ -80,8 +80,8 @@ impl Game {
     pub async fn save(db: &Db, home_id: TeamId, away_id: TeamId, season_id: SeasonId, date: Date) {
         let id = sqlx::query_scalar(
             "INSERT INTO Game
-            (date, clock, home_id, away_id, season_id)
-            VALUES ($1, 0, $2, $3, $4)
+            (date, home_id, away_id, season_id)
+            VALUES ($1, $2, $3, $4)
             RETURNING id"
         ).bind(date)
         .bind(home_id)
@@ -117,16 +117,16 @@ impl Game {
 }
 
 impl Rules {
-    pub async fn save(&self, db: &Db, comp_id: CompetitionId) {
-        sqlx::query(
-            "INSERT INTO MatchRules
-            (comp_id, periods, period_length, overtime_length, continuous_overtime)
-            VALUES ($1, $2, $3, $4, $5)"
-        ).bind(comp_id)
-        .bind(self.periods)
+    pub async fn save(&mut self, db: &Db) {
+        self.id = sqlx::query_scalar(
+            "INSERT INTO GameRules
+            (periods, period_length, overtime_length, continuous_overtime)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id"
+        ).bind(self.periods)
         .bind(self.period_length)
         .bind(self.overtime_length)
         .bind(self.continuous_overtime)
-        .execute(db).await.unwrap();
+        .fetch_one(db).await.unwrap();
     }
 }

@@ -4,10 +4,10 @@ use serde::Serialize;
 use sqlx::{FromRow, Row, sqlite::SqliteRow};
 use time::Date;
 
-use crate::{logic::{person::attribute::PersonAttribute, time::years_between, types::{Db, PersonId}}, packages::player_search_screen::country::CountryPackage};
+use crate::{logic::{person::attribute::PersonAttribute, time::years_between, types::{Db, PersonId}}, packages::screens::player_search::country::CountryPackage};
 
 #[derive(Serialize)]
-pub struct PlayerPackage {
+pub struct Package {
     person: PersonPackage,
     position: String,
     ability: u8,
@@ -21,7 +21,7 @@ pub struct PlayerPackage {
     }
 }*/
 
-impl PlayerPackage {
+impl Package {
     // Get all free agents.
     fn custom_from_row(row: &SqliteRow, today: Date) -> sqlx::Result<Self> {
         Ok(Self {
@@ -53,7 +53,7 @@ impl PlayerPackage {
                 WHERE is_signed = TRUE
             ) AND Person.is_active = TRUE
             ORDER BY position_id ASC, surname ASC, forename ASC"
-        ).map(|row| PlayerPackage::custom_from_row(&row, today).unwrap())
+        ).map(|row| Package::custom_from_row(&row, today).unwrap())
         .fetch_all(db).await.unwrap();
 
         players.sort_by(|a, b| b.ability.cmp(&a.ability));

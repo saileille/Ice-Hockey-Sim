@@ -4,6 +4,14 @@ use time::Date;
 
 use crate::{db::{get_today, next_day}, logic::{app_data::AppData, competition::Competition, person::{contract::Contract, manager::Manager, player::Player}, team::Team, types::Db}};
 
+// Warp into the far future!
+#[tauri::command]
+pub async fn skip_days(handle: tauri::AppHandle, days: u8) {
+    for _ in 0..days {
+        go_to_next_day(handle.clone()).await;
+    }
+}
+
 // Advance the time with one day.
 #[tauri::command]
 pub async fn go_to_next_day(handle: tauri::AppHandle) {

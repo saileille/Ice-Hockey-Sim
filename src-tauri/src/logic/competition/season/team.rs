@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::FromRow;
 
-use crate::{logic::{competition::{Competition, round_robin::RoundRobin as RoundRobinFormat}, game::team::TeamGame, types::{Db, SeasonId, TeamId}}, packages::competition_screen::season::KnockoutTeamPackage};
+use crate::{logic::{competition::{Competition, round_robin::RoundRobin as RoundRobinFormat}, game::team::TeamGame, types::{Db, SeasonId, TeamId}}};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[derive(PartialEq)]
@@ -76,9 +76,9 @@ impl TeamSeason {
         })
     }*/
 
-    pub fn comp_screen_package_pair(&self) -> KnockoutTeamPackage {
+    /*pub fn comp_screen_package_pair(&self) -> KnockoutTeamPackage {
         KnockoutTeamPackage::build(self)
-    }
+    }*/
 }
 
 // Functional

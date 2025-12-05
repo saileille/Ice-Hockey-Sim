@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use serde_json::json;
 use tauri::Manager as TauriManager;
 
-use crate::{db::get_today, logic::{app_data::AppData, competition::Competition, person::{contract::{Contract, ContractRole}, manager::Manager, player::Player}, team::Team, time::date_to_string, types::{CompetitionId, PersonId, TeamId}}, packages::{competition_screen::CompetitionPackage, player_search_screen::PlayerPackage}};
+use crate::{db::get_today, logic::{app_data::AppData, competition::Competition, person::{contract::{Contract, ContractRole}, manager::Manager, player::Player}, team::Team, time::date_to_string, types::{CompetitionId, PersonId, TeamId}}, packages::screens::{competition, player_search}};
 
 // Get name and ID of all competitions that are not part of another competition.
 #[tauri::command]
@@ -52,10 +52,10 @@ pub async fn team_select_package(handle: tauri::AppHandle, id: CompetitionId) ->
 
 // Get all the info for a competition screen in a JSON string.
 #[tauri::command]
-pub async fn comp_screen_package(handle: tauri::AppHandle, id: CompetitionId) -> CompetitionPackage {
+pub async fn comp_screen_package(handle: tauri::AppHandle, id: CompetitionId) -> competition::Package {
     let db = &handle.state::<AppData>().db;
     let today = get_today(db).await;
-    CompetitionPackage::build(db, today, id).await
+    competition::Package::build(db, today, id).await
 }
 
 // Get all info for a team screen in a JSON string.
@@ -106,12 +106,12 @@ pub async fn human_package(handle: tauri::AppHandle) -> serde_json::Value {
 
 // Get all free agents.
 #[tauri::command]
-pub async fn free_agents_package(handle: tauri::AppHandle) -> Vec<PlayerPackage> {
+pub async fn free_agents_package(handle: tauri::AppHandle) -> Vec<player_search::Package> {
     let now = std::time::Instant::now();
 
     let db = &handle.state::<AppData>().db;
     let today = get_today(db).await;
-    let package = PlayerPackage::free_agents(db, today).await;
+    let package = player_search::Package::free_agents(db, today).await;
 
     println!("Free agents fetched in {:.2?}", now.elapsed());
     return package;

@@ -1,6 +1,3 @@
-// Logic stuff.
-mod manager;
-
-// Frontend packages.
-pub mod competition_screen;
-pub mod player_search_screen;
+mod db; // Database tables recreated.
+pub mod screens;    // Frontend stuff, these datatypes contain information shown to the user.
+mod logic;  // Internal game logic stuff.

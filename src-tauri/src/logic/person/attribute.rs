@@ -1,6 +1,6 @@
 use rand::{Rng, rngs::ThreadRng};
 
-use crate::{db::ATTRIBUTES, logic::{time::years_to_days, types::AttributeValue}};
+use crate::{db::ATTRIBUTES, logic::{time::years_to_days, types::{AttributeDisplayValue, AttributeValue}}};
 
 // Attribute data.
 #[derive(Hash, PartialEq, Eq)]
@@ -25,19 +25,19 @@ pub enum AttributeId {
 pub struct Attribute {
     _id: AttributeId,
 
-    // The age when the attribute starts to develop.
+    // The age (in days) when the attribute starts to develop.
     start_change: u16,
 
-    // The age when this attribute is usually at its peak.
+    // The age (in days) when this attribute is usually at its peak.
     peak: u16
 }
 
 impl Attribute {
-    pub fn build(id: AttributeId, start_change: u8, peak: u8) -> Self {
+    pub fn build(id: AttributeId, start_change_year: u8, peak_year: u8) -> Self {
         Self {
             _id: id,
-            start_change: years_to_days(start_change),
-            peak: years_to_days(peak),
+            start_change: years_to_days(start_change_year),
+            peak: years_to_days(peak_year),
         }
     }
 
@@ -68,7 +68,7 @@ impl PersonAttribute {
     const MAX: AttributeValue = AttributeValue::MAX;
 
     // Multiply by this amount when doing logarithmic stuff.
-    const DISPLAY_MULTIPLIER: f64 = ((u8::MAX as AttributeValue + 1 + Self::MIN) / AttributeValue::BITS as AttributeValue) as f64;
+    const DISPLAY_MULTIPLIER: f64 = ((AttributeDisplayValue::MAX as AttributeValue + 1 + Self::MIN) / AttributeValue::BITS as AttributeValue) as f64;
 
     // Subtract by this amount when doing logarithmic stuff.
     // log2(MIN) * DISPLAY_MULTIPLIER
@@ -82,7 +82,7 @@ impl PersonAttribute {
     }
 
     // Get a display value of the attribute.
-    pub fn display(attribute: AttributeValue) -> u8 {
+    pub fn display(attribute: AttributeValue) -> AttributeDisplayValue {
         // Now between 0 and 16.
         let mut log = (attribute as f64).log2();
 
@@ -90,7 +90,7 @@ impl PersonAttribute {
         log *= Self::DISPLAY_MULTIPLIER;
 
         // Decrease the value so the minimum is 0.
-        let display_attribute = (log - Self::DISPLAY_SUBTRACTOR) as u8;
+        let display_attribute = (log - Self::DISPLAY_SUBTRACTOR) as AttributeDisplayValue;
 
         // Now between 0 and 201.
         return display_attribute;

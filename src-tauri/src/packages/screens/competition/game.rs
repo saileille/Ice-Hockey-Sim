@@ -31,7 +31,7 @@ impl GamePackage {
     pub fn select_query() -> String {
         let home_and_away = TeamPackage::home_away_queries();
         format!(
-            "SELECT (MatchRules.total_length < Game.clock) AS had_overtime, (Game.clock > 0) AS is_over, Game.date,
+            "SELECT (GameRules.total_length < Game.clock) AS had_overtime, (Game.clock > 0) AS is_over, Game.date,
             home_id, home_seed, home_name, home_goals,
             away_id, away_seed, away_name, away_goals
             FROM Game
@@ -39,7 +39,7 @@ impl GamePackage {
             {home_and_away}
 
             INNER JOIN Season ON Season.id = Game.season_id
-            INNER JOIN MatchRules ON MatchRules.comp_id = Season.comp_id"
+            INNER JOIN GameRules ON GameRules.comp_id = Season.comp_id"
         )
 }
 }

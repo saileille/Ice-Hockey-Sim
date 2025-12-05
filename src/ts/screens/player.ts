@@ -12,7 +12,7 @@ const getTitle = (player: Player): HTMLHeadingElement => {
 
     element.append(
         createTextImage(player.person.country),
-        ` ${player.person.name} (`
+        ` ${player.person.full_name} (`
     );
 
     if (player.person.contract !== null) {

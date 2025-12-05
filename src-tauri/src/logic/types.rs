@@ -8,8 +8,12 @@ pub type Db = SqlitePool;
 
 // Database ID types.
 pub type CountryId = u8;
+pub type RoundRobinFormatId = u8;
+pub type KnockoutRoundFormatId = u8;
+pub type GameRulesId = u8;
 pub type CompetitionId = u8;
 pub type SeasonId = u8;
+pub type KnockoutPairId = u8;
 pub type GameId = u16;
 pub type GameEventId = u16;
 
@@ -21,6 +25,7 @@ pub type GameSeconds = u16;  // Seconds elapsed in a match. 2 bytes is enough fo
 
 // In-code attribute values. The display value is calculated separately.
 pub type AttributeValue = u16;
+pub type AttributeDisplayValue = u8;
 
 // Type conversions.
 pub mod convert {

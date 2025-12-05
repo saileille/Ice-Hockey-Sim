@@ -16,7 +16,7 @@ export const drawScreen = async (id: number) => {
     ];
 
     if (team.manager !== null) {
-        elements.push(createElement("div", { "textContent": `Manager: ${team.manager.person.name}` }, []));
+        elements.push(createElement("div", { "textContent": `Manager: ${team.manager.person.full_name}` }, []));
     }
 
     const screen = initialiseContentScreen();
@@ -39,7 +39,7 @@ const drawRoster = (screen: HTMLDivElement, players: Array<Player>) => {
             seasonsLeft = player.person.contract.seasons_left;
 
         roster.appendChild(createElement("tr", {}, [
-            createElement("td", {}, [createLink("span", "player", player.id, player.person.name)]),
+            createElement("td", {}, [createLink("span", "player", player.person.id, player.person.full_name)]),
             createElement("td", {}, [createTextImage(player.person.country)]),
             createElement("td", { "textContent": player.position }, []),
             createElement("td", { "textContent": player.person.age }, []),

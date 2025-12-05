@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 use time::Date;
 
-use crate::{logic::{competition::{Competition, season::{schedule_generator::assign_dates, team::TeamSeason}}, types::{Db, SeasonId, TeamId}}, packages::competition_screen::season::{KnockoutPairPackage, KnockoutRoundPackage}};
+use crate::{logic::{competition::{Competition, season::{schedule_generator::assign_dates, team::TeamSeason}}, types::{Db, SeasonId, TeamId}}};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[derive(Default, Clone)]
@@ -18,22 +18,6 @@ impl KnockoutRound {
         Self::default()
     }
 
-    // Get relevant information for a competition screen.
-    /*pub async fn comp_screen_package(&self, db: &Db) -> serde_json::Value {
-        let mut pairs = Vec::new();
-        for pair in self.pairs.iter() {
-            pairs.push(pair.comp_screen_package(db).await);
-        }
-
-        json!({
-            "pairs": pairs
-        })
-    }*/
-
-    pub fn comp_screen_package(&self, comp_name: String) -> KnockoutRoundPackage {
-        KnockoutRoundPackage::build(self, comp_name)
-    }
-
     // Set up a knockout round.
     pub async fn setup(&mut self, db: &Db, teams: &[TeamSeason], start: Date, end: Date, comp: &Competition, season_id: SeasonId) {
         self.draw_teams(db, teams, season_id).await;
@@ -46,7 +30,10 @@ impl KnockoutRound {
         let mut pots = self.create_pots_and_pairs(teams);
 
         for pair in self.pairs.iter_mut() {
-            let last_index = pots.len() - 1;
+            let last_index = match pots.len() {
+                0 => panic!("season {season_id} has no pots\npairs: {}", self.pairs.len()),
+                v => v - 1
+            };
 
             let mut draw_pots = if pots.len() > 1 {
                 vec![pots[0].clone(), pots[last_index].clone()]
@@ -78,12 +65,13 @@ impl KnockoutRound {
             }
         }
 
-        self.save(db, season_id).await;
+        // self.save(db, season_id).await;
     }
 
     // Create pots from which to draw teams. Top seeds are first, bottom seeds are last.
     fn create_pots_and_pairs(&mut self, teams: &[TeamSeason]) -> Vec<(u8, Vec<TeamId>)> {
-        for _ in 0..teams.len() / 2 {
+        let pairs = teams.len() / 2;
+        while self.pairs.len() < pairs {
             self.pairs.push(KnockoutPair::default());
         }
 
@@ -114,7 +102,7 @@ impl KnockoutRound {
                 pair.update_teamdata(home, away);
             }
         }
-        self.save(db, season_id).await;
+        // self.save(db, season_id).await;
     }
 
     // Check if the knockout round is over.
@@ -152,12 +140,12 @@ pub struct KnockoutPair {
 impl KnockoutPair {
     // Get nice JSON for comp screen.
 
-    pub fn comp_screen_package(&self) -> KnockoutPairPackage {
+    /*pub fn comp_screen_package(&self) -> KnockoutPairPackage {
         KnockoutPairPackage {
             home: self.home.comp_screen_package_pair(),
             away: self.away.comp_screen_package_pair(),
         }
-    }
+    }*/
 
     // Get the victor and the loser of the pair, or None if neither has won.
     fn get_winner_loser(&self, wins_required: u8) -> Option<[TeamSeason; 2]> {

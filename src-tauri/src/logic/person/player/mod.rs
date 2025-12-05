@@ -39,14 +39,14 @@ impl Player {
         let position_id = PositionId::get_random();
 
         let mut player = Self::build(person, position_id);
-        player.create_ability(&data.db, today).await;
+        player.create_ability(today);
 
         return player;
     }
 
     // Create the ability of a player during its generation.
     // Simulate the player's training for every day of their life so far.
-    async fn create_ability(&mut self, db: &Db, today: Date) {
+    fn create_ability(&mut self, today: Date) {
         let days = self.person.age_in_days(today);
         let mut rng = rand::rng();
         for i in 0..days {

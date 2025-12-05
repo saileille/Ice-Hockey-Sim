@@ -10,34 +10,31 @@ type Team = {
     name: string,
     rank: string,
     games: number,
-    wins: number,
+    regular_wins: number,
     ot_wins: number,
     draws: number,
     ot_losses: number,
-    losses: number,
-    total_wins: number,
-    total_losses: number,
+    regular_losses: number,
     goals_scored: number,
     goals_conceded: number,
     goal_difference: number,
     points: number,
-    seed: number
 };
 
 type KnockoutRound = {
-    pairs: Array<KnockoutPair>
+    pairs: Array<KnockoutPair>,
 };
 
 type KnockoutPair = {
     home: KnockoutTeam,
-    away: KnockoutTeam
+    away: KnockoutTeam,
 };
 
 type KnockoutTeam = {
     id: number,
     name: string,
     wins: number,
-    seed: number
+    seed: number,
 };
 
 type Game = {
@@ -45,18 +42,16 @@ type Game = {
     away: GameTeam,
     date: string,
     had_overtime: boolean,
-    is_over: boolean
 };
 
 type GameTeam = {
     id: number,
     name: string,
     seed: number,
-    goals: number
+    goals: number,
 };
 
 type Season = {
-    name: string,
     teams: Array<Team>,
     knockout_rounds: Array<KnockoutRound>,
     upcoming_games: Array<Game>,
@@ -64,8 +59,6 @@ type Season = {
 };
 
 type Competition = {
-    name: string,
-    full_name: string,
     season: Season,
     comp_nav: Array<Array<[number, string]>>,
     competition_type: CompetitionType
@@ -75,8 +68,6 @@ type Competition = {
 export const drawScreen = async (id: number) => {
     const comp: Competition = await invoke("comp_screen_package", { id: id });
     const screen = initialiseContentScreen();
-
-    console.dir(comp.season);
 
     // If the competition is something like playoffs.
     if (comp.competition_type === "Tournament" || comp.competition_type === "KnockoutRound") {
@@ -161,11 +152,11 @@ const drawRoundRobinStandings = (teams: Array<Team>): HTMLTableElement => {
             createElement("td", { "textContent": team.rank }, []),
             createElement("td", {}, [createLink("span", "team", team.id, team.name)]),
             createElement("td", { "textContent": team.games }, []),
-            createElement("td", { "textContent": team.wins }, []),
+            createElement("td", { "textContent": team.regular_wins }, []),
             createElement("td", { "textContent": team.ot_wins }, []),
             createElement("td", { "textContent": team.draws }, []),
             createElement("td", { "textContent": team.ot_losses }, []),
-            createElement("td", { "textContent": team.losses }, []),
+            createElement("td", { "textContent": team.regular_losses }, []),
             createElement("td", { "textContent": team.goals_scored }, []),
             createElement("td", { "textContent": team.goals_conceded }, []),
             createElement("td", { "textContent": team.goal_difference }, []),
