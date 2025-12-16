@@ -1,3 +1,5 @@
+pub mod competition;
+
 use tauri::{AppHandle, Manager as _};
 use tauri_plugin_dialog::DialogExt as _;
 

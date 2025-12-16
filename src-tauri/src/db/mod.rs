@@ -21,13 +21,18 @@ impl AppData {
     }
 }
 
+// Data in a game which is awkward to implement in the database.
 struct MiscData {
     today: Mutex<Date>,
 }
 
 impl Default for MiscData {
     fn default() -> Self {
-        Self { today: Mutex::new(date!(2025-07-01)) }
+        let data = Self {
+            today: Mutex::new(Date::MIN),
+        };
+        data.reset();
+        return data;
     }
 }
 
@@ -45,7 +50,7 @@ impl MiscData {
     }
 
     // Reset the object to its default values.
-    fn default(&self) {
+    fn reset(&self) {
         *self.today.lock().unwrap() = date!(2025-07-01);
     }
 }
@@ -57,7 +62,7 @@ pub struct Directories {
 }
 
 pub struct DbInfo {
-    pool: Db,
+    pub pool: Db,
     pub path: Mutex<String>,   // The path where the database gets saved to and loaded from.
     pub in_sync: Mutex<bool>,  // Keeps track of unsaved changes in the database.
     data: MiscData,
@@ -111,7 +116,7 @@ impl DbInfo {
         ).execute(&mut *tx).await.unwrap();
 
         // Reset the runtime memory stuff.
-        self.data.default();
+        self.data.reset();
     }
 
     // Create the database connection pool.

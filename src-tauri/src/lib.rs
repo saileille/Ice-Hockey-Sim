@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod logic;
+mod packages;
 
 use tauri::{Manager as _, async_runtime::block_on};
 
@@ -25,10 +26,12 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            commands::db::new_database,
-            commands::db::load_database,
-            commands::db::save_database,
-            commands::db::to_main_menu,
+            commands::editor::new_database,
+            commands::editor::load_database,
+            commands::editor::save_database,
+            commands::editor::to_main_menu,
+            commands::editor::competition::comp_select_package,
+            commands::editor::competition::comp_editor_package,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

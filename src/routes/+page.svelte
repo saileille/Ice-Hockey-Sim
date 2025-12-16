@@ -20,5 +20,5 @@
 <main class="container">
     <button disabled>New Game</button>
     <button disabled>Load Game</button>
-    <button><a href="/db">Database Editor</a></button>
+    <button><a href="/editor">Database Editor</a></button>
 </main>
