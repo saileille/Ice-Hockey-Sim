@@ -1,24 +1,18 @@
 mod commands;
 mod db;
 mod logic;
-mod packages;
 
-use tauri::Manager;
+use tauri::{Manager as _, async_runtime::block_on};
 
 use crate::db::initialise;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-
-    // Test stuffs...
-    #[cfg(dev)] {
-        // tests::simulate_to_day("2026-05-01");
-    }
-
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let handle = app.handle();
-            tauri::async_runtime::block_on(async move {
+            block_on(async move {
                 let data = initialise(handle).await;
                 handle.manage(data);
             });
@@ -31,18 +25,10 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            commands::continue_game::go_to_next_day,
-            commands::continue_game::skip_days,
-            commands::top_bar_package,
-            commands::comp_select_package,
-            commands::team_select_package,
-            commands::comp_screen_package,
-            commands::team_screen_package,
-            commands::player_package,
-            commands::create_human_manager,
-            commands::human_package,
-            commands::free_agents_package,
-            commands::offer_contract,
+            commands::db::new_database,
+            commands::db::load_database,
+            commands::db::save_database,
+            commands::db::to_main_menu,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

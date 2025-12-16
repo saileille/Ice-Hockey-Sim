@@ -1,0 +1,21 @@
+-- Delete all non-static data from the database.
+DELETE FROM CompConnection;
+DELETE FROM Competition;
+DELETE FROM Contract;
+DELETE FROM Country;
+DELETE FROM Game;
+DELETE FROM GameEvent;
+DELETE FROM GameRules;
+DELETE FROM KnockoutPair;
+DELETE FROM KnockoutRoundFormat;
+DELETE FROM KnockoutTeam;
+DELETE FROM Manager;
+DELETE FROM Person;
+DELETE FROM Player;
+DELETE FROM Position;
+DELETE FROM RoundRobinFormat;
+DELETE FROM Season;
+DELETE FROM ShotEvent;
+DELETE FROM Team;
+DELETE FROM TeamGame;
+DELETE FROM TeamSeason;

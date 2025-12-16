@@ -1,8 +1,8 @@
 [package]
-name = "ice-hockey-sim"
+name = "icehockeysim2"
 version = "0.1.0"
-description = "Hockey Manager"
-authors = ["saileille"]
+description = "A Tauri App"
+authors = ["you"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,27 +11,23 @@ edition = "2021"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "ice_hockey_sim_lib"
+name = "icehockeysim2_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "*", features = [] }
 
 [dependencies]
-fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs" }
-tauri = { version = "*", features = ["protocol-asset"] }
+tauri = { version = "*", features = [] }
 tauri-plugin-opener = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
-rand = "*"
-lazy_static = "*"
-time = { version = "*", features = ["formatting", "parsing", "macros", "serde"] }
-ordinal = "*"
+tauri-plugin-dialog = "*"
+
+# Self-added.
 sqlx = { version = "*", features = [ "sqlite", "migrate", "runtime-tokio", "time", "json" ] }
-futures = "*"
 dunce = "*"
-futures-util = "*"
-tokio = { version = "*", features = ["macros"] }
+time = { version = "*", features = ["formatting", "parsing", "macros", "serde"] }
 
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.

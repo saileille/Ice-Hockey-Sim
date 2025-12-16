@@ -1,255 +1,242 @@
-// The game database.
-mod competition;
-mod game;
-mod person;
+use std::{collections::HashMap, fs::{self, File}, io::Read, path::{Path, PathBuf}, str::FromStr, sync::Mutex};
+use serde_json::json;
+use sqlx::{migrate, sqlite::{SqliteConnectOptions, SqlitePoolOptions}};
+use tauri::{path::BaseDirectory, AppHandle, Manager as _};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons::YesNo};
+use time::{Date, macros::date};
 
-mod country;
-mod team;
-mod time;
+use crate::logic::Db;
 
-use std::{collections::HashMap, path::Path};
-use rand::rngs::ThreadRng;
-use sqlx::{Sqlite, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
-use tauri::{AppHandle, Manager as TauriManager, path::BaseDirectory};
-use ::time::{macros::date, Date};
-use lazy_static::lazy_static;
-
-use crate::logic::{app_data::{AppData, CountryWeights, Directories}, competition::{Competition, Seed, comp_connection::CompConnection, knockout_generator, round_robin::RoundRobin as RoundRobinFormat, season::ranking::RankCriteria}, country::Country, event, game as match_event, io::{get_countries_from_name_files, remove_db}, person::{attribute::{Attribute, AttributeId}, player::Player}, team::Team, time::{AnnualDate, AnnualWindow}, types::Db};
-
-// Get the current date.
-pub async fn get_today(db: &Db) -> Date {
-    sqlx::query_scalar(
-        "SELECT value_data FROM KeyValue
-        WHERE key_name = 'today'"
-    ).fetch_one(db).await.unwrap()
+pub struct AppData {
+    pub directories: Directories,
+    pub db_info: DbInfo,
 }
 
-// Continue to the next day.
-pub async fn next_day(db: &Db, today: Date) {
-    sqlx::query(
-        "UPDATE KeyValue SET value_data = $1
-        WHERE key_name = 'today'"
-    ).bind(today.next_day().unwrap())
-    .execute(db).await.unwrap();
+impl AppData {
+    fn build(directories: Directories, db_info: DbInfo) -> Self {
+        Self {
+            directories,
+            db_info,
+        }
+    }
 }
 
-lazy_static! {
-    pub static ref ATTRIBUTES: HashMap<AttributeId, Attribute> = {
-         HashMap::from([
-             (AttributeId::Defending, Attribute::build(
-                AttributeId::Defending, 0, 0
-            )),
-            (AttributeId::Shooting, Attribute::build(
-                AttributeId::Shooting, 0, 0
-            )),
-            (AttributeId::Passing, Attribute::build(
-                AttributeId::Passing, 0, 0
-            )),
-            (AttributeId::Faceoffs, Attribute::build(
-                AttributeId::Faceoffs, 0, 0
-            )),
-            (AttributeId::General, Attribute::build(
-                AttributeId::General, 6, 26
-            )),
-        ])
-    };
-
-    pub static ref EVENT_TYPES: HashMap<event::Id, event::Type> = {
-        let e = HashMap::from([
-            // Chance of home team getting the puck. Failure means it goes to away team.
-            (event::Id::PuckPossessionChange, event::Type::build(0.1, 0.5, 0.9)),
-
-            // Chance of attacking team to get a shot at the goal.
-            // Minimum chance is 10 times as low as the equilibrium, maximum chance is 10 times as high.
-            (event::Id::ShotAtGoal, event::Type::build(5.6 / 3600.0, 56.0 / 3600.0, 560.0 / 3600.0)),
-
-            // Chance of a shot going in goal.
-            // NOTE: min_boundary and max_boundary are asymmetrical.
-           (event::Id::Goal, event::Type::build(0.01, 5.5 / 56.0, 0.75))
-        ]);
-        return e;
-    };
+struct MiscData {
+    today: Mutex<Date>,
 }
 
-pub async fn setup(dir: &Path) -> Db {
-    // Database in resource folder.
-    let canonised = dunce::canonicalize(dir).unwrap();
-    let path = canonised.to_str().unwrap();
-    Sqlite::create_database(format!("sqlite://{path}/db.db?mode=rwc").as_str()).await.unwrap();
-    let db = SqlitePoolOptions::new().connect(format!("sqlite://{path}/db.db").as_str()).await.unwrap();
-
-    // Database in memory
-    // Sqlite::create_database(format!("sqlite::memory:").as_str()).await.unwrap();
-    // let db = SqlitePoolOptions::new().connect(format!("sqlite::memory:").as_str()).await.unwrap();
-
-    // Database in src folder (testing only).
-    // Sqlite::create_database(format!("sqlite://data/db.db?mode=rwc").as_str()).await.unwrap();
-    // let db = SqlitePoolOptions::new().connect(format!("sqlite://data/db.db").as_str()).await.unwrap();
-
-    sqlx::migrate!("sql/migrations").run(&db).await.unwrap();
-
-    return db;
+impl Default for MiscData {
+    fn default() -> Self {
+        Self { today: Mutex::new(date!(2025-07-01)) }
+    }
 }
 
-// Initialise the database.
+impl MiscData {
+    // Get a JSON object.
+    fn json(&self) -> serde_json::Value {
+        json!({
+            "today": *self.today.lock().unwrap()
+        })
+    }
+
+    // Replace the existing data.
+    fn overwrite(&self, json: serde_json::Value) {
+        *self.today.lock().unwrap() = serde_json::from_value(json["today"].clone()).unwrap();
+    }
+
+    // Reset the object to its default values.
+    fn default(&self) {
+        *self.today.lock().unwrap() = date!(2025-07-01);
+    }
+}
+
+pub struct Directories {
+    names: PathBuf,
+    flags: PathBuf,
+    pub db: PathBuf,
+}
+
+pub struct DbInfo {
+    pool: Db,
+    pub path: Mutex<String>,   // The path where the database gets saved to and loaded from.
+    pub in_sync: Mutex<bool>,  // Keeps track of unsaved changes in the database.
+    data: MiscData,
+    queries: HashMap<String, String>,
+}
+
+impl DbInfo {
+    fn build(data: Db, path: String) -> Self {
+        Self {
+            pool: data,
+            path: Mutex::new(path),
+            in_sync: Mutex::new(true),
+            data: Default::default(),
+            queries: Self::initialise_queries(),
+        }
+    }
+
+    fn initialise_queries() -> HashMap<String, String> {
+        let mut queries = HashMap::new();
+
+        let buf = PathBuf::from("migrations/more_sql/");
+        let dir = fs::read_dir(&buf).unwrap();
+
+        for entry in dir {
+            // Get the filename.
+            let filename = entry.unwrap().file_name().into_string().unwrap();
+            if !filename.ends_with(".sql") { continue }
+            let key = String::from(&filename[0..filename.len() - 4]);
+
+            // Get the query.
+            let mut sql = String::new();
+            let mut file = File::open(format!("migrations/more_sql/{key}.sql")).unwrap();
+            file.read_to_string(&mut sql).unwrap();
+
+            // Add them together!
+            queries.insert(key, sql);
+        }
+
+        return queries;
+    }
+
+    // Reset the database.
+    pub async fn reset(&self) {
+        self.defer_foreign_keys().await;
+
+        let mut tx = self.pool.begin().await.unwrap();
+
+        // Delete the non-static data from the database.
+        sqlx::query(
+            self.queries.get("delete_data").unwrap()
+        ).execute(&mut *tx).await.unwrap();
+
+        // Reset the runtime memory stuff.
+        self.data.default();
+    }
+
+    // Create the database connection pool.
+    pub async fn init_connection() -> Db {
+        let options = SqliteConnectOptions::from_str("sqlite::memory:").unwrap();
+
+        let data = SqlitePoolOptions::new()
+            .connect_with(options).await.unwrap();
+
+        migrate!("./migrations").run(&data).await.unwrap();
+        return data;
+    }
+
+    // Build the default database file.
+    async fn build_default(path: &Path) -> Self {
+        let data = Self::init_connection().await;
+        let info = Self::build(data, path.to_str().unwrap().to_string());
+        info.save_to_file().await;
+        return info;
+    }
+
+    // Load the default database.
+    async fn load_default(url: &str) -> Self {
+        let data = Self::init_connection().await;
+        let info = Self::build(data, url.to_string());
+        info.load_from_file().await;
+        return info;
+    }
+
+    // Defer the foreign keys before interactions
+    // between in-memory and on-disk databases.
+    async fn defer_foreign_keys(&self) {
+        sqlx::query(
+            "PRAGMA defer_foreign_keys = TRUE"
+        ).execute(&self.pool).await.unwrap();
+    }
+
+    // Save the database to file.
+    pub async fn save_to_file(&self) {
+        // Generate the blob from the database.
+        let blob: Vec<u8> = sqlx::query_scalar(
+            self.queries.get("save_data").unwrap()
+        ).bind(self.data.json())
+        .fetch_one(&self.pool).await.unwrap();
+
+        // Write it on disk as bytes.
+        fs::write(self.path.lock().unwrap().as_str(), &blob).unwrap();
+
+        // The database is now synchronised.
+        *self.in_sync.lock().unwrap() = true;
+    }
+
+    // Load the database from file.
+    pub async fn load_from_file(&self) {
+        // Load the blob from the database file.
+        let blob = fs::read(self.path.lock().unwrap().as_str()).unwrap();
+
+        self.defer_foreign_keys().await;
+
+        let mut tx = self.pool.begin().await.unwrap();
+
+        // Delete all previous data from the database.
+        sqlx::query(
+            self.queries.get("delete_data").unwrap()
+        ).execute(&mut *tx).await.unwrap();
+
+        // Insert the blob's data into the database.
+        let json: serde_json::Value = sqlx::query_scalar(
+            self.queries.get("insert_data").unwrap()
+        ).bind(&blob)
+        .fetch_one(&mut *tx).await.unwrap();
+
+        tx.commit().await.unwrap();
+
+        // Overwrite the in-memory data.
+        self.data.overwrite(json);
+
+        // The database is now synchronised.
+        *self.in_sync.lock().unwrap() = true;
+    }
+
+    // A pop-up dialog that reminds the user about unsaved changes.
+    pub async fn remind_save_dialog(&self, handle: &AppHandle) {
+        if *self.in_sync.lock().unwrap() { return; }
+        let save_changes = handle.dialog()
+            .message("You have unsaved changes. Do you want to save them before continuing?")
+            .title("Unsaved Changes")
+            .buttons(YesNo)
+            .blocking_show();
+
+        if !save_changes { return; }
+        self.save_to_file().await;
+    }
+}
+
+impl Directories {
+    fn build(data_dir: PathBuf) -> Self {
+        let dirs = Self {
+            names: data_dir.join("names/"),
+            flags: data_dir.join("flags/"),
+            db: data_dir.join("db/"),
+        };
+
+        return dirs;
+    }
+}
+
+// Load the default database.
 pub async fn initialise(handle: &AppHandle) -> AppData {
-    let mut data = create_dir_paths(handle).await;
-
-    // Creating the start date and saving it to the database.
-    let today = date!(2025-07-01);
-    sqlx::query(
-        "INSERT INTO KeyValue (key_name, value_data)
-        VALUES ('today', $1)"
-    ).bind(today)
-    .execute(&data.db).await.unwrap();
-
-    let mut rng = rand::rng();
-
-    add_competitions(&data.db, &mut rng, today).await;
-    initialise_seasons(&data.db).await;
-    create_countries(&data).await;
-
-    data.country_weights = CountryWeights::build(&data.db).await;
-
-    let teams = Team::fetch_all(&data.db).await;
-    generate_free_agent_players(&data, today, &teams).await;
-    setup_teams(&data, today, teams).await;
-
-    return data
-}
-
-// Create the resource directory paths.
-async fn create_dir_paths(handle: &AppHandle) -> AppData {
-    let data_dir = handle.path().resolve("data/", BaseDirectory::Resource).unwrap();
-    let people_name_dir = data_dir.join("names/");
-    let flag_dir = data_dir.join("flags/");
-
-    let directories = Directories {
-        names: people_name_dir.to_str().unwrap().to_string(),
-        flags: flag_dir.to_str().unwrap().to_string(),
-        db: data_dir.to_str().unwrap().to_string(),
-    };
-
-    remove_db(&directories);
-
-    let db = setup(&data_dir.as_path()).await;
-    return AppData::build(db, directories);
-}
-
-// Add competitions.
-// NOTE: Season window of the parent competition MUST go at least one day past the last day of the last stage.
-// Otherwise some contracts might expire before the last match day is played.
-async fn add_competitions(db: &Db, rng: &mut ThreadRng, today: Date) {
-    let now = std::time::Instant::now();
-
-    Competition::build_and_save(
-        db, today,
-        "PHL",
-        vec![
-            Team::build("Ruiske"),     // 1
-            Team::build("Atomi"),      // 2
-            Team::build("Uupuneet"),   // 3
-            Team::build("SantaClaus"), // 4
-            Team::build("HardCore"),   // 5
-            Team::build("Ikirouta"),   // 6
-            Team::build("Kelarotat"),  // 7
-            Team::build("Vety"),       // 8
-            Team::build("Saappaat"),   // 9
-            Team::build("Siat"),       // 10
-            Team::build("Turmio"),     // 11
-            Team::build("Sirkus"),     // 12
-            Team::build("Polkka"),     // 13
-            Team::build("Teurastus"),  // 14
-        ],
-        AnnualWindow::build(
-            AnnualDate::build(9, 1),
-            AnnualDate::build(6, 1)
-        ),
-        Vec::new(),
-        0,
-        None,
-        None,
-        None,
-        vec![RankCriteria::ChildCompRanking],
-        vec![
-            Competition::build_and_save(
-                db, today,
-                "Regular Season",
-                Vec::new(),
-                AnnualWindow::build(
-                    AnnualDate::build(9, 1),
-                    AnnualDate::build(3, 31)
-                ),
-                Vec::new(),
-                14,
-                Some(match_event::Rules::build_and_save(db, 3, 1200, 300, false).await),
-                Some(RoundRobinFormat::build_and_save(db, 4, 0, 3, 2, 1, 1, 0).await),
-                None,
-                vec![
-                    RankCriteria::Points,
-                    RankCriteria::GoalDifference,
-                    RankCriteria::GoalsScored,
-                    RankCriteria::TotalWins,
-                    RankCriteria::RegularWins,
-                    RankCriteria::OvertimeWins,
-                    RankCriteria::Draws,
-                    RankCriteria::RegularLosses,
-                ],
-                Vec::new(),
-            ).await,
-            knockout_generator::build(
-                db, rng, today,
-                "Playoffs",
-                vec!["Pity Round"],
-                AnnualWindow::build(
-                    AnnualDate::build(4, 1),
-                    AnnualDate::build(5, 31)
-                ),
-                vec![match_event::Rules::build_and_save(db, 3, 1200, 0, true).await],
-                vec![2, 4],
-                vec![10],
-                1,
-                vec![CompConnection::build(1, 1, 10, Seed::GetFromPosition, false)],
-                vec![RankCriteria::Seed],
-            ).await
-        ],
-    ).await;
-
-    println!("Added competitions in {:.2?}", now.elapsed());
-}
-
-// Set up seasons for the first time, starting from the parent competitions and going down the hierarchy.
-async fn initialise_seasons(db: &Db) {
-    let now = std::time::Instant::now();
-    let comps = Competition::fetch_parents(db).await;
-    for comp in comps {
-        comp.setup_season(db, &mut Vec::new()).await;
+    #[cfg(debug_assertions)] {
+        let path = Path::new("data/db/default.db");
+        if !path.exists() {
+            DbInfo::build_default(path).await;
+            panic!("default database created, program must terminate");
+        }
     }
-    println!("Initialised seasons in {:.2?}", now.elapsed());
-}
 
-async fn create_countries(data: &AppData) {
-    let now = std::time::Instant::now();
-    let country_names = get_countries_from_name_files(&data.directories);
-    for name in country_names.iter() {
-        Country::build_and_save(&data.directories, &data.db, name).await;
-    }
-    println!("Created countries in {:.2?}", now.elapsed());
-}
+    let data_dir = handle
+        .path()
+        .resolve("data/", BaseDirectory::Resource)
+        .unwrap();
 
-// Generate a certain amount of free agents per team.
-async fn generate_free_agent_players(data: &AppData, today: Date, teams: &[Team]) {
-    let now = std::time::Instant::now();
-    for _ in 0..teams.len() * 50 {
-        Player::build_and_save(data, today, 16, 35).await;
-    }
-    println!("Generated free agents in {:.2?}", now.elapsed());
-}
+    let directories = Directories::build(data_dir);
+    let default_db = directories.db.join("default.db");
 
-async fn setup_teams(data: &AppData, today: Date, teams: Vec<Team>) {
-    let now = std::time::Instant::now();
-    for mut team in teams.into_iter() {
-        team.setup(data, today).await;
-    }
-    println!("Set up teams in {:.2?}", now.elapsed());
+    let db_info = DbInfo::load_default(default_db.to_str().unwrap()).await;
+    return AppData::build(directories, db_info);
 }
